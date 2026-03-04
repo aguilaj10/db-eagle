@@ -46,3 +46,9 @@ local.properties
 
 # Kotlin compiler
 .kotlin/
+
+# Sisyphus - ignore all except tracked directories
+.sisyphus/*
+!.sisyphus/evidence/
+!.sisyphus/notepads/
+!.sisyphus/plans/

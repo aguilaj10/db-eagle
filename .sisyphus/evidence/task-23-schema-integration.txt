@@ -1,0 +1,23 @@
+Task 23 - Schema browser integration (load schema → tree view)
+
+Implementation summary:
+- Replaced Schema Browser mock tree with live schema from active connected driver.
+- On entering Schema Browser tab (and when active connection changes), loads schema via driver.getSchema().
+- Tree sections: Tables, Views, Indexes.
+- Columns are lazy-loaded on table expansion via driver.getColumns(tableName).
+- Caching:
+  - Schema cache TTL: 5 minutes.
+  - Column cache TTL: 5 minutes per table.
+  - Manual refresh button clears caches and reloads schema.
+- No active connection: shows empty state text.
+- Failures: surfaced via AlertDialog and statusText updates.
+
+Files changed:
+- app/src/main/kotlin/com/dbeagle/App.kt
+- app/src/main/kotlin/com/dbeagle/ui/SchemaTree.kt
+
+Verification:
+- ./gradlew :app:compileKotlin test
+
+Result:
+- BUILD SUCCESSFUL
