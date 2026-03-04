@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.compose) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.spotless)
+    alias(libs.plugins.detekt)
 }
 
 dependencies {
@@ -65,5 +66,20 @@ spotless {
         target("**/*.gradle.kts")
         targetExclude("**/build/**")
         ktlint()
+    }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("$rootDir/detekt.yml"))
+    parallel = true
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    reports {
+        html.required.set(true)
+        xml.required.set(false)
+        txt.required.set(false)
     }
 }
