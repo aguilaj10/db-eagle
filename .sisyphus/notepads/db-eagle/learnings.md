@@ -1489,3 +1489,10 @@ try {
 - Tests use runBlocking (not runTest) for DatabaseDriver suspend functions in data module
 - ConnectionProfile requires encryptedPassword field (not password)
 - SQLiteDriver.disconnect() closes connection (not close())
+
+## Task 28: ER Diagram Generator (FK Relationships)
+- Chosen structure: `ERDiagram(nodes, edges)` where nodes are `ERTableNode(schema, table)` and edges are `ERForeignKeyEdge(from, fromColumn, to, toColumn)`.
+- Rationale:
+  - Minimal and renderer-friendly: Task 29 can position nodes and draw edges without needing full column metadata.
+  - Reuses existing driver output: `SchemaMetadata.tables` provides schema for nodes; `SchemaMetadata.foreignKeys` provides FK endpoints/columns.
+  - Single-schema constraint: since `ForeignKeyRelationship` has no schema fields, edge filtering is based on table names present in the selected schema’s `TableMetadata` list.
