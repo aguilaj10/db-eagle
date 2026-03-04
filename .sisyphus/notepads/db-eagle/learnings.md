@@ -1496,3 +1496,12 @@ try {
   - Minimal and renderer-friendly: Task 29 can position nodes and draw edges without needing full column metadata.
   - Reuses existing driver output: `SchemaMetadata.tables` provides schema for nodes; `SchemaMetadata.foreignKeys` provides FK endpoints/columns.
   - Single-schema constraint: since `ForeignKeyRelationship` has no schema fields, edge filtering is based on table names present in the selected schema’s `TableMetadata` list.
+
+## ER Diagram Layout and Compose Desktop
+- In Compose Desktop without `ui-test` libraries, testing `createComposeRule` is not natively possible without adding specific Robolectric/compose-test-desktop test frameworks. Created a basic unit test verifying the model setup instead for compilation smoke check.
+- Custom drawing logic in `Canvas` (`withTransform`, `translate`, `scale`) needs to rely on standard `androidx.compose.ui.graphics.drawscope` extensions which can get slightly complex when drawing paths like arrowheads and calculating boundaries on pure geometric offsets.
+
+### Task 29: ER Diagram Render Evidence
+- Generated ER Diagram PNG evidence deterministically using Compose Desktop `ImageComposeScene`.
+- We can wrap the Compose view within a `Surface(color = Color.White)` to provide a proper background when rendering headless.
+- Skia's `Image.encodeToData(EncodedImageFormat.PNG)` effectively gets the bytes that we can write to disk directly without needing intermediate BufferedImage or AWT types.
