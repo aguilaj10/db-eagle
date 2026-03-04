@@ -2541,3 +2541,69 @@ release:
 **Commit**: `658df03 docs: create landing page with download links`
 - Included: `docs/` folder (HTML + assets), README update, evidence screenshot, learnings
 - Clean working tree after commit
+
+### Gradle Test Output Corruption Prevention (2026-03-04)
+
+**Context**: Gradle's test result XML generation can fail with `EOFException` (Kryo buffer underflow) when test output is excessive or malformed.
+
+**Key Learning**: TestContainers (and similar logging-heavy frameworks) can corrupt Gradle's test output stream if not configured properly.
+
+#### Symptoms of Corrupted Test Output Stream
+1. Build fails during XML generation phase (after tests execute)
+2. Error: "Could not write XML test results for [TestClass] to file [...]"
+3. Stack trace shows: `java.io.EOFException` → `KryoException: Buffer underflow`
+4. Zero-byte XML files generated in `build/test-results/test/`
+5. Binary test results exist but cannot be deserialized
+
+#### Root Causes
+- **Excessive stdout/stderr**: Frameworks like TestContainers log heavily during setup
+- **Malformed output**: Non-UTF8 characters, binary data, or control characters in test output
+- **Println statements**: Direct console output from tests bypassing JUnit's output capture
+- **Parallel test execution**: Interleaved output from concurrent tests can corrupt Kryo serialization
+
+#### Solution Pattern
+1. **Suppress test logging** in Gradle:
+   ```kotlin
+   tasks.test {
+       useJUnitPlatform()
+       testLogging {
+           showStandardStreams = false  // Critical for TestContainers
+       }
+       maxParallelForks = 1  // Prevent output interleaving
+   }
+   ```
+
+2. **Remove println from tests**: Use JUnit's `TestReporter` or logger frameworks instead
+   - ❌ `println("Skipping test: Docker unavailable")`
+   - ✅ Silent `return` or use proper test skip mechanisms
+
+3. **Silent exception handling in teardown**:
+   ```kotlin
+   @AfterTest
+   fun teardown() {
+       try { cleanup() } 
+       catch (e: Exception) { /* Ignore - already in cleanup phase */ }
+   }
+   ```
+
+4. **Configure framework logging**: For TestContainers, set SLF4J binding to control output
+   - Already resolved in Task 10 (slf4j-simple added as testRuntimeOnly)
+
+#### When to Apply This Pattern
+- Any test suite using TestContainers, Docker clients, or container orchestration
+- Tests that spawn subprocesses or external services
+- Integration tests with verbose third-party libraries
+- CI/CD environments where test output capture is critical
+
+#### Best Practices
+- **Never** use `println()` in production test code
+- **Always** configure `showStandardStreams = false` for integration test modules
+- **Prefer** silent returns over print-based skip notifications
+- **Test XML generation** explicitly: check for 0-byte files after test runs
+- **Verify** with `./gradlew test --rerun-tasks` (forces full test execution, no caching)
+
+#### Related Patterns
+- TestContainers graceful skip pattern (Task 6, Task 8)
+- SLF4J logging configuration (Task 10)
+- Headless environment constraints (Task 39, 40, 41)
+

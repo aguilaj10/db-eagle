@@ -49,7 +49,7 @@ local.properties
 
 # Sisyphus - ignore all except tracked directories
 .sisyphus/*
-!.sisyphus/evidence/
+.sisyphus/evidence/
 !.sisyphus/notepads/
 !.sisyphus/plans/
 /.sisyphus/evidence/task-24-data-edit.txt

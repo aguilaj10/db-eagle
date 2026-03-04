@@ -34,8 +34,7 @@ class PostgreSQLDriverTest {
                 seedSchema(postgresContainer!!)
             }
         } catch (e: Exception) {
-            println("Warning: Could not start PostgreSQL container. Docker may not be available.")
-            println("Tests will be skipped. Error: ${e.message}")
+            // Docker not available - tests will be skipped
             dockerAvailable = false
         }
     }
@@ -45,23 +44,20 @@ class PostgreSQLDriverTest {
         try {
             DatabaseConnectionPool.closeAllPools()
         } catch (e: Exception) {
-            println("Warning: Error closing pools: ${e.message}")
+            // Ignore cleanup errors
         }
 
         try {
             postgresContainer?.stop()
             postgresContainer = null
         } catch (e: Exception) {
-            println("Warning: Error stopping container: ${e.message}")
+            // Ignore cleanup errors
         }
     }
 
     @Test
     fun testExecuteQuerySelect1() = kotlinx.coroutines.runBlocking {
-        if (!dockerAvailable) {
-            println("Skipping testExecuteQuerySelect1: Docker not available")
-            return@runBlocking
-        }
+        if (!dockerAvailable) return@runBlocking
 
         val container = postgresContainer!!
         val driver = PostgreSQLDriver()
@@ -78,10 +74,7 @@ class PostgreSQLDriverTest {
 
     @Test
     fun testExecuteQuerySelectUsersColumns() = kotlinx.coroutines.runBlocking {
-        if (!dockerAvailable) {
-            println("Skipping testExecuteQuerySelectUsersColumns: Docker not available")
-            return@runBlocking
-        }
+        if (!dockerAvailable) return@runBlocking
 
         val container = postgresContainer!!
         val driver = PostgreSQLDriver()
@@ -102,10 +95,7 @@ class PostgreSQLDriverTest {
 
     @Test
     fun testMetadataTablesColumnsForeignKeysAndSchema() = kotlinx.coroutines.runBlocking {
-        if (!dockerAvailable) {
-            println("Skipping testMetadataTablesColumnsForeignKeysAndSchema: Docker not available")
-            return@runBlocking
-        }
+        if (!dockerAvailable) return@runBlocking
 
         val container = postgresContainer!!
         val driver = PostgreSQLDriver()

@@ -25,4 +25,10 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    
+    testLogging {
+        showStandardStreams = false
+    }
+    
+    maxParallelForks = 1
 }

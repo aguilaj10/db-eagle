@@ -8,7 +8,6 @@ testcontainers = "1.19.7"
 kotlinx-coroutines = "1.8.1"
 cryptography-kotlin = "0.3.1"
 kover = "0.8.2"
-jvm-target = "17"
 postgresql = "42.7.3"
 sqlite-jdbc = "3.46.1.3"
 

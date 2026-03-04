@@ -2,11 +2,11 @@
 leakDetectionThresholdMs=30000
 openedConnections=10
 sleptMs=35000
-elapsedMs=35293
+elapsedMs=35433
 repoRoot=/home/jonathan/desarrollo/db-eagle
 
 --- Captured WARN excerpt (Hikari leak detection) ---
-05:13:49.537 [DBEagle-Task 33 Leak Detection-task-33- housekeeper] WARN com.zaxxer.hikari.pool.ProxyLeakTask -- Connection leak detection triggered for org.sqlite.jdbc4.JDBC4Connection@63998bf4 on thread Test worker, stack trace follows
+10:39:11.462 [DBEagle-Task 33 Leak Detection-task-33- housekeeper] WARN com.zaxxer.hikari.pool.ProxyLeakTask -- Connection leak detection triggered for org.sqlite.jdbc4.JDBC4Connection@6eb33eed on thread Test worker, stack trace follows
 java.lang.Exception: Apparent connection leak detected
 	at com.zaxxer.hikari.HikariDataSource.getConnection(HikariDataSource.java:99)
 	at com.dbeagle.pool.DatabaseConnectionPool.getConnection(DatabaseConnectionPool.kt:57)

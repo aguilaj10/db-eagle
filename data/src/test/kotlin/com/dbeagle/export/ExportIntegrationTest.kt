@@ -107,9 +107,6 @@ class ExportIntegrationTest {
         exporter.export(outputFile, queryResult, queryResult.resultSet, null)
         
         val content = outputFile.readText()
-        println("CSV Content length: ${content.length}")
-        println("CSV Content:\n$content")
-        println("---End of content---")
         
         assertTrue(content.contains("id,text"))
         assertTrue(content.contains("\"value with, comma\""))

@@ -21,8 +21,7 @@ class DatabaseConnectionPoolTest {
             postgresContainer?.start()
             dockerAvailable = postgresContainer?.isRunning == true
         } catch (e: Exception) {
-            println("Warning: Could not start PostgreSQL container. Docker may not be available.")
-            println("Tests will be skipped. Error: ${e.message}")
+            // Docker not available - tests will be skipped
             dockerAvailable = false
         }
     }
@@ -32,23 +31,20 @@ class DatabaseConnectionPoolTest {
         try {
             DatabaseConnectionPool.closeAllPools()
         } catch (e: Exception) {
-            println("Warning: Error closing pools: ${e.message}")
+            // Ignore cleanup errors
         }
         
         try {
             postgresContainer?.stop()
             postgresContainer = null
         } catch (e: Exception) {
-            println("Warning: Error stopping container: ${e.message}")
+            // Ignore cleanup errors
         }
     }
 
     @Test
     fun testPoolIsCreatedLazily() {
-        if (!dockerAvailable) {
-            println("Skipping testPoolIsCreatedLazily: Docker not available")
-            return
-        }
+        if (!dockerAvailable) return
 
         val container = postgresContainer!!
         val profile = ConnectionProfile(
@@ -75,10 +71,7 @@ class DatabaseConnectionPoolTest {
 
     @Test
     fun testGetConnectionReturnsValidConnection() {
-        if (!dockerAvailable) {
-            println("Skipping testGetConnectionReturnsValidConnection: Docker not available")
-            return
-        }
+        if (!dockerAvailable) return
 
         val container = postgresContainer!!
         val profile = ConnectionProfile(
@@ -108,10 +101,7 @@ class DatabaseConnectionPoolTest {
 
     @Test
     fun testPoolReusesSameDataSource() {
-        if (!dockerAvailable) {
-            println("Skipping testPoolReusesSameDataSource: Docker not available")
-            return
-        }
+        if (!dockerAvailable) return
 
         val container = postgresContainer!!
         val profile = ConnectionProfile(
@@ -137,10 +127,7 @@ class DatabaseConnectionPoolTest {
 
     @Test
     fun testClosePoolRemovesPool() {
-        if (!dockerAvailable) {
-            println("Skipping testClosePoolRemovesPool: Docker not available")
-            return
-        }
+        if (!dockerAvailable) return
 
         val container = postgresContainer!!
         val profile = ConnectionProfile(
@@ -167,10 +154,7 @@ class DatabaseConnectionPoolTest {
 
     @Test
     fun testClosePoolByIdRemovesPool() {
-        if (!dockerAvailable) {
-            println("Skipping testClosePoolByIdRemovesPool: Docker not available")
-            return
-        }
+        if (!dockerAvailable) return
 
         val container = postgresContainer!!
         val profile = ConnectionProfile(
@@ -197,10 +181,7 @@ class DatabaseConnectionPoolTest {
 
     @Test
     fun testCloseAllPoolsRemovesAllPools() {
-        if (!dockerAvailable) {
-            println("Skipping testCloseAllPoolsRemovesAllPools: Docker not available")
-            return
-        }
+        if (!dockerAvailable) return
 
         val container = postgresContainer!!
         val profile1 = ConnectionProfile(
@@ -242,10 +223,7 @@ class DatabaseConnectionPoolTest {
 
     @Test
     fun testMultipleProfilesCreateSeparatePools() {
-        if (!dockerAvailable) {
-            println("Skipping testMultipleProfilesCreateSeparatePools: Docker not available")
-            return
-        }
+        if (!dockerAvailable) return
 
         val container = postgresContainer!!
         val profile1 = ConnectionProfile(
@@ -285,10 +263,7 @@ class DatabaseConnectionPoolTest {
 
     @Test
     fun testClosePoolIsIdempotent() {
-        if (!dockerAvailable) {
-            println("Skipping testClosePoolIsIdempotent: Docker not available")
-            return
-        }
+        if (!dockerAvailable) return
 
         val container = postgresContainer!!
         val profile = ConnectionProfile(
@@ -314,10 +289,7 @@ class DatabaseConnectionPoolTest {
 
     @Test
     fun testConnectionPoolHandlesInvalidCredentials() {
-        if (!dockerAvailable) {
-            println("Skipping testConnectionPoolHandlesInvalidCredentials: Docker not available")
-            return
-        }
+        if (!dockerAvailable) return
 
         val container = postgresContainer!!
         val profile = ConnectionProfile(
