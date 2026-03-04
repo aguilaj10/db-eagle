@@ -6,16 +6,19 @@ import com.dbeagle.model.ForeignKeyRelationship
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.TableMetadata
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.transactions.transaction
+import java.io.PrintWriter
 import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.SQLException
+import java.sql.SQLFeatureNotSupportedException
+import java.util.logging.Logger
 import javax.sql.DataSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.transactions.transaction
 
 class SQLiteDriver : DatabaseDriver {
     private var config: ConnectionConfig? = null
@@ -359,18 +362,18 @@ private class NonClosingConnectionDataSource(
         password: String?,
     ): Connection = getConnection()
 
-    override fun getLogWriter(): java.io.PrintWriter? = null
+    override fun getLogWriter(): PrintWriter? = null
 
-    override fun setLogWriter(out: java.io.PrintWriter?) {}
+    override fun setLogWriter(out: PrintWriter?) {}
 
     override fun setLoginTimeout(seconds: Int) {}
 
     override fun getLoginTimeout(): Int = 0
 
-    override fun getParentLogger(): java.util.logging.Logger = java.util.logging.Logger
+    override fun getParentLogger(): Logger = Logger
         .getGlobal()
 
-    override fun <T : Any?> unwrap(iface: Class<T>?): T = throw java.sql.SQLFeatureNotSupportedException()
+    override fun <T : Any?> unwrap(iface: Class<T>?): T = throw SQLFeatureNotSupportedException()
 
     override fun isWrapperFor(iface: Class<*>?): Boolean = false
 

@@ -4,9 +4,11 @@ import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.QueryResult
 import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.ui.SchemaTreeNode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
 class SessionViewModel(
     private val closePool: suspend (profileId: String) -> Unit = { DatabaseConnectionPool.closePool(it) },
@@ -96,7 +98,7 @@ class SessionViewModel(
         val driver = drivers.remove(profileId)
         if (driver != null) {
             try {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     driver.disconnect()
                 }
             } catch (_: Exception) {
@@ -104,7 +106,7 @@ class SessionViewModel(
         }
 
         try {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 closePool(profileId)
             }
         } catch (_: Exception) {

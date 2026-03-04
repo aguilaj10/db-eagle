@@ -7,13 +7,17 @@ import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.TableMetadata
 import com.dbeagle.pool.DatabaseConnectionPool
+import java.io.PrintWriter
+import java.sql.Connection
+import java.sql.DatabaseMetaData
+import java.sql.ResultSet
+import java.sql.SQLException
+import java.sql.SQLFeatureNotSupportedException
+import java.util.logging.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.sql.Connection
-import java.sql.ResultSet
-import java.sql.SQLException
 
 class PostgreSQLDriver : DatabaseDriver {
     private var config: ConnectionConfig? = null
@@ -148,7 +152,7 @@ class PostgreSQLDriver : DatabaseDriver {
                         while (rs.next()) {
                             val name = rs.getString("COLUMN_NAME")
                             val type = rs.getString("TYPE_NAME")
-                            val nullable = rs.getInt("NULLABLE") != java.sql.DatabaseMetaData.columnNoNulls
+                            val nullable = rs.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls
                             val defaultValue = rs.getString("COLUMN_DEF")
                             add(
                                 ColumnMetadata(
@@ -312,18 +316,18 @@ private class PoolBackedDataSource(
         password: String?,
     ): Connection = getConnection()
 
-    override fun getLogWriter(): java.io.PrintWriter? = null
+    override fun getLogWriter(): PrintWriter? = null
 
-    override fun setLogWriter(out: java.io.PrintWriter?) {}
+    override fun setLogWriter(out: PrintWriter?) {}
 
     override fun setLoginTimeout(seconds: Int) {}
 
     override fun getLoginTimeout(): Int = 0
 
-    override fun getParentLogger(): java.util.logging.Logger = java.util.logging.Logger
+    override fun getParentLogger(): Logger = Logger
         .getGlobal()
 
-    override fun <T : Any?> unwrap(iface: Class<T>?): T = throw java.sql.SQLFeatureNotSupportedException()
+    override fun <T : Any?> unwrap(iface: Class<T>?): T = throw SQLFeatureNotSupportedException()
 
     override fun isWrapperFor(iface: Class<*>?): Boolean = false
 }
