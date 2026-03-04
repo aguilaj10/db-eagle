@@ -1943,3 +1943,10 @@ val repoRoot = generateSequence(File(System.getProperty("user.dir"))) { it.paren
 ## Keyboard Shortcuts and Focus
 - **OS Key Repeats**: When implementing keyboard shortcuts in Compose Desktop, using `KeyEventType.KeyDown` can lead to multiple triggerings if the user holds the keys down due to OS-level key repeat events. Always prefer `KeyEventType.KeyUp` for simple commands (like Ctrl+N, Ctrl+Enter) unless continuous triggering is desired.
 - **Focus Modifiers**: The order of modifiers matters for focus. For a focus border to update reliably, `onFocusChanged` should ideally be attached to the specific element that receives focus or in the right order within the modifier chain of a focusable parent.
+
+## Task 37: Application Icon + Branding
+- Kept generated icons in `app/src/main/resources/icons`.
+- Wired them into `app/build.gradle.kts` using `compose.desktop { application { nativeDistributions { ... } } }`.
+- Removed the duplicated `application` Gradle plugin block to prevent the 'run task already exists' conflict between the standard Application plugin and Compose Desktop's application DSL block.
+- Removed out-of-scope IDE and generator script files.
+

@@ -1,0 +1,1 @@
+Icon generated and wired via app/build.gradle.kts using nativeDistributions in compose.desktop. Screen captures impossible in headless mode.

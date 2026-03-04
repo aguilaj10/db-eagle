@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.compose)
     alias(libs.plugins.kotlin.compose)
-    application
 }
 
 dependencies {
@@ -30,6 +29,27 @@ tasks.test {
     useJUnitPlatform()
 }
 
-application {
-    mainClass.set("com.dbeagle.AppKt")
+compose.desktop {
+    application {
+        mainClass = "com.dbeagle.AppKt"
+        nativeDistributions {
+            targetFormats(
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
+            )
+            packageName = "DBEagle"
+            packageVersion = "1.0.0"
+
+            macOS {
+                iconFile.set(project.file("src/main/resources/icons/icon.icns"))
+            }
+            windows {
+                iconFile.set(project.file("src/main/resources/icons/icon.ico"))
+            }
+            linux {
+                iconFile.set(project.file("src/main/resources/icons/icon_512x512.png"))
+            }
+        }
+    }
 }

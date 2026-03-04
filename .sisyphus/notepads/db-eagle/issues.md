@@ -193,3 +193,7 @@ All scaffolding goals achieved:
 ### Task 36 - Headless profiling limitation (Expected)
 
 Cannot measure UI FPS / rendering performance in this headless environment; relying on code-level virtualization (LazyColumn) + compile/test verification.
+
+## Task 37: Application Icon + Branding
+- Headless environment prevented capturing an actual screenshot of the running app icon. Generated the icon files headlessly using Java Graphics2D and struct.pack for ICO/ICNS generation, and relied on text evidence.
+
