@@ -1,6 +1,7 @@
 package com.dbeagle.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -11,6 +12,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -27,6 +30,7 @@ fun SQLEditor(
     isRunning: Boolean,
     onClear: () -> Unit,
     onSaveToFavorites: () -> Unit,
+    onCancel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var highlights by remember {
@@ -45,38 +49,60 @@ fun SQLEditor(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        // Toolbar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(onClick = onRun, enabled = !isRunning) {
-                if (isRunning) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
-                    )
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp && 
+                    event.key == Key.Enter && 
+                    (event.isCtrlPressed || event.isMetaPressed)) {
+                    if (!isRunning) {
+                        onRun()
+                    }
+                    true
                 } else {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Run Query")
+                    false
                 }
-                Spacer(Modifier.width(4.dp))
-                Text(if (isRunning) "Running" else "Run")
             }
-            OutlinedButton(onClick = onClear) {
-                Icon(Icons.Default.Clear, contentDescription = "Clear")
-                Spacer(Modifier.width(4.dp))
-                Text("Clear")
-            }
-            OutlinedButton(onClick = onSaveToFavorites) {
-                Icon(Icons.Default.Favorite, contentDescription = "Save")
-                Spacer(Modifier.width(4.dp))
-                Text("Save")
-            }
-        }
+    ) {
+        // Toolbar
+         Row(
+             modifier = Modifier
+                 .fillMaxWidth()
+                 .background(MaterialTheme.colorScheme.surfaceVariant)
+                 .padding(8.dp),
+             horizontalArrangement = Arrangement.spacedBy(8.dp)
+         ) {
+             Button(onClick = onRun, enabled = !isRunning) {
+                 if (isRunning) {
+                     CircularProgressIndicator(
+                         modifier = Modifier.size(18.dp),
+                         strokeWidth = 2.dp
+                     )
+                 } else {
+                     Icon(Icons.Default.PlayArrow, contentDescription = "Run Query")
+                 }
+                 Spacer(Modifier.width(4.dp))
+                 Text(if (isRunning) "Running" else "Run")
+             }
+             if (isRunning) {
+                 OutlinedButton(onClick = onCancel) {
+                     Icon(Icons.Default.Clear, contentDescription = "Cancel")
+                     Spacer(Modifier.width(4.dp))
+                     Text("Cancel")
+                 }
+             }
+             OutlinedButton(onClick = onClear) {
+                 Icon(Icons.Default.Clear, contentDescription = "Clear")
+                 Spacer(Modifier.width(4.dp))
+                 Text("Clear")
+             }
+             OutlinedButton(onClick = onSaveToFavorites) {
+                 Icon(Icons.Default.Favorite, contentDescription = "Save")
+                 Spacer(Modifier.width(4.dp))
+                 Text("Save")
+             }
+         }
 
         HorizontalDivider()
 
@@ -104,16 +130,29 @@ fun SQLEditor(
             }
 
             // Code Editor
-            CodeEditText(
-                highlights = highlights,
-                onValueChange = { newSql ->
-                    highlights = highlights.getBuilder().code(newSql).build()
-                    onSqlChange(newSql)
-                },
+            var isFocused by remember { mutableStateOf(false) }
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(8.dp)
-            )
+                    .border(
+                        width = if (isFocused) 2.dp else 1.dp,
+                        color = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        shape = MaterialTheme.shapes.small
+                    )
+            ) {
+                CodeEditText(
+                    highlights = highlights,
+                    onValueChange = { newSql ->
+                        highlights = highlights.getBuilder().code(newSql).build()
+                        onSqlChange(newSql)
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp)
+                        .onFocusChanged { isFocused = it.hasFocus }
+                )
+            }
         }
     }
 }

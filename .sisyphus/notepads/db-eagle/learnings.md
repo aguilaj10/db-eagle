@@ -1907,3 +1907,34 @@ val repoRoot = generateSequence(File(System.getProperty("user.dir"))) { it.paren
 - **Observation:** When wrapping Compose DB actions into coroutines, `CancellationException` needs explicit catch-blocks or to be allowed to bubble up if we are swallowing `Exception`. Otherwise, canceling a `Job` (like hitting a Cancel button on an active query) may trigger an generic error state rather than a clean cancellation state in UI.
 - **Pattern:** Always use `withContext(Dispatchers.IO)` around `driver.*` calls and `QueryExecutor` because standard JDBC/DB drivers block the thread. Leaving them in the main Compose coroutine scope (which defaults to Main) leads to severe UI freezes on slow remote connections.
 - Compose coroutine cancellation flows should always rethrow or cleanly catch `CancellationException` before a broad `Exception` catch block to avoid surfacing task cancellation as an application error.
+
+### Task 35 - Keyboard Shortcuts + Accessibility Basics
+
+#### Shortcuts in Compose Desktop
+- `onPreviewKeyEvent` is the preferred way to capture keyboard shortcuts globally or locally.
+- For global shortcuts, attach the `onPreviewKeyEvent` to the top-level `Window` component. This ensures the shortcuts are handled before child components intercept them.
+- To handle cross-platform Ctrl/Cmd combinations, use `event.isCtrlPressed || event.isMetaPressed`. This automatically covers Windows/Linux (Ctrl) and macOS (Cmd).
+- Ensure to check `event.type == KeyEventType.KeyDown` so actions aren't triggered multiple times (e.g. once on Down, once on Up).
+
+#### Focus Indicators in Compose Desktop
+- Compose 1.6+ provides `Modifier.focusable()`, but when wrapping custom components (like `CodeEditText` from external libraries), manually managing focus visual state provides better control.
+- Pattern used:
+  ```kotlin
+  var isFocused by remember { mutableStateOf(false) }
+  Box(
+      modifier = Modifier
+          .border(
+              width = if (isFocused) 2.dp else 1.dp,
+              color = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+          )
+          .onFocusChanged { isFocused = it.hasFocus }
+  ) {
+      // Child component
+  }
+  ```
+- This ensures Tab navigation correctly displays a visible outline on the focused element, conforming to accessibility standards.
+
+
+## Keyboard Shortcuts and Focus
+- **OS Key Repeats**: When implementing keyboard shortcuts in Compose Desktop, using `KeyEventType.KeyDown` can lead to multiple triggerings if the user holds the keys down due to OS-level key repeat events. Always prefer `KeyEventType.KeyUp` for simple commands (like Ctrl+N, Ctrl+Enter) unless continuous triggering is desired.
+- **Focus Modifiers**: The order of modifiers matters for focus. For a focus border to update reliably, `onFocusChanged` should ideally be attached to the specific element that receives focus or in the right order within the modifier chain of a focusable parent.

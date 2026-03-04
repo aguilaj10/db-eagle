@@ -1,5 +1,11 @@
 package com.dbeagle
 
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -83,6 +89,7 @@ fun main() {
         val historyRepository = remember { FileQueryHistoryRepository() }
         val favoritesRepository = remember { FileFavoritesRepository() }
         var showSaveFavoriteDialog by remember { mutableStateOf(false) }
+        var triggerNewConnection by remember { mutableStateOf(false) }
 
         if (showSaveFavoriteDialog) {
             SaveFavoriteDialog(
@@ -104,7 +111,31 @@ fun main() {
         Window(
             onCloseRequest = ::exitApplication,
             title = "DB Eagle",
-            state = windowState
+            state = windowState,
+            onPreviewKeyEvent = { event ->
+                if (event.type == KeyEventType.KeyUp && (event.isCtrlPressed || event.isMetaPressed)) {
+                    when (event.key) {
+                        Key.N -> {
+                            selectedTab = NavigationTab.Connections
+                            triggerNewConnection = true
+                            true
+                        }
+                        Key.W -> {
+                            activeProfileId?.let { pid ->
+                                appCoroutineScope.launch {
+                                    sessionViewModel.closeSession(pid)
+                                }
+                            }
+                            true
+                        }
+                        Key.Comma -> {
+                            selectedTab = NavigationTab.Settings
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
         ) {
             MaterialTheme {
                 Scaffold(
@@ -187,7 +218,10 @@ fun main() {
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Button(
-                                    onClick = { /* Placeholder: New Connection */ },
+                                    onClick = { 
+                                        selectedTab = NavigationTab.Connections
+                                        triggerNewConnection = true
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text("New Connection")
@@ -281,6 +315,8 @@ fun main() {
                                             onStatusTextChanged = { statusText = it },
                                             snackbarHostState = snackbarHostState,
                                             coroutineScope = appCoroutineScope,
+                                            triggerNewConnection = triggerNewConnection,
+                                            onNewConnectionTriggered = { triggerNewConnection = false }
                                         )
                                     }
                                     NavigationTab.QueryEditor -> {

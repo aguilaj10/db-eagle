@@ -43,6 +43,8 @@ fun ConnectionManagerScreen(
     onStatusTextChanged: (String) -> Unit = {},
     snackbarHostState: SnackbarHostState,
     coroutineScope: CoroutineScope,
+    triggerNewConnection: Boolean = false,
+    onNewConnectionTriggered: () -> Unit = {}
 ) {
     var masterPassword by remember { mutableStateOf<String?>(null) }
     
@@ -57,6 +59,8 @@ fun ConnectionManagerScreen(
             onStatusTextChanged = onStatusTextChanged,
             snackbarHostState = snackbarHostState,
             coroutineScope = coroutineScope,
+            triggerNewConnection = triggerNewConnection,
+            onNewConnectionTriggered = onNewConnectionTriggered
         )
     }
 }
@@ -100,6 +104,8 @@ fun ConnectionListScreen(
     onStatusTextChanged: (String) -> Unit,
     snackbarHostState: SnackbarHostState,
     coroutineScope: CoroutineScope,
+    triggerNewConnection: Boolean = false,
+    onNewConnectionTriggered: () -> Unit = {}
 ) {
     val repository = remember(masterPassword) {
         PreferencesBackedConnectionProfileRepository(
@@ -121,6 +127,14 @@ fun ConnectionListScreen(
     var showDialog by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
     var connectingJob by remember { mutableStateOf<Job?>(null) }
+
+    LaunchedEffect(triggerNewConnection) {
+        if (triggerNewConnection) {
+            editingProfile = null
+            showDialog = true
+            onNewConnectionTriggered()
+        }
+    }
 
     fun refreshProfiles() {
         coroutineScope.launch {

@@ -167,3 +167,25 @@ All scaffolding goals achieved:
 
 **Known gap**: `DatabaseDriver.getColumns(table: String)` does not accept schema.
 - Impact: For DBs with multiple schemas, lazy column loading may need a future driver API change.
+
+### Task 34 - SQLEditor onCancel Parameter (RESOLVED)
+
+**Issue**: Compilation error in `App.kt` - `SQLEditor(...)` call passing `onCancel` parameter but function signature did not accept it.
+- Error: Type mismatch: expected different parameter signature
+- Call site: App.kt lines 345-444 (QueryEditor tab)
+- Location: onCancel callback provided at line 355-359
+
+**Root Cause**: Function signature mismatch - `App.kt` was calling `SQLEditor(onCancel = { ... })` but `SQLEditor.kt` did not have the parameter.
+
+**Solution**: 
+1. Added `onCancel: () -> Unit = {}` parameter to `SQLEditor` composable signature (line 30)
+2. Implemented Cancel button that appears ONLY when `isRunning == true` (lines 70-76)
+3. Button uses existing Material3 OutlinedButton with Clear icon and "Cancel" label
+4. Default empty lambda allows backward compatibility if needed
+
+**Verification**:
+- `./gradlew :app:compileKotlin` → BUILD SUCCESSFUL
+- `./gradlew test` → BUILD SUCCESSFUL (16 actionable tasks)
+- All 4 Kotlin modules compile without errors
+- Call site in App.kt now resolves without compilation errors
+- Cancel button conditionally renders only during query execution (isRunning == true)
