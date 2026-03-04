@@ -9,7 +9,7 @@ hikaricp = "5.1.0"
 testcontainers = "1.19.7"
 kotlinx-coroutines = "1.10.2"
 cryptography-kotlin = "0.3.1"
-kover = "0.8.2"
+kover = "0.9.7"
 postgresql = "42.7.3"
 sqlite-jdbc = "3.46.1.3"
 
