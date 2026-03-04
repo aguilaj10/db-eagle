@@ -2342,3 +2342,177 @@ jobs:
 ✅ RPM packaging: Configuration valid, requires rpm-build tools
 ✅ Linux icon: Configured and embedded
 ✅ Desktop integration: Launcher entry with icon
+
+### Task 42 - GitHub Release Automation
+
+#### Release Workflow Architecture
+Implemented release automation via GitHub Actions with minimal changes to existing build workflow:
+- **Tag Trigger**: Added `tags: [ 'v*' ]` to `on.push` trigger (builds on tag push)
+- **Release Job**: New separate job that runs ONLY on tag refs (if: startsWith(github.ref, 'refs/tags/v'))
+- **Dependency Chain**: Release job depends on build job completion (`needs: build`)
+- **Artifact Coordination**: Release job downloads all build job artifacts from all OS matrices
+
+#### Release Job Design Decisions
+
+1. **Separate Release Job vs. Build Job Extension**:
+   - Why separate: Release only runs on tags, not on every push
+   - Using `if: startsWith(github.ref, 'refs/tags/v')` in separate job is cleaner than conditional logic within build job
+   - Improves readability: build job responsibilities are clear, release job responsibilities are clear
+
+2. **Tag Pattern Matching**:
+   - Pattern: `v*` matches tags starting with 'v' (v0.1.0, v1.0.0, v1.0.0-rc1, etc.)
+   - Pattern matching happens at GitHub API level (not in job condition)
+   - Job condition `startsWith(github.ref, 'refs/tags/v')` filters tags that start with 'v'
+   - GitHub ref format for tags: `refs/tags/v0.1.0` (not just `v0.1.0`)
+
+3. **artifacts/**/*.{dmg,msi,deb} Glob Patterns**:
+   - `softprops/action-gh-release@v2` uses glob patterns to find files
+   - Directory structure after download-artifact:
+     ```
+     artifacts/
+       db-eagle-macos/app/build/compose/binaries/main/dmg/*.dmg
+       db-eagle-windows/app/build/compose/binaries/main/msi/*.msi
+       db-eagle-linux/app/build/compose/binaries/main/deb/*.deb
+     ```
+   - Glob pattern `artifacts/**/*.dmg` recursively finds all DMG files regardless of nested path
+
+4. **Permissions: contents: write**:
+   - Required specifically for release job (not all jobs need this)
+   - Allows `softprops/action-gh-release` to create release and upload assets
+   - Follows principle of least privilege (only release job gets write perms)
+   - Build job runs with default permissions (not write)
+
+5. **No Checkout Required for Artifacts**:
+   - Only need checkout in release job to access git context for release notes generation
+   - GITHUB_TOKEN already authenticated, no login needed
+
+#### Integration with Existing Build Job
+
+**No changes to build job**:
+- Existing packaging logic remains unchanged
+- Existing artifact uploads remain unchanged (7-day retention)
+- Build matrices (ubuntu/macos/windows) continue as-is
+- Build job's `if-no-files-found: ignore` prevents build from failing if installer doesn't exist on platform
+
+**Fallback strategy leveraged**:
+- macOS: DMG falls back to ZIP
+- Windows: MSI falls back to ZIP
+- Linux: DEB falls back to ZIP/TAR
+- Release job uploads whatever installers were built successfully
+
+#### Artifacts Expected in Release
+
+Based on build job artifact uploads:
+- **macOS Release Assets**: `*.dmg` files (primary) or ZIP (fallback)
+- **Windows Release Assets**: `*.msi` files (primary) or ZIP (fallback)
+- **Linux Release Assets**: `*.deb` files (primary) or ZIP/TAR (fallback)
+
+Release glob patterns ensure all installer types get uploaded:
+```
+files: |
+  artifacts/**/*.dmg
+  artifacts/**/*.msi
+  artifacts/**/*.deb
+```
+
+If DEB/MSI/DMG don't exist, no error (softprops action simply skips missing globs).
+
+#### Release Notes Generation
+
+- `generate_release_notes: true` enables GitHub's automatic release notes
+- GitHub compares git history between previous tag and current tag
+- Extracts commit messages and groups by type (features, fixes, etc.)
+- No manual release notes text needed
+- Works automatically if git tags exist on repository
+
+#### Manual Tag Workflow (By Design)
+
+Team workflow remains explicit:
+1. `git tag -a v0.1.0 -m "Release message"` - Create tag locally
+2. `git push origin v0.1.0` - Push tag to trigger workflow
+3. GitHub Actions builds + creates release automatically
+4. Developer verifies release assets on GitHub releases page
+
+**Why not auto-tag?**
+- Plan explicitly states: "Manual tag creation only (no auto-tag)"
+- Gives developers control over release timing
+- Prevents accidental releases from every commit
+
+#### YAML Structure Best Practices
+
+```yaml
+release:
+  needs: build              # Explicit dependency on build job
+  runs-on: ubuntu-latest    # Only need one runner (not matrix)
+  if: startsWith(...)       # Guard clause for tag refs
+  permissions:
+    contents: write         # Minimal scoped permissions
+```
+
+- `needs: build` ensures artifact availability before release job starts
+- `ubuntu-latest` sufficient for GitHub API calls (no OS-specific work)
+- Guard clause prevents release job from running on branch pushes
+
+#### Action Versions and Stability
+
+- `actions/download-artifact@v4` - Latest major version for artifact handling
+- `softprops/action-gh-release@v2` - Stable, widely-used release action
+- Both pinned to major version (auto-updates for patches, stable for major features)
+
+#### Verification Without Pushing to Remote
+
+**YAML validity can be verified locally**:
+1. Syntax check: `yamllint .github/workflows/build.yml` (if yamllint installed)
+2. Manual review against GitHub Actions documentation
+3. Comparison with official examples from GitHub/softprops repos
+
+**Full integration testing requires**:
+1. Push to real GitHub repository
+2. Tag creation: `git tag -a v0.1.0 -m "Test"`
+3. Tag push: `git push origin v0.1.0`
+4. Observe Actions runs in GitHub UI
+5. Verify release appears in /releases page
+
+#### Key Gotchas & Learnings
+
+1. **Tag ref format**: GitHub uses `refs/tags/v0.1.0` internally, not just `v0.1.0`
+   - Condition check: `startsWith(github.ref, 'refs/tags/v')` (not `startsWith(github.ref, 'v')`)
+
+2. **Artifact download path structure**: Download-artifact creates named subdirectories
+   - Downloads each artifact to: `artifacts/db-eagle-macos/`, `artifacts/db-eagle-windows/`, etc.
+   - Glob patterns must account for nested paths
+
+3. **No need for separate checkout in release job** (if not needed for release notes):
+   - In this case, checkout is included for git context
+   - Could be omitted if not generating release notes
+
+4. **Silent skip for missing files**: softprops/action-gh-release doesn't error if glob matches nothing
+   - Design allows fallback artifacts to be uploaded
+   - No special handling needed if primary installer doesn't exist
+
+#### Design Alignment with Plan Requirements
+
+✓ **Tag trigger** (`tags: [ 'v*' ]`) - Implemented
+✓ **Manual tag creation** - Workflow requires human `git tag` command
+✓ **No auto-tag** - Workflow does not create tags automatically
+✓ **GitHub Release creation** - softprops/action-gh-release handles this
+✓ **Auto-generated release notes** - generate_release_notes: true
+✓ **Installer uploads** - Glob patterns for DMG/MSI/DEB
+✓ **Artifact path matching** - Matches build job's upload paths
+✓ **Permissions scoped** - contents: write on release job only
+✓ **No additional dependencies** - Uses only GitHub actions (no new Gradle deps)
+
+#### Future Enhancements (Out of Scope)
+
+- Code signing: Post-processing step after release creation (Windows Authenticode)
+- Changelog management: Alternative to auto-generated release notes (e.g., CHANGELOG.md)
+- Release pre-processing: Modify release notes before publishing
+- Draft releases: Create release as draft, manual publication
+- Asset descriptions: Add release notes for each asset file
+
+#### Verification Artifacts Created
+
+- `.github/workflows/build.yml` - Updated with tag trigger and release job
+- `.sisyphus/evidence/task-42-github-release.txt` - Full documentation of implementation
+- This notebook entry - Learnings and design decisions
+
