@@ -1,5 +1,6 @@
 package com.dbeagle
 
+import com.dbeagle.navigation.NavigationTab
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -106,15 +107,6 @@ private fun readMemoryStats(): MemoryStats {
         totalBytes = total,
         maxBytes = max,
     )
-}
-
-enum class NavigationTab(val title: String) {
-    Connections("Connections"),
-    QueryEditor("Query Editor"),
-    SchemaBrowser("Schema Browser"),
-    Favorites("Favorites"),
-    History("History"),
-    Settings("Settings"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
