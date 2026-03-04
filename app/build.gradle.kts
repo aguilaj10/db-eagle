@@ -90,6 +90,13 @@ compose.desktop {
                     }
                 }
             }
+            windows {
+                iconFile.set(project.file("src/main/resources/icons/icon.ico"))
+                
+                // MSI installer configuration
+                menuGroup = "DBEagle"
+                upgradeUuid = "3e4f5c6b-7d8a-9b1c-2d3e-4f5a6b7c8d9e"
+            }
             linux {
                 iconFile.set(project.file("src/main/resources/icons/icon_512x512.png"))
             }

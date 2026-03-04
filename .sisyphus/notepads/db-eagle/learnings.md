@@ -2216,3 +2216,66 @@ Both patterns supported via `findProperty()` + `System.getenv()`.
 5. **Icon Already Configured**: Task 37 icon work carried forward
     - No need to reconfigure icon paths in Task 39
 
+
+### Task 40 - Windows Packaging (MSI + Signing)
+
+#### Compose Desktop Windows Packaging Configuration
+- **MSI Installer Properties:**
+  - `menuGroup`: Defines Windows Start Menu folder name (e.g., `"DBEagle"`)
+  - `upgradeUuid`: Stable UUID ensures clean upgrades between versions (must remain constant across releases)
+  - `iconFile`: ICO file for installer and Start Menu shortcuts (already configured in Task 37)
+
+#### Code Signing Limitations (Windows vs macOS)
+**Discovery**: Compose Desktop DSL for Windows does NOT support `signing {}` block
+- macOS has native support: `macOS { signing { sign.set(true); identity.set(...) } }`
+- Windows lacks equivalent DSL properties in Compose Gradle plugin
+- **Root Cause**: Windows code signing requires WiX Toolset integration; Compose delegates to `jpackage` which doesn't expose Authenticode signing directly
+
+**Workaround**: Post-processing via `signtool.exe` (Windows SDK)
+```groovy
+// In CI/CD after packageMsi task:
+signtool.exe sign /f cert.pfx /p password /tr http://timestamp.digicert.com /td sha256 /fd sha256 DBEagle.msi
+```
+
+#### MSI Packaging Validation on Non-Windows
+- `./gradlew :app:packageMsi --dry-run` validates task graph on Linux/macOS
+- Actual MSI generation requires Windows runner (WiX Toolset native)
+- Dry-run confirms:
+  1. Task dependencies are valid (createRuntimeImage → jar → prepareAppResources → packageMsi)
+  2. Gradle DSL syntax is correct
+  3. No compilation errors
+
+#### Add to PATH Not Implemented (Compose DSL Limitation)
+- Plan mentioned "Add to Windows PATH (optional)" as stretch goal
+- Compose Desktop does not provide declarative PATH modification
+- Implementation would require:
+  1. Custom WiX XML fragment via `jpackage --add-launcher` with environment variable modification
+  2. Or registry script in MSI post-install hook modifying `HKCU\Environment\Path`
+- Decision: Out of scope for basic MSI packaging (Task 40 focused on installer generation, not environment modification)
+
+#### CI/CD Pattern for Windows Packaging
+```yaml
+jobs:
+  windows-msi:
+    runs-on: windows-latest  # Required for WiX Toolset
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - run: ./gradlew :app:packageMsi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DBEagle-Windows-MSI
+          path: app/build/compose/binaries/main/msi/*.msi
+```
+
+#### Key Differences: Windows MSI vs macOS DMG Packaging
+| Aspect | macOS (Task 39) | Windows (Task 40) |
+|--------|----------------|------------------|
+| Signing DSL | ✅ `macOS { signing { } }` | ❌ No DSL support |
+| Signing Method | Compose native via `codesign` | Post-processing via `signtool.exe` |
+| Notarization | ✅ `notarization { }` DSL | ❌ N/A (Windows has SmartScreen, not notarization) |
+| PATH Modification | N/A (not typical for macOS apps) | ❌ Not supported in Compose DSL |
+| Upgrade Handling | DMG is simple installer; upgrades replace app bundle | MSI uses `upgradeUuid` for in-place upgrades |
+

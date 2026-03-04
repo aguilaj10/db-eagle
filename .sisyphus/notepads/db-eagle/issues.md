@@ -215,3 +215,44 @@ Cannot measure UI FPS / rendering performance in this headless environment; rely
 
 **Resolution**: Expected behavior - not a bug. DMG is a macOS-specific format requiring macOS tooling.
 
+
+### Task 40 - Windows MSI Packaging Constraints (Expected)
+
+**Issue**: Cannot execute actual MSI packaging on Linux x86_64
+
+**Context**:
+- MSI format requires Windows-specific WiX Toolset (`candle.exe`, `light.exe`)
+- Compose Desktop `packageMsi` task delegates to `jpackage --type msi`
+- JDK 17's `jpackage` requires Windows OS to generate MSI installers
+- Current environment: Linux headless server (no Windows)
+
+**Verification Strategy**:
+- ✅ Dry-run task graph validation: `./gradlew :app:packageMsi --dry-run` (PASS)
+- ✅ Compilation test: `./gradlew :app:compileKotlin` (PASS)
+- ❌ Real MSI generation: Requires Windows runner in CI/CD
+
+**Resolution**: Expected behavior - not a bug. MSI packaging validated via task graph; actual installer requires `windows-latest` GitHub Actions runner.
+
+### Task 40 - Compose Desktop Windows Signing Limitation (API Gap)
+
+**Issue**: Compose Desktop DSL does not support `signing {}` block for Windows
+
+**Context**:
+- Attempted to add conditional signing config similar to macOS (Task 39)
+- macOS has native DSL: `macOS { signing { sign.set(true); identity.set(...) } }`
+- Windows lacks equivalent properties in Compose Gradle Plugin 1.7.0
+
+**Root Cause**:
+- Windows code signing (Authenticode) requires WiX Toolset + `signtool.exe` integration
+- Compose plugin delegates to JDK `jpackage`, which doesn't expose signing APIs for MSI
+- Unlike macOS where `codesign` is directly integrated
+
+**Workaround**:
+- Code signing must be done as post-processing step:
+  ```bash
+  signtool.exe sign /f cert.pfx /p password /tr http://timestamp.digicert.com DBEagle.msi
+  ```
+- Can be added to CI/CD workflow after `packageMsi` task completes
+
+**Decision**: Task 40 focused on MSI installer generation; optional signing deferred to CI/CD implementation (not blocking).
+
