@@ -2521,3 +2521,23 @@ release:
 - Configured for GitHub Pages serving from `/docs` folder at `https://aguilaj10.github.io/db-eagle/`.
 - Download buttons link directly to GitHub Releases latest: `https://github.com/aguilaj10/db-eagle/releases/latest`.
 - Screenshots from `.sisyphus/evidence` and branding icons were copied to `docs/assets/`.
+
+### Task 43: Landing Page Evidence Capture
+
+**Date**: 2026-03-04
+
+**Method**: Used headless Chrome to capture landing page screenshot
+- Playwright MCP server timeout issues in this environment
+- Fallback: `google-chrome-stable --headless --screenshot` worked perfectly
+- Command: `google-chrome-stable --headless --disable-gpu --screenshot=.sisyphus/evidence/task-43-landing-page.png --window-size=1920,1080 http://localhost:4173/`
+- Result: 92KB PNG screenshot successfully captured
+
+**Verification**:
+- All 3 download buttons correctly link to `https://github.com/aguilaj10/db-eagle/releases/latest`
+- GitHub button correctly links to `https://github.com/aguilaj10/db-eagle`
+- Local server was running on port 4173 (PID tracked in `/tmp/db-eagle-docs-http.pid`)
+- Page returned HTTP 200 with complete HTML
+
+**Commit**: `658df03 docs: create landing page with download links`
+- Included: `docs/` folder (HTML + assets), README update, evidence screenshot, learnings
+- Clean working tree after commit
