@@ -27,18 +27,22 @@ object ErrorHandler {
     /**
      * Log an error to the local file with timestamp and stack trace.
      */
-    private fun logError(message: String, throwable: Throwable? = null) {
+    private fun logError(
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         try {
             val timestamp = LocalDateTime.now().format(dateFormatter)
-            val logEntry = buildString {
-                append("[$timestamp] $message\n")
-                if (throwable != null) {
-                    val sw = StringWriter()
-                    throwable.printStackTrace(PrintWriter(sw))
-                    append(sw.toString())
+            val logEntry =
+                buildString {
+                    append("[$timestamp] $message\n")
+                    if (throwable != null) {
+                        val sw = StringWriter()
+                        throwable.printStackTrace(PrintWriter(sw))
+                        append(sw.toString())
+                    }
+                    append("\n")
                 }
-                append("\n")
-            }
             logFile.appendText(logEntry)
         } catch (e: Exception) {
             // Silently fail if logging fails (don't crash the app)
@@ -57,13 +61,13 @@ object ErrorHandler {
         snackbarHostState: SnackbarHostState,
         scope: CoroutineScope,
         message: String,
-        throwable: Throwable? = null
+        throwable: Throwable? = null,
     ) {
         logError("Query Error: $message", throwable)
         scope.launch {
             snackbarHostState.showSnackbar(
                 message = message,
-                duration = SnackbarDuration.Long
+                duration = SnackbarDuration.Long,
             )
         }
     }
@@ -75,7 +79,10 @@ object ErrorHandler {
      * @param throwable Optional throwable to log
      * @return The formatted error message for the dialog
      */
-    fun getConnectionErrorMessage(message: String, throwable: Throwable? = null): String {
+    fun getConnectionErrorMessage(
+        message: String,
+        throwable: Throwable? = null,
+    ): String {
         logError("Connection Error: $message", throwable)
         return message
     }
@@ -85,7 +92,10 @@ object ErrorHandler {
      * @param message The error message to log
      * @param throwable Optional throwable to log
      */
-    fun logGeneralError(message: String, throwable: Throwable? = null) {
+    fun logGeneralError(
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         logError("General Error: $message", throwable)
     }
 
@@ -102,14 +112,15 @@ object ErrorHandler {
         scope: CoroutineScope,
         message: String,
         actionLabel: String,
-        onAction: () -> Unit
+        onAction: () -> Unit,
     ) {
         scope.launch {
-            val result = snackbarHostState.showSnackbar(
-                message = message,
-                actionLabel = actionLabel,
-                duration = SnackbarDuration.Long
-            )
+            val result =
+                snackbarHostState.showSnackbar(
+                    message = message,
+                    actionLabel = actionLabel,
+                    duration = SnackbarDuration.Long,
+                )
             if (result == SnackbarResult.ActionPerformed) {
                 onAction()
             }

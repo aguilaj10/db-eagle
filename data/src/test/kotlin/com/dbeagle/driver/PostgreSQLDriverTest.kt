@@ -19,11 +19,12 @@ class PostgreSQLDriverTest {
     @BeforeTest
     fun setup() {
         try {
-            postgresContainer = PostgreSQLContainer("postgres:15-alpine")
-                .withDatabaseName("testdb")
-                .withUsername("testuser")
-                .withPassword("testpass")
-                .withStartupTimeoutSeconds(60)
+            postgresContainer =
+                PostgreSQLContainer("postgres:15-alpine")
+                    .withDatabaseName("testdb")
+                    .withUsername("testuser")
+                    .withPassword("testpass")
+                    .withStartupTimeoutSeconds(60)
 
             postgresContainer?.start()
             dockerAvailable = postgresContainer?.isRunning == true
@@ -114,7 +115,7 @@ class PostgreSQLDriverTest {
                     it.toTable == "users" &&
                     it.toColumn == "id"
             },
-            "Expected orders.user_id -> users.id foreign key"
+            "Expected orders.user_id -> users.id foreign key",
         )
 
         val schema = driver.getSchema()
@@ -127,22 +128,23 @@ class PostgreSQLDriverTest {
 }
 
 private fun connectionConfig(container: PostgreSQLContainer<*>): ConnectionConfig {
-    val profile = ConnectionProfile(
-        id = "test-postgres-driver",
-        name = "Test PostgreSQL Driver",
-        type = DatabaseType.PostgreSQL,
-        host = container.host,
-        port = container.firstMappedPort,
-        database = container.databaseName,
-        username = container.username,
-        encryptedPassword = "",
-        options = mapOf("password" to container.password)
-    )
+    val profile =
+        ConnectionProfile(
+            id = "test-postgres-driver",
+            name = "Test PostgreSQL Driver",
+            type = DatabaseType.PostgreSQL,
+            host = container.host,
+            port = container.firstMappedPort,
+            database = container.databaseName,
+            username = container.username,
+            encryptedPassword = "",
+            options = mapOf("password" to container.password),
+        )
 
     return ConnectionConfig(
         profile = profile,
         connectionTimeoutSeconds = 30,
-        queryTimeoutSeconds = 60
+        queryTimeoutSeconds = 60,
     )
 }
 
@@ -157,7 +159,7 @@ private fun seedSchema(container: PostgreSQLContainer<*>) {
                     name TEXT NOT NULL,
                     email TEXT
                 );
-                """.trimIndent()
+                """.trimIndent(),
             )
             st.execute(
                 """
@@ -167,7 +169,7 @@ private fun seedSchema(container: PostgreSQLContainer<*>) {
                     total_cents INTEGER NOT NULL,
                     CONSTRAINT fk_orders_users FOREIGN KEY (user_id) REFERENCES users(id)
                 );
-                """.trimIndent()
+                """.trimIndent(),
             )
             st.execute("TRUNCATE TABLE orders RESTART IDENTITY;")
             st.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE;")

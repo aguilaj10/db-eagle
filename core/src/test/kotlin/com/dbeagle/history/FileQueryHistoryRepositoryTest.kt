@@ -19,13 +19,13 @@ class FileQueryHistoryRepositoryTest {
         val entry1 = QueryHistoryEntry(
             query = "SELECT * FROM users",
             durationMs = 100,
-            connectionProfileId = "profile1"
+            connectionProfileId = "profile1",
         )
         Thread.sleep(10)
         val entry2 = QueryHistoryEntry(
             query = "SELECT * FROM orders",
             durationMs = 200,
-            connectionProfileId = "profile2"
+            connectionProfileId = "profile2",
         )
 
         repo.add(entry1)
@@ -40,15 +40,15 @@ class FileQueryHistoryRepositoryTest {
     @Test
     fun `persistence survives repository re-instantiation`() {
         val historyFile = File(tempDir, "history.json")
-        
+
         val repo1 = FileQueryHistoryRepository(historyFile)
         repeat(5) { i ->
             repo1.add(
                 QueryHistoryEntry(
                     query = "SELECT $i FROM test",
                     durationMs = (i * 10).toLong(),
-                    connectionProfileId = "profile$i"
-                )
+                    connectionProfileId = "profile$i",
+                ),
             )
         }
 
@@ -64,19 +64,19 @@ class FileQueryHistoryRepositoryTest {
     fun `clear removes all entries and persists empty state`() {
         val historyFile = File(tempDir, "history.json")
         val repo1 = FileQueryHistoryRepository(historyFile)
-        
+
         repeat(3) { i ->
             repo1.add(
                 QueryHistoryEntry(
                     query = "SELECT $i",
                     durationMs = 10,
-                    connectionProfileId = "profile"
-                )
+                    connectionProfileId = "profile",
+                ),
             )
         }
-        
+
         assertEquals(3, repo1.getAll().size)
-        
+
         repo1.clear()
         assertEquals(0, repo1.getAll().size)
 
@@ -88,11 +88,11 @@ class FileQueryHistoryRepositoryTest {
     fun `getAll returns empty list when file does not exist`() {
         val historyFile = File(tempDir, "nonexistent.json")
         assertFalse(historyFile.exists())
-        
+
         val repo = FileQueryHistoryRepository(historyFile)
         assertTrue(historyFile.delete())
         assertFalse(historyFile.exists())
-        
+
         val entries = repo.getAll()
         assertTrue(entries.isEmpty())
     }
@@ -101,18 +101,18 @@ class FileQueryHistoryRepositoryTest {
     fun `add creates parent directory if missing`() {
         val nestedDir = File(tempDir, "nested/dir")
         val historyFile = File(nestedDir, "history.json")
-        
+
         assertFalse(nestedDir.exists())
-        
+
         val repo = FileQueryHistoryRepository(historyFile)
         repo.add(
             QueryHistoryEntry(
                 query = "SELECT 1",
                 durationMs = 10,
-                connectionProfileId = "profile"
-            )
+                connectionProfileId = "profile",
+            ),
         )
-        
+
         assertTrue(historyFile.exists())
         assertEquals(1, repo.getAll().size)
     }

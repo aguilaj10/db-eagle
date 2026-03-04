@@ -3,8 +3,6 @@ package com.dbeagle.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Favorite
@@ -31,7 +29,7 @@ fun SQLEditor(
     onClear: () -> Unit,
     onSaveToFavorites: () -> Unit,
     onCancel: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var highlights by remember {
         mutableStateOf(
@@ -39,7 +37,7 @@ fun SQLEditor(
                 .code(sql)
                 .language(SyntaxLanguage.DEFAULT)
                 .theme(SyntaxThemes.atom(darkMode = true))
-                .build()
+                .build(),
         )
     }
 
@@ -53,9 +51,10 @@ fun SQLEditor(
         modifier = modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && 
-                    event.key == Key.Enter && 
-                    (event.isCtrlPressed || event.isMetaPressed)) {
+                if (event.type == KeyEventType.KeyUp &&
+                    event.key == Key.Enter &&
+                    (event.isCtrlPressed || event.isMetaPressed)
+                ) {
                     if (!isRunning) {
                         onRun()
                     }
@@ -63,46 +62,46 @@ fun SQLEditor(
                 } else {
                     false
                 }
-            }
+            },
     ) {
         // Toolbar
-         Row(
-             modifier = Modifier
-                 .fillMaxWidth()
-                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                 .padding(8.dp),
-             horizontalArrangement = Arrangement.spacedBy(8.dp)
-         ) {
-             Button(onClick = onRun, enabled = !isRunning) {
-                 if (isRunning) {
-                     CircularProgressIndicator(
-                         modifier = Modifier.size(18.dp),
-                         strokeWidth = 2.dp
-                     )
-                 } else {
-                     Icon(Icons.Default.PlayArrow, contentDescription = "Run Query")
-                 }
-                 Spacer(Modifier.width(4.dp))
-                 Text(if (isRunning) "Running" else "Run")
-             }
-             if (isRunning) {
-                 OutlinedButton(onClick = onCancel) {
-                     Icon(Icons.Default.Clear, contentDescription = "Cancel")
-                     Spacer(Modifier.width(4.dp))
-                     Text("Cancel")
-                 }
-             }
-             OutlinedButton(onClick = onClear) {
-                 Icon(Icons.Default.Clear, contentDescription = "Clear")
-                 Spacer(Modifier.width(4.dp))
-                 Text("Clear")
-             }
-             OutlinedButton(onClick = onSaveToFavorites) {
-                 Icon(Icons.Default.Favorite, contentDescription = "Save")
-                 Spacer(Modifier.width(4.dp))
-                 Text("Save")
-             }
-         }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(onClick = onRun, enabled = !isRunning) {
+                if (isRunning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Run Query")
+                }
+                Spacer(Modifier.width(4.dp))
+                Text(if (isRunning) "Running" else "Run")
+            }
+            if (isRunning) {
+                OutlinedButton(onClick = onCancel) {
+                    Icon(Icons.Default.Clear, contentDescription = "Cancel")
+                    Spacer(Modifier.width(4.dp))
+                    Text("Cancel")
+                }
+            }
+            OutlinedButton(onClick = onClear) {
+                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                Spacer(Modifier.width(4.dp))
+                Text("Clear")
+            }
+            OutlinedButton(onClick = onSaveToFavorites) {
+                Icon(Icons.Default.Favorite, contentDescription = "Save")
+                Spacer(Modifier.width(4.dp))
+                Text("Save")
+            }
+        }
 
         HorizontalDivider()
 
@@ -114,7 +113,7 @@ fun SQLEditor(
                 modifier = Modifier
                     .width(48.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(vertical = 16.dp)
+                    .padding(vertical = 16.dp),
             ) {
                 for (i in 1..lineCount) {
                     Text(
@@ -123,8 +122,8 @@ fun SQLEditor(
                         textAlign = TextAlign.End,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
                     )
                 }
             }
@@ -138,8 +137,8 @@ fun SQLEditor(
                     .border(
                         width = if (isFocused) 2.dp else 1.dp,
                         color = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        shape = MaterialTheme.shapes.small
-                    )
+                        shape = MaterialTheme.shapes.small,
+                    ),
             ) {
                 CodeEditText(
                     highlights = highlights,
@@ -150,7 +149,7 @@ fun SQLEditor(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(8.dp)
-                        .onFocusChanged { isFocused = it.hasFocus }
+                        .onFocusChanged { isFocused = it.hasFocus },
                 )
             }
         }

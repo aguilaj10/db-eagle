@@ -6,5 +6,5 @@ import kotlinx.serialization.Serializable
 data class ConnectionConfig(
     val profile: ConnectionProfile,
     val connectionTimeoutSeconds: Int = 30,
-    val queryTimeoutSeconds: Int = 60
+    val queryTimeoutSeconds: Int = 60,
 )

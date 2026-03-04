@@ -5,7 +5,6 @@ import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.ForeignKeyRelationship
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
-import com.dbeagle.model.TableMetadata
 
 interface DatabaseDriver {
     /**
@@ -23,7 +22,10 @@ interface DatabaseDriver {
      * Executes a query with optional parameters and returns the result.
      * [sql] is the query string; [params] are optional parameter values for prepared statements.
      */
-    suspend fun executeQuery(sql: String, params: List<Any> = emptyList()): QueryResult
+    suspend fun executeQuery(
+        sql: String,
+        params: List<Any> = emptyList(),
+    ): QueryResult
 
     /**
      * Retrieves complete schema metadata including tables, views, indexes, and foreign keys.

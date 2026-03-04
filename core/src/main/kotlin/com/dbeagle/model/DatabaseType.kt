@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 sealed class DatabaseType {
     @Serializable
     object PostgreSQL : DatabaseType()
+
     @Serializable
     object SQLite : DatabaseType()
 }

@@ -23,7 +23,7 @@ import java.util.*
 fun FavoritesScreen(
     repository: FavoritesRepository,
     onLoadQuery: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var favorites by remember { mutableStateOf(repository.getAll()) }
     var searchQuery by remember { mutableStateOf("") }
@@ -42,7 +42,7 @@ fun FavoritesScreen(
                 repository.save(updated)
                 favorites = repository.getAll()
                 editingFavorite = null
-            }
+            },
         )
     }
 
@@ -57,7 +57,7 @@ fun FavoritesScreen(
                         repository.delete(deletingFavorite!!.id)
                         favorites = repository.getAll()
                         deletingFavorite = null
-                    }
+                    },
                 ) {
                     Text("Delete")
                 }
@@ -66,7 +66,7 @@ fun FavoritesScreen(
                 TextButton(onClick = { deletingFavorite = null }) {
                     Text("Cancel")
                 }
-            }
+            },
         )
     }
 
@@ -76,12 +76,12 @@ fun FavoritesScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "${displayedFavorites.size} ${if (displayedFavorites.size == 1) "favorite" else "favorites"}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             OutlinedTextField(
@@ -90,7 +90,7 @@ fun FavoritesScreen(
                 placeholder = { Text("Search favorites...") },
                 singleLine = true,
                 modifier = Modifier.width(300.dp),
-                textStyle = MaterialTheme.typography.bodyMedium
+                textStyle = MaterialTheme.typography.bodyMedium,
             )
         }
 
@@ -99,7 +99,7 @@ fun FavoritesScreen(
         if (displayedFavorites.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = if (searchQuery.isBlank()) {
@@ -108,20 +108,20 @@ fun FavoritesScreen(
                         "No favorites match your search."
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(8.dp)
+                contentPadding = PaddingValues(8.dp),
             ) {
                 items(displayedFavorites) { favorite ->
                     FavoriteCard(
                         favorite = favorite,
                         onClick = { onLoadQuery(favorite.query) },
                         onEdit = { editingFavorite = favorite },
-                        onDelete = { deletingFavorite = favorite }
+                        onDelete = { deletingFavorite = favorite },
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -135,7 +135,7 @@ private fun FavoriteCard(
     favorite: FavoriteQuery,
     onClick: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
     val timestampText = dateFormat.format(Date(favorite.lastModified))
@@ -144,23 +144,23 @@ private fun FavoriteCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(12.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = favorite.name,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -169,7 +169,7 @@ private fun FavoriteCard(
                             Icons.Default.Edit,
                             contentDescription = "Edit",
                             modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                     }
                     IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
@@ -177,7 +177,7 @@ private fun FavoriteCard(
                             Icons.Default.Delete,
                             contentDescription = "Delete",
                             modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.error
+                            tint = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
@@ -188,18 +188,18 @@ private fun FavoriteCard(
             if (favorite.tags.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     favorite.tags.forEach { tag ->
                         Surface(
                             color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = MaterialTheme.shapes.small
+                            shape = MaterialTheme.shapes.small,
                         ) {
                             Text(
                                 text = tag,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
                         }
                     }
@@ -212,7 +212,7 @@ private fun FavoriteCard(
                 style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -220,7 +220,7 @@ private fun FavoriteCard(
             Text(
                 text = "Modified: $timestampText",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -230,7 +230,7 @@ private fun FavoriteCard(
 private fun EditFavoriteDialog(
     favorite: FavoriteQuery,
     onDismiss: () -> Unit,
-    onSave: (FavoriteQuery) -> Unit
+    onSave: (FavoriteQuery) -> Unit,
 ) {
     var name by remember { mutableStateOf(favorite.name) }
     var tagsText by remember { mutableStateOf(favorite.tags.joinToString(", ")) }
@@ -245,7 +245,7 @@ private fun EditFavoriteDialog(
                     onValueChange = { name = it },
                     label = { Text("Name") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -253,7 +253,7 @@ private fun EditFavoriteDialog(
                     onValueChange = { tagsText = it },
                     label = { Text("Tags (comma-separated)") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
                 )
             }
         },
@@ -265,7 +265,7 @@ private fun EditFavoriteDialog(
                         .filter { it.isNotBlank() }
                     onSave(favorite.copy(name = name, tags = tags))
                 },
-                enabled = name.isNotBlank()
+                enabled = name.isNotBlank(),
             ) {
                 Text("Save")
             }
@@ -274,6 +274,6 @@ private fun EditFavoriteDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }

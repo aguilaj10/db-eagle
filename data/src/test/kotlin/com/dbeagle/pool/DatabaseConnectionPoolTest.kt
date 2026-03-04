@@ -17,7 +17,7 @@ class DatabaseConnectionPoolTest {
                 .withUsername("testuser")
                 .withPassword("testpass")
                 .withStartupTimeoutSeconds(60)
-            
+
             postgresContainer?.start()
             dockerAvailable = postgresContainer?.isRunning == true
         } catch (e: Exception) {
@@ -33,7 +33,7 @@ class DatabaseConnectionPoolTest {
         } catch (e: Exception) {
             // Ignore cleanup errors
         }
-        
+
         try {
             postgresContainer?.stop()
             postgresContainer = null
@@ -55,17 +55,17 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         assertFalse(DatabaseConnectionPool.hasPool(profile.id), "Pool should not exist before first getConnection")
         assertEquals(0, DatabaseConnectionPool.getPoolCount(), "Pool count should be 0 initially")
 
         val conn = DatabaseConnectionPool.getConnection(profile, container.password)
-        
+
         assertTrue(DatabaseConnectionPool.hasPool(profile.id), "Pool should exist after first getConnection")
         assertEquals(1, DatabaseConnectionPool.getPoolCount(), "Pool count should be 1 after creation")
-        
+
         conn.close()
     }
 
@@ -82,18 +82,18 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         val conn = DatabaseConnectionPool.getConnection(profile, container.password)
-        
+
         assertFalse(conn.isClosed, "Connection should be open")
-        
+
         val stmt = conn.createStatement()
         val rs = stmt.executeQuery("SELECT 1 as result")
         assertTrue(rs.next(), "Result set should have at least one row")
         assertEquals(1, rs.getInt("result"), "SELECT 1 should return 1")
-        
+
         rs.close()
         stmt.close()
         conn.close()
@@ -112,15 +112,15 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         val conn1 = DatabaseConnectionPool.getConnection(profile, container.password)
         assertEquals(1, DatabaseConnectionPool.getPoolCount(), "Should still have 1 pool")
-        
+
         val conn2 = DatabaseConnectionPool.getConnection(profile, container.password)
         assertEquals(1, DatabaseConnectionPool.getPoolCount(), "Should still have 1 pool after second connection")
-        
+
         conn1.close()
         conn2.close()
     }
@@ -138,16 +138,16 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         val conn = DatabaseConnectionPool.getConnection(profile, container.password)
         conn.close()
-        
+
         assertTrue(DatabaseConnectionPool.hasPool(profile.id), "Pool should exist before close")
-        
+
         DatabaseConnectionPool.closePool(profile)
-        
+
         assertFalse(DatabaseConnectionPool.hasPool(profile.id), "Pool should not exist after close")
         assertEquals(0, DatabaseConnectionPool.getPoolCount(), "Pool count should be 0 after close")
     }
@@ -165,16 +165,16 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         val conn = DatabaseConnectionPool.getConnection(profile, container.password)
         conn.close()
-        
+
         assertTrue(DatabaseConnectionPool.hasPool(profile.id), "Pool should exist before close")
-        
+
         DatabaseConnectionPool.closePool(profile.id)
-        
+
         assertFalse(DatabaseConnectionPool.hasPool(profile.id), "Pool should not exist after close by id")
         assertEquals(0, DatabaseConnectionPool.getPoolCount(), "Pool count should be 0 after close")
     }
@@ -192,9 +192,9 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
-        
+
         val profile2 = ConnectionProfile(
             id = "test-close-all-2",
             name = "Test Close All 2",
@@ -203,19 +203,19 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         val conn1 = DatabaseConnectionPool.getConnection(profile1, container.password)
         val conn2 = DatabaseConnectionPool.getConnection(profile2, container.password)
-        
+
         assertEquals(2, DatabaseConnectionPool.getPoolCount(), "Should have 2 pools")
-        
+
         conn1.close()
         conn2.close()
-        
+
         DatabaseConnectionPool.closeAllPools()
-        
+
         assertEquals(0, DatabaseConnectionPool.getPoolCount(), "All pools should be closed")
         assertFalse(DatabaseConnectionPool.hasPool(profile1.id), "Pool 1 should not exist")
         assertFalse(DatabaseConnectionPool.hasPool(profile2.id), "Pool 2 should not exist")
@@ -234,9 +234,9 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
-        
+
         val profile2 = ConnectionProfile(
             id = "test-multi-2",
             name = "Test Multi 2",
@@ -245,18 +245,18 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         val conn1 = DatabaseConnectionPool.getConnection(profile1, container.password)
         assertEquals(1, DatabaseConnectionPool.getPoolCount(), "Should have 1 pool after first profile")
-        
+
         val conn2 = DatabaseConnectionPool.getConnection(profile2, container.password)
         assertEquals(2, DatabaseConnectionPool.getPoolCount(), "Should have 2 pools after second profile")
-        
+
         assertTrue(DatabaseConnectionPool.hasPool(profile1.id), "Pool 1 should exist")
         assertTrue(DatabaseConnectionPool.hasPool(profile2.id), "Pool 2 should exist")
-        
+
         conn1.close()
         conn2.close()
     }
@@ -274,16 +274,16 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         val conn = DatabaseConnectionPool.getConnection(profile, container.password)
         conn.close()
-        
+
         DatabaseConnectionPool.closePool(profile)
         DatabaseConnectionPool.closePool(profile)
         DatabaseConnectionPool.closePool(profile.id)
-        
+
         assertFalse(DatabaseConnectionPool.hasPool(profile.id), "Pool should not exist")
     }
 
@@ -300,16 +300,16 @@ class DatabaseConnectionPoolTest {
             port = container.firstMappedPort,
             database = container.databaseName,
             username = container.username,
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         val exception = assertFailsWith<IllegalStateException> {
             DatabaseConnectionPool.getConnection(profile, "wrong-password")
         }
-        
+
         assertTrue(
             exception.message?.contains("Failed to acquire connection") == true,
-            "Exception message should indicate connection failure"
+            "Exception message should indicate connection failure",
         )
     }
 }

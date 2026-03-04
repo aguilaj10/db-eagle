@@ -11,12 +11,12 @@ sealed class QueryResult {
         val columnNames: List<String>,
         val rows: List<Map<String, String>>,
         @Transient
-        val resultSet: PaginatedResultSet? = null
+        val resultSet: PaginatedResultSet? = null,
     ) : QueryResult()
 
     @Serializable
     data class Error(
         val message: String,
-        val errorCode: String? = null
+        val errorCode: String? = null,
     ) : QueryResult()
 }

@@ -20,7 +20,7 @@ interface ResultExporter {
         outputFile: File,
         firstPage: QueryResult.Success,
         resultSet: PaginatedResultSet?,
-        onProgress: ((currentRowCount: Int, isDone: Boolean) -> Unit)? = null
+        onProgress: ((currentRowCount: Int, isDone: Boolean) -> Unit)? = null,
     )
 }
 
@@ -32,21 +32,21 @@ class CsvExporter : ResultExporter {
         outputFile: File,
         firstPage: QueryResult.Success,
         resultSet: PaginatedResultSet?,
-        onProgress: ((currentRowCount: Int, isDone: Boolean) -> Unit)?
+        onProgress: ((currentRowCount: Int, isDone: Boolean) -> Unit)?,
     ) {
         outputFile.bufferedWriter().use { writer ->
             // Write header
             writeHeaderRow(writer, firstPage.columnNames)
-            
+
             var rowCount = 0
-            
+
             // Write first page rows
             firstPage.rows.forEach { row ->
                 writeDataRow(writer, firstPage.columnNames, row)
                 rowCount++
             }
             onProgress?.invoke(rowCount, resultSet?.hasMore() != true)
-            
+
             // Fetch and write additional pages if available
             var rs = resultSet
             while (rs?.hasMore() == true) {
@@ -59,17 +59,24 @@ class CsvExporter : ResultExporter {
             }
         }
     }
-    
-    private fun writeHeaderRow(writer: BufferedWriter, columns: List<String>) {
+
+    private fun writeHeaderRow(
+        writer: BufferedWriter,
+        columns: List<String>,
+    ) {
         writer.write(columns.joinToString(",") { escapeCsvField(it) })
         writer.newLine()
     }
-    
-    private fun writeDataRow(writer: BufferedWriter, columns: List<String>, row: Map<String, String>) {
+
+    private fun writeDataRow(
+        writer: BufferedWriter,
+        columns: List<String>,
+        row: Map<String, String>,
+    ) {
         writer.write(columns.joinToString(",") { col -> escapeCsvField(row[col] ?: "") })
         writer.newLine()
     }
-    
+
     private fun escapeCsvField(field: String): String {
         // If field contains comma, quote, or newline, wrap in quotes and escape internal quotes
         if (field.contains(',') || field.contains('"') || field.contains('\n') || field.contains('\r')) {
@@ -87,14 +94,14 @@ class JsonExporter : ResultExporter {
         outputFile: File,
         firstPage: QueryResult.Success,
         resultSet: PaginatedResultSet?,
-        onProgress: ((currentRowCount: Int, isDone: Boolean) -> Unit)?
+        onProgress: ((currentRowCount: Int, isDone: Boolean) -> Unit)?,
     ) {
         outputFile.bufferedWriter().use { writer ->
             writer.write("[\n")
-            
+
             var rowCount = 0
             var isFirstRow = true
-            
+
             // Write first page rows
             firstPage.rows.forEach { row ->
                 if (!isFirstRow) writer.write(",\n")
@@ -103,7 +110,7 @@ class JsonExporter : ResultExporter {
                 rowCount++
             }
             onProgress?.invoke(rowCount, resultSet?.hasMore() != true)
-            
+
             // Fetch and write additional pages if available
             var rs = resultSet
             while (rs?.hasMore() == true) {
@@ -116,48 +123,55 @@ class JsonExporter : ResultExporter {
                 }
                 onProgress?.invoke(rowCount, !rs.hasMore())
             }
-            
+
             writer.write("\n]")
         }
     }
-    
-    private fun writeJsonRow(writer: BufferedWriter, columns: List<String>, row: Map<String, String>) {
+
+    private fun writeJsonRow(
+        writer: BufferedWriter,
+        columns: List<String>,
+        row: Map<String, String>,
+    ) {
         writer.write("  {")
-        writer.write(columns.joinToString(", ") { col ->
-            "\"${escapeJsonString(col)}\": \"${escapeJsonString(row[col] ?: "")}\""
-        })
+        writer.write(
+            columns.joinToString(", ") { col ->
+                "\"${escapeJsonString(col)}\": \"${escapeJsonString(row[col] ?: "")}\""
+            },
+        )
         writer.write("}")
     }
-    
-    private fun escapeJsonString(s: String): String {
-        return s.replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-    }
+
+    private fun escapeJsonString(s: String): String = s
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
 }
 
 /**
  * SQL exporter that writes INSERT statements for the exported data.
  */
-class SqlExporter(private val tableName: String = "exported_data") : ResultExporter {
+class SqlExporter(
+    private val tableName: String = "exported_data",
+) : ResultExporter {
     override suspend fun export(
         outputFile: File,
         firstPage: QueryResult.Success,
         resultSet: PaginatedResultSet?,
-        onProgress: ((currentRowCount: Int, isDone: Boolean) -> Unit)?
+        onProgress: ((currentRowCount: Int, isDone: Boolean) -> Unit)?,
     ) {
         outputFile.bufferedWriter().use { writer ->
             var rowCount = 0
-            
+
             // Write first page rows
             firstPage.rows.forEach { row ->
                 writeInsertStatement(writer, tableName, firstPage.columnNames, row)
                 rowCount++
             }
             onProgress?.invoke(rowCount, resultSet?.hasMore() != true)
-            
+
             // Fetch and write additional pages if available
             var rs = resultSet
             while (rs?.hasMore() == true) {
@@ -170,23 +184,22 @@ class SqlExporter(private val tableName: String = "exported_data") : ResultExpor
             }
         }
     }
-    
+
     private fun writeInsertStatement(
         writer: BufferedWriter,
         table: String,
         columns: List<String>,
-        row: Map<String, String>
+        row: Map<String, String>,
     ) {
         val columnList = columns.joinToString(", ")
-        val valuesList = columns.joinToString(", ") { col ->
-            val value = row[col] ?: ""
-            "'${escapeSqlString(value)}'"
-        }
+        val valuesList =
+            columns.joinToString(", ") { col ->
+                val value = row[col] ?: ""
+                "'${escapeSqlString(value)}'"
+            }
         writer.write("INSERT INTO $table ($columnList) VALUES ($valuesList);")
         writer.newLine()
     }
-    
-    private fun escapeSqlString(s: String): String {
-        return s.replace("'", "''")
-    }
+
+    private fun escapeSqlString(s: String): String = s.replace("'", "''")
 }

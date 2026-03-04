@@ -4,7 +4,7 @@ data class AppSettings(
     val resultLimit: Int = DEFAULT_RESULT_LIMIT,
     val queryTimeoutSeconds: Int = DEFAULT_QUERY_TIMEOUT_SECONDS,
     val connectionTimeoutSeconds: Int = DEFAULT_CONNECTION_TIMEOUT_SECONDS,
-    val maxConnections: Int = DEFAULT_MAX_CONNECTIONS
+    val maxConnections: Int = DEFAULT_MAX_CONNECTIONS,
 ) {
     init {
         require(resultLimit > 0) { "resultLimit must be > 0" }

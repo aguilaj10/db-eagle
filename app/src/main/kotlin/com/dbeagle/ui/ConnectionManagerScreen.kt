@@ -27,23 +27,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.dbeagle.driver.DataDrivers
 import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.driver.DatabaseDriverRegistry
-import com.dbeagle.driver.DataDrivers
 import com.dbeagle.error.ErrorHandler
 import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
+import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.profile.MasterPasswordProvider
 import com.dbeagle.profile.PreferencesBackedConnectionProfileRepository
-import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.session.SessionViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ConnectionManagerScreen(
@@ -52,13 +52,13 @@ fun ConnectionManagerScreen(
     snackbarHostState: SnackbarHostState,
     coroutineScope: CoroutineScope,
     triggerNewConnection: Boolean = false,
-    onNewConnectionTriggered: () -> Unit = {}
+    onNewConnectionTriggered: () -> Unit = {},
 ) {
     var masterPassword by remember { mutableStateOf<String?>(null) }
-    
+
     if (masterPassword == null) {
         MasterPasswordDialog(
-            onPasswordEntered = { masterPassword = it }
+            onPasswordEntered = { masterPassword = it },
         )
     } else {
         ConnectionListScreen(
@@ -68,7 +68,7 @@ fun ConnectionManagerScreen(
             snackbarHostState = snackbarHostState,
             coroutineScope = coroutineScope,
             triggerNewConnection = triggerNewConnection,
-            onNewConnectionTriggered = onNewConnectionTriggered
+            onNewConnectionTriggered = onNewConnectionTriggered,
         )
     }
 }
@@ -76,7 +76,7 @@ fun ConnectionManagerScreen(
 @Composable
 fun MasterPasswordDialog(onPasswordEntered: (String) -> Unit) {
     var password by remember { mutableStateOf("") }
-    
+
     AlertDialog(
         onDismissRequest = { },
         title = { Text("Master Password Required") },
@@ -90,18 +90,18 @@ fun MasterPasswordDialog(onPasswordEntered: (String) -> Unit) {
                     label = { Text("Master Password") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
             Button(
                 onClick = { onPasswordEntered(password) },
-                enabled = password.isNotEmpty()
+                enabled = password.isNotEmpty(),
             ) {
                 Text("Unlock")
             }
-        }
+        },
     )
 }
 
@@ -113,11 +113,11 @@ fun ConnectionListScreen(
     snackbarHostState: SnackbarHostState,
     coroutineScope: CoroutineScope,
     triggerNewConnection: Boolean = false,
-    onNewConnectionTriggered: () -> Unit = {}
+    onNewConnectionTriggered: () -> Unit = {},
 ) {
     val repository = remember(masterPassword) {
         PreferencesBackedConnectionProfileRepository(
-            masterPasswordProvider = MasterPasswordProvider { masterPassword }
+            masterPasswordProvider = MasterPasswordProvider { masterPassword },
         )
     }
 
@@ -131,7 +131,7 @@ fun ConnectionListScreen(
 
     var connectionErrorMessage by remember { mutableStateOf<String?>(null) }
     var retryConnection by remember { mutableStateOf<ConnectionProfile?>(null) }
-    
+
     var showDialog by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
     var connectingJob by remember { mutableStateOf<Job?>(null) }
@@ -195,7 +195,7 @@ fun ConnectionListScreen(
             }) {
                 Icon(Icons.Default.Add, contentDescription = "Add Connection")
             }
-        }
+        },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             val localStatus = if (connectedProfileIds.isEmpty()) "Disconnected" else "Connected (${connectedProfileIds.size})"
@@ -203,147 +203,149 @@ fun ConnectionListScreen(
                 text = "Status: $localStatus",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Box(modifier = Modifier.fillMaxSize()) {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (error != null) {
-                Text(
-                    text = error ?: "",
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else if (profiles.isEmpty()) {
-                Text(
-                    text = "No connections found. Click + to add one.",
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(profiles) { profile ->
-                        ConnectionRow(
-                            profile = profile,
-                            isConnected = connectedProfileIds.contains(profile.id),
-                            isConnecting = connectingProfileId == profile.id,
-                            isBusy = connectingProfileId != null,
-                            onCancelConnect = {
-                                connectingJob?.cancel()
-                            },
-                            onConnect = {
-                                if (connectingProfileId != null) return@ConnectionRow
-                                connectingJob = coroutineScope.launch {
-                                    sessionViewModel.setConnecting(profile.id)
-                                    var driver: DatabaseDriver? = null
-                                    try {
-                                        val loaded = repository.load(profile.id)
-                                            ?: throw IllegalStateException("Profile not found")
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (error != null) {
+                    Text(
+                        text = error ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                } else if (profiles.isEmpty()) {
+                    Text(
+                        text = "No connections found. Click + to add one.",
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(profiles) { profile ->
+                            ConnectionRow(
+                                profile = profile,
+                                isConnected = connectedProfileIds.contains(profile.id),
+                                isConnecting = connectingProfileId == profile.id,
+                                isBusy = connectingProfileId != null,
+                                onCancelConnect = {
+                                    connectingJob?.cancel()
+                                },
+                                onConnect = {
+                                    if (connectingProfileId != null) return@ConnectionRow
+                                    connectingJob = coroutineScope.launch {
+                                        sessionViewModel.setConnecting(profile.id)
+                                        var driver: DatabaseDriver? = null
+                                        try {
+                                            val loaded = repository.load(profile.id)
+                                                ?: throw IllegalStateException("Profile not found")
 
-                                        val prototype = DatabaseDriverRegistry.getDriver(loaded.type)
-                                            ?: throw IllegalStateException(
-                                                "No driver registered for type: ${loaded.type}"
+                                            val prototype = DatabaseDriverRegistry.getDriver(loaded.type)
+                                                ?: throw IllegalStateException(
+                                                    "No driver registered for type: ${loaded.type}",
+                                                )
+
+                                            driver = try {
+                                                prototype::class.java.getDeclaredConstructor().newInstance()
+                                            } catch (e: Exception) {
+                                                throw IllegalStateException(
+                                                    "Driver for type ${loaded.type} must have a no-arg constructor",
+                                                    e,
+                                                )
+                                            }
+
+                                            val password = loaded.encryptedPassword
+                                            val configProfile = loaded.copy(
+                                                options = loaded.options + ("password" to password),
                                             )
 
-                                        driver = try {
-                                            prototype::class.java.getDeclaredConstructor().newInstance()
-                                        } catch (e: Exception) {
-                                            throw IllegalStateException(
-                                                "Driver for type ${loaded.type} must have a no-arg constructor",
-                                                e
-                                            )
-                                        }
+                                            onStatusTextChanged("Status: Connecting (${loaded.name})")
 
-                                        val password = loaded.encryptedPassword
-                                        val configProfile = loaded.copy(
-                                            options = loaded.options + ("password" to password)
-                                        )
-
-                                        onStatusTextChanged("Status: Connecting (${loaded.name})")
-
-                                        withContext(Dispatchers.IO) {
-                                            DatabaseConnectionPool.getConnection(loaded, password).use { _ -> }
-                                            driver!!.connect(ConnectionConfig(profile = configProfile))
-                                            try {
-                                                driver!!.getSchema()
-                                            } catch (schemaError: Exception) {
+                                            withContext(Dispatchers.IO) {
+                                                DatabaseConnectionPool.getConnection(loaded, password).use { _ -> }
+                                                driver!!.connect(ConnectionConfig(profile = configProfile))
                                                 try {
-                                                    driver!!.disconnect()
-                                                } catch (_: Exception) {
-                                                } finally {
-                                                    DatabaseConnectionPool.closePool(loaded.id)
+                                                    driver!!.getSchema()
+                                                } catch (schemaError: Exception) {
+                                                    try {
+                                                        driver!!.disconnect()
+                                                    } catch (_: Exception) {
+                                                    } finally {
+                                                        DatabaseConnectionPool.closePool(loaded.id)
+                                                    }
+                                                    throw schemaError
                                                 }
-                                                throw schemaError
+                                            }
+
+                                            sessionViewModel.openSession(
+                                                profileId = loaded.id,
+                                                profileName = loaded.name,
+                                                driver = driver!!,
+                                            )
+                                            updateActiveConnection(loaded.id)
+
+                                            onStatusTextChanged("Status: Connected (${loaded.name})")
+                                        } catch (e: CancellationException) {
+                                            try {
+                                                driver?.disconnect()
+                                            } catch (_: Exception) {}
+                                            DatabaseConnectionPool.closePool(profile.id)
+                                            updateStatus()
+                                        } catch (e: Exception) {
+                                            try {
+                                                driver?.disconnect()
+                                            } catch (_: Exception) {
+                                            }
+                                            DatabaseConnectionPool.closePool(profile.id)
+                                            updateStatus()
+                                            connectionErrorMessage = ErrorHandler.getConnectionErrorMessage(
+                                                "Failed to connect: ${e.message}",
+                                                e,
+                                            )
+                                            retryConnection = profile
+                                        } finally {
+                                            sessionViewModel.setConnecting(null)
+                                            if (connectingJob?.isActive != true) {
+                                                connectingJob = null
                                             }
                                         }
-
-                                        sessionViewModel.openSession(
-                                            profileId = loaded.id,
-                                            profileName = loaded.name,
-                                            driver = driver!!
-                                        )
-                                        updateActiveConnection(loaded.id)
-
-                                        onStatusTextChanged("Status: Connected (${loaded.name})")
-                                    } catch (e: CancellationException) {
-                                        try { driver?.disconnect() } catch (_: Exception) {}
-                                        DatabaseConnectionPool.closePool(profile.id)
-                                        updateStatus()
-                                    } catch (e: Exception) {
+                                    }
+                                },
+                                onDisconnect = {
+                                    if (connectingProfileId != null) return@ConnectionRow
+                                    coroutineScope.launch {
+                                        sessionViewModel.setConnecting(profile.id)
                                         try {
-                                            driver?.disconnect()
+                                            onStatusTextChanged("Status: Disconnecting (${profile.name})")
+                                            sessionViewModel.closeSession(profile.id)
+                                        } catch (_: Exception) {
+                                        } finally {
+                                            DatabaseConnectionPool.closePool(profile.id)
+                                            updateStatus()
+                                            sessionViewModel.setConnecting(null)
+                                        }
+                                    }
+                                },
+                                onEdit = {
+                                    editingProfile = profile
+                                    showDialog = true
+                                },
+                                onDelete = {
+                                    coroutineScope.launch {
+                                        repository.delete(profile.id)
+                                        try {
+                                            sessionViewModel.closeSession(profile.id)
                                         } catch (_: Exception) {
                                         }
                                         DatabaseConnectionPool.closePool(profile.id)
-                                        updateStatus()
-                                        connectionErrorMessage = ErrorHandler.getConnectionErrorMessage(
-                                            "Failed to connect: ${e.message}",
-                                            e
-                                        )
-                                        retryConnection = profile
-                                    } finally {
-                                        sessionViewModel.setConnecting(null)
-                                        if (connectingJob?.isActive != true) {
-                                            connectingJob = null
-                                        }
-                                    }
-                                }
-                            },
-                            onDisconnect = {
-                                if (connectingProfileId != null) return@ConnectionRow
-                                coroutineScope.launch {
-                                    sessionViewModel.setConnecting(profile.id)
-                                    try {
-                                        onStatusTextChanged("Status: Disconnecting (${profile.name})")
-                                        sessionViewModel.closeSession(profile.id)
-                                    } catch (_: Exception) {
-                                    } finally {
-                                        DatabaseConnectionPool.closePool(profile.id)
-                                        updateStatus()
-                                        sessionViewModel.setConnecting(null)
-                                    }
-                                }
-                            },
-                            onEdit = {
-                                editingProfile = profile
-                                showDialog = true
-                            },
-                            onDelete = {
-                                coroutineScope.launch {
-                                    repository.delete(profile.id)
-                                    try {
-                                        sessionViewModel.closeSession(profile.id)
-                                    } catch (_: Exception) {
-                                    }
-                                    DatabaseConnectionPool.closePool(profile.id)
 
-                                    refreshProfiles()
-                                }
-                            }
-                        )
+                                        refreshProfiles()
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
-            }
             }
         }
     }
@@ -361,13 +363,13 @@ fun ConnectionListScreen(
                     } catch (e: Exception) {
                         connectionErrorMessage = ErrorHandler.getConnectionErrorMessage(
                             "Failed to save profile: ${e.message}",
-                            e
+                            e,
                         )
                         retryConnection = null
                         showDialog = false
                     }
                 }
-            }
+            },
         )
     }
 
@@ -395,7 +397,7 @@ fun ConnectionListScreen(
 
                                     val prototype = DatabaseDriverRegistry.getDriver(loaded.type)
                                         ?: throw IllegalStateException(
-                                            "No driver registered for type: ${loaded.type}"
+                                            "No driver registered for type: ${loaded.type}",
                                         )
 
                                     driver = try {
@@ -403,13 +405,13 @@ fun ConnectionListScreen(
                                     } catch (e: Exception) {
                                         throw IllegalStateException(
                                             "Driver for type ${loaded.type} must have a no-arg constructor",
-                                            e
+                                            e,
                                         )
                                     }
 
                                     val password = loaded.encryptedPassword
                                     val configProfile = loaded.copy(
-                                        options = loaded.options + ("password" to password)
+                                        options = loaded.options + ("password" to password),
                                     )
 
                                     onStatusTextChanged("Status: Connecting (${loaded.name})")
@@ -435,13 +437,15 @@ fun ConnectionListScreen(
                                     sessionViewModel.openSession(
                                         profileId = loaded.id,
                                         profileName = loaded.name,
-                                        driver = driver!!
+                                        driver = driver!!,
                                     )
                                     updateActiveConnection(loaded.id)
 
                                     onStatusTextChanged("Status: Connected (${loaded.name})")
                                 } catch (e: CancellationException) {
-                                    try { driver?.disconnect() } catch (_: Exception) {}
+                                    try {
+                                        driver?.disconnect()
+                                    } catch (_: Exception) {}
                                     DatabaseConnectionPool.closePool(profile.id)
                                     updateStatus()
                                 } catch (e: Exception) {
@@ -453,7 +457,7 @@ fun ConnectionListScreen(
                                     updateStatus()
                                     connectionErrorMessage = ErrorHandler.getConnectionErrorMessage(
                                         "Failed to connect: ${e.message}",
-                                        e
+                                        e,
                                     )
                                     retryConnection = profile
                                 } finally {
@@ -473,7 +477,7 @@ fun ConnectionListScreen(
                 }) {
                     Text("Cancel")
                 }
-            }
+            },
         )
     }
 }
@@ -488,7 +492,7 @@ fun ConnectionRow(
     onDisconnect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onCancelConnect: () -> Unit = {}
+    onCancelConnect: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -496,21 +500,21 @@ fun ConnectionRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
                     .size(10.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isConnected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outlineVariant
-                    )
+                        if (isConnected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outlineVariant,
+                    ),
             )
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -518,18 +522,18 @@ fun ConnectionRow(
             Box(
                 modifier = Modifier
                     .size(40.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = if (profile.type is DatabaseType.PostgreSQL) "PG" else "SQ",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = profile.name, style = MaterialTheme.typography.titleMedium)
                 val subtitle = if (profile.type is DatabaseType.PostgreSQL) {
@@ -545,7 +549,7 @@ fun ConnectionRow(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
+                            strokeWidth = 2.dp,
                         )
                         IconButton(onClick = onCancelConnect) {
                             Icon(Icons.Default.Clear, contentDescription = "Cancel Connection")
@@ -558,7 +562,7 @@ fun ConnectionRow(
                 }
                 DropdownMenu(
                     expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    onDismissRequest = { expanded = false },
                 ) {
                     if (!isConnected) {
                         DropdownMenuItem(
@@ -567,7 +571,7 @@ fun ConnectionRow(
                                 expanded = false
                                 onConnect()
                             },
-                            enabled = !isBusy
+                            enabled = !isBusy,
                         )
                     } else {
                         DropdownMenuItem(
@@ -576,7 +580,7 @@ fun ConnectionRow(
                                 expanded = false
                                 onDisconnect()
                             },
-                            enabled = !isBusy
+                            enabled = !isBusy,
                         )
                     }
                     DropdownMenuItem(
@@ -585,7 +589,7 @@ fun ConnectionRow(
                             expanded = false
                             onEdit()
                         },
-                        enabled = !isBusy
+                        enabled = !isBusy,
                     )
                     DropdownMenuItem(
                         text = { Text("Delete") },
@@ -593,7 +597,7 @@ fun ConnectionRow(
                             expanded = false
                             onDelete()
                         },
-                        enabled = !isBusy
+                        enabled = !isBusy,
                     )
                 }
             }

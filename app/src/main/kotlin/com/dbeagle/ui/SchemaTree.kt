@@ -1,13 +1,11 @@
 package com.dbeagle.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.onClick
 import androidx.compose.foundation.PointerMatcher
-import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.onClick
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -15,24 +13,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.unit.dp
 
 sealed class SchemaTreeNode(
     val id: String,
     val label: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
 ) {
     open val children: List<SchemaTreeNode> = emptyList()
 
-    class Section(id: String, label: String, override val children: List<SchemaTreeNode>) :
-        SchemaTreeNode(id, label, Icons.AutoMirrored.Filled.List)
+    class Section(id: String, label: String, override val children: List<SchemaTreeNode>) : SchemaTreeNode(id, label, Icons.AutoMirrored.Filled.List)
 
-    class Table(id: String, label: String, override val children: List<SchemaTreeNode>) :
-        SchemaTreeNode(id, label, Icons.Default.Menu)
+    class Table(id: String, label: String, override val children: List<SchemaTreeNode>) : SchemaTreeNode(id, label, Icons.Default.Menu)
 
-    class Column(id: String, label: String, val type: String) :
-        SchemaTreeNode(id, label, Icons.Default.Info)
+    class Column(id: String, label: String, val type: String) : SchemaTreeNode(id, label, Icons.Default.Info)
 
     class View(id: String, label: String) : SchemaTreeNode(id, label, Icons.Default.PlayArrow)
 
@@ -45,7 +40,7 @@ fun SchemaTree(
     modifier: Modifier = Modifier,
     onNodeExpansionChanged: (SchemaTreeNode, Boolean) -> Unit = { _, _ -> },
     onCopyName: (String) -> Unit = {},
-    onViewData: (String) -> Unit = {}
+    onViewData: (String) -> Unit = {},
 ) {
     var expandedIds by remember { mutableStateOf(setOf<String>()) }
 
@@ -82,7 +77,7 @@ fun SchemaTree(
                 onToggle = { toggleExpanded(node.id) },
                 onNodeExpansionChanged = onNodeExpansionChanged,
                 onCopyName = onCopyName,
-                onViewData = onViewData
+                onViewData = onViewData,
             )
         }
     }
@@ -97,7 +92,7 @@ private fun SchemaTreeNodeItem(
     onToggle: () -> Unit,
     onNodeExpansionChanged: (SchemaTreeNode, Boolean) -> Unit,
     onCopyName: (String) -> Unit,
-    onViewData: (String) -> Unit
+    onViewData: (String) -> Unit,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
 
@@ -118,10 +113,10 @@ private fun SchemaTreeNodeItem(
                         if (node is SchemaTreeNode.Table) {
                             showContextMenu = true
                         }
-                    }
+                    },
                 )
                 .padding(vertical = 4.dp, horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(modifier = Modifier.width((depth * 16).dp))
 
@@ -131,7 +126,7 @@ private fun SchemaTreeNodeItem(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 Spacer(modifier = Modifier.width(16.dp))
@@ -143,7 +138,7 @@ private fun SchemaTreeNodeItem(
                 imageVector = node.icon,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -151,7 +146,7 @@ private fun SchemaTreeNodeItem(
             Text(
                 text = node.label,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
 
             if (node is SchemaTreeNode.Column) {
@@ -159,28 +154,28 @@ private fun SchemaTreeNodeItem(
                 Text(
                     text = node.type,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
         DropdownMenu(
             expanded = showContextMenu,
-            onDismissRequest = { showContextMenu = false }
+            onDismissRequest = { showContextMenu = false },
         ) {
             DropdownMenuItem(
                 text = { Text("Copy Name") },
                 onClick = {
                     onCopyName(node.label)
                     showContextMenu = false
-                }
+                },
             )
             DropdownMenuItem(
                 text = { Text("View Data") },
                 onClick = {
                     onViewData(node.label)
                     showContextMenu = false
-                }
+                },
             )
         }
     }

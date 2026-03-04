@@ -5,7 +5,6 @@ import com.dbeagle.test.DatabaseTestContainers
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.test.Ignore
 
 class SmokeTest : BaseTest() {
     override fun beforeTest() {

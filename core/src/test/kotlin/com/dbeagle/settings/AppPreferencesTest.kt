@@ -1,7 +1,7 @@
 package com.dbeagle.settings
 
-import kotlin.test.*
 import java.util.prefs.Preferences
+import kotlin.test.*
 
 class AppPreferencesTest {
     private val prefsNode = Preferences.userRoot().node("com.dbeagle.settings")
@@ -33,7 +33,7 @@ class AppPreferencesTest {
             resultLimit = 500,
             queryTimeoutSeconds = 120,
             connectionTimeoutSeconds = 45,
-            maxConnections = 20
+            maxConnections = 20,
         )
         AppPreferences.save(custom)
         val loaded = AppPreferences.load()

@@ -9,9 +9,8 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 class FileQueryHistoryRepository(
-    private val historyFile: File = File(System.getProperty("user.home"), ".dbeagle/history.json")
+    private val historyFile: File = File(System.getProperty("user.home"), ".dbeagle/history.json"),
 ) : QueryHistoryRepository {
-
     private val json = Json { prettyPrint = true }
 
     init {

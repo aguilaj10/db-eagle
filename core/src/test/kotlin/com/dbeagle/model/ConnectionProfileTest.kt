@@ -5,20 +5,20 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ConnectionProfileTest {
-
     @Test
     fun testConnectionProfileSerializationRoundtrip() {
-        val original = ConnectionProfile(
-            id = "test-profile-1",
-            name = "Production DB",
-            type = DatabaseType.PostgreSQL,
-            host = "localhost",
-            port = 5432,
-            database = "myapp",
-            username = "admin",
-            encryptedPassword = "encrypted_secret_123",
-            options = mapOf("ssl" to "true", "sslmode" to "require")
-        )
+        val original =
+            ConnectionProfile(
+                id = "test-profile-1",
+                name = "Production DB",
+                type = DatabaseType.PostgreSQL,
+                host = "localhost",
+                port = 5432,
+                database = "myapp",
+                username = "admin",
+                encryptedPassword = "encrypted_secret_123",
+                options = mapOf("ssl" to "true", "sslmode" to "require"),
+            )
 
         val json = Json.encodeToString(ConnectionProfile.serializer(), original)
         val deserialized = Json.decodeFromString(ConnectionProfile.serializer(), json)
@@ -35,15 +35,16 @@ class ConnectionProfileTest {
 
     @Test
     fun testConnectionProfileWithDefaults() {
-        val profile = ConnectionProfile(
-            name = "Test DB",
-            type = DatabaseType.SQLite,
-            host = "localhost",
-            port = 3306,
-            database = "test",
-            username = "user",
-            encryptedPassword = "pass"
-        )
+        val profile =
+            ConnectionProfile(
+                name = "Test DB",
+                type = DatabaseType.SQLite,
+                host = "localhost",
+                port = 3306,
+                database = "test",
+                username = "user",
+                encryptedPassword = "pass",
+            )
 
         val json = Json.encodeToString(ConnectionProfile.serializer(), profile)
         val deserialized = Json.decodeFromString(ConnectionProfile.serializer(), json)

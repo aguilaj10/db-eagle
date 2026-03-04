@@ -20,11 +20,12 @@ object DatabaseTestContainers {
      */
     fun startPostgres() {
         if (container == null) {
-            container = PostgreSQLContainer("postgres:15-alpine")
-                .withDatabaseName(DATABASE_NAME)
-                .withUsername(DATABASE_USER)
-                .withPassword(DATABASE_PASSWORD)
-                .withStartupTimeoutSeconds(60)
+            container =
+                PostgreSQLContainer("postgres:15-alpine")
+                    .withDatabaseName(DATABASE_NAME)
+                    .withUsername(DATABASE_USER)
+                    .withPassword(DATABASE_PASSWORD)
+                    .withStartupTimeoutSeconds(60)
 
             container!!.start()
         }
@@ -57,9 +58,7 @@ object DatabaseTestContainers {
      * @return JDBC URL string
      * @throws IllegalStateException if container not started
      */
-    fun getJdbcUrl(): String {
-        return container?.jdbcUrl ?: throw IllegalStateException("PostgreSQL container not started. Call startPostgres() first.")
-    }
+    fun getJdbcUrl(): String = container?.jdbcUrl ?: throw IllegalStateException("PostgreSQL container not started. Call startPostgres() first.")
 
     /**
      * Checks if PostgreSQL container is currently running.

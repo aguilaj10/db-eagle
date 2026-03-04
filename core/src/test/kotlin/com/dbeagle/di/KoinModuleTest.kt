@@ -9,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class KoinModuleTest {
-
     @Test
     fun `should start Koin with coreModule successfully`() {
         startKoin {
@@ -64,6 +63,3 @@ class KoinModuleTest {
         }
     }
 }
-
-
-

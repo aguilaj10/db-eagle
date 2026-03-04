@@ -7,13 +7,13 @@ import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.TableMetadata
 import com.dbeagle.pool.DatabaseConnectionPool
-import java.sql.Connection
-import java.sql.ResultSet
-import java.sql.SQLException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.sql.Connection
+import java.sql.ResultSet
+import java.sql.SQLException
 
 class PostgreSQLDriver : DatabaseDriver {
     private var config: ConnectionConfig? = null
@@ -26,19 +26,21 @@ class PostgreSQLDriver : DatabaseDriver {
             "PostgreSQLDriver only supports DatabaseType.PostgreSQL"
         }
 
-        val password = profile.options["password"]
-            ?: throw IllegalArgumentException(
-                "Missing plaintext password in ConnectionProfile.options['password']"
-            )
+        val password =
+            profile.options["password"]
+                ?: throw IllegalArgumentException(
+                    "Missing plaintext password in ConnectionProfile.options['password']",
+                )
 
         this.config = config
         this.decryptedPassword = password
 
         buildJdbcUrl(profile)
 
-        database = Database.connect(
-            datasource = PoolBackedDataSource(profile, password)
-        )
+        database =
+            Database.connect(
+                datasource = PoolBackedDataSource(profile, password),
+            )
         testConnection()
     }
 
@@ -52,7 +54,10 @@ class PostgreSQLDriver : DatabaseDriver {
         database = null
     }
 
-    override suspend fun executeQuery(sql: String, params: List<Any>): QueryResult {
+    override suspend fun executeQuery(
+        sql: String,
+        params: List<Any>,
+    ): QueryResult {
         val db = database ?: return QueryResult.Error("Not connected")
         val cfg = config!!
 
@@ -72,13 +77,13 @@ class PostgreSQLDriver : DatabaseDriver {
                             val updated = stmt.updateCount
                             QueryResult.Success(
                                 columnNames = listOf("updatedCount"),
-                                rows = listOf(mapOf("updatedCount" to updated.toString()))
+                                rows = listOf(mapOf("updatedCount" to updated.toString())),
                             )
                         } else {
                             stmt.resultSet.use { rs ->
                                 QueryResult.Success(
                                     columnNames = rs.columnNames(),
-                                    rows = rs.rowsAsStringMaps()
+                                    rows = rs.rowsAsStringMaps(),
                                 )
                             }
                         }
@@ -93,13 +98,14 @@ class PostgreSQLDriver : DatabaseDriver {
     }
 
     override suspend fun getSchema(): SchemaMetadata {
-        val tables = getTables().map { table ->
-            TableMetadata(
-                name = table,
-                schema = "public",
-                columns = getColumns(table)
-            )
-        }
+        val tables =
+            getTables().map { table ->
+                TableMetadata(
+                    name = table,
+                    schema = "public",
+                    columns = getColumns(table),
+                )
+            }
 
         val views = getViews()
         val indexes = getIndexes()
@@ -109,7 +115,7 @@ class PostgreSQLDriver : DatabaseDriver {
             tables = tables,
             views = views,
             indexes = indexes,
-            foreignKeys = foreignKeys
+            foreignKeys = foreignKeys,
         )
     }
 
@@ -149,8 +155,8 @@ class PostgreSQLDriver : DatabaseDriver {
                                     name = name,
                                     type = type,
                                     nullable = nullable,
-                                    defaultValue = defaultValue
-                                )
+                                    defaultValue = defaultValue,
+                                ),
                             )
                         }
                     }
@@ -168,11 +174,12 @@ class PostgreSQLDriver : DatabaseDriver {
                 val jdbc = connection.connection as Connection
                 val md = jdbc.metaData
 
-                val tableNames = md.getTables(null, "public", "%", arrayOf("TABLE")).use { rs ->
-                    buildList {
-                        while (rs.next()) add(rs.getString("TABLE_NAME"))
+                val tableNames =
+                    md.getTables(null, "public", "%", arrayOf("TABLE")).use { rs ->
+                        buildList {
+                            while (rs.next()) add(rs.getString("TABLE_NAME"))
+                        }
                     }
-                }
 
                 val fks = mutableListOf<ForeignKeyRelationship>()
                 for (table in tableNames) {
@@ -194,8 +201,8 @@ class PostgreSQLDriver : DatabaseDriver {
                                         fromTable = fromTable,
                                         fromColumn = fromColumn,
                                         toTable = toTable,
-                                        toColumn = toColumn
-                                    )
+                                        toColumn = toColumn,
+                                    ),
                                 )
                             }
                         }
@@ -206,7 +213,7 @@ class PostgreSQLDriver : DatabaseDriver {
                     compareBy<ForeignKeyRelationship> { it.fromTable }
                         .thenBy { it.fromColumn }
                         .thenBy { it.toTable }
-                        .thenBy { it.toColumn }
+                        .thenBy { it.toColumn },
                 )
             }
         }
@@ -240,7 +247,7 @@ class PostgreSQLDriver : DatabaseDriver {
         DatabaseCapability.ForeignKeys,
         DatabaseCapability.Schemas,
         DatabaseCapability.Views,
-        DatabaseCapability.Indexes
+        DatabaseCapability.Indexes,
     )
 
     override fun getName(): String = "PostgreSQL"
@@ -269,11 +276,12 @@ class PostgreSQLDriver : DatabaseDriver {
         return withContext(Dispatchers.IO) {
             transaction(db) {
                 val jdbc = connection.connection as Connection
-                val tableNames = jdbc.metaData.getTables(null, "public", "%", arrayOf("TABLE")).use { rs ->
-                    buildList {
-                        while (rs.next()) add(rs.getString("TABLE_NAME"))
+                val tableNames =
+                    jdbc.metaData.getTables(null, "public", "%", arrayOf("TABLE")).use { rs ->
+                        buildList {
+                            while (rs.next()) add(rs.getString("TABLE_NAME"))
+                        }
                     }
-                }
 
                 val indexNames = mutableSetOf<String>()
                 for (table in tableNames) {
@@ -290,26 +298,32 @@ class PostgreSQLDriver : DatabaseDriver {
         }
     }
 
-    private fun buildJdbcUrl(profile: com.dbeagle.model.ConnectionProfile): String {
-        return "jdbc:postgresql://${profile.host}:${profile.port}/${profile.database}"
-    }
+    private fun buildJdbcUrl(profile: com.dbeagle.model.ConnectionProfile): String = "jdbc:postgresql://${profile.host}:${profile.port}/${profile.database}"
 }
 
 private class PoolBackedDataSource(
     private val profile: com.dbeagle.model.ConnectionProfile,
-    private val password: String
+    private val password: String,
 ) : javax.sql.DataSource {
     override fun getConnection(): Connection = DatabaseConnectionPool.getConnection(profile, password)
-    override fun getConnection(username: String?, password: String?): Connection = getConnection()
+
+    override fun getConnection(
+        username: String?,
+        password: String?,
+    ): Connection = getConnection()
 
     override fun getLogWriter(): java.io.PrintWriter? = null
+
     override fun setLogWriter(out: java.io.PrintWriter?) {}
+
     override fun setLoginTimeout(seconds: Int) {}
+
     override fun getLoginTimeout(): Int = 0
-    override fun getParentLogger(): java.util.logging.Logger = java.util.logging.Logger.getGlobal()
-    override fun <T : Any?> unwrap(iface: Class<T>?): T {
-        throw java.sql.SQLFeatureNotSupportedException()
-    }
+
+    override fun getParentLogger(): java.util.logging.Logger = java.util.logging.Logger
+        .getGlobal()
+
+    override fun <T : Any?> unwrap(iface: Class<T>?): T = throw java.sql.SQLFeatureNotSupportedException()
 
     override fun isWrapperFor(iface: Class<*>?): Boolean = false
 }

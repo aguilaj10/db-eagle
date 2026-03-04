@@ -12,7 +12,7 @@ import com.dbeagle.settings.AppSettings
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var settings by remember { mutableStateOf(AppPreferences.load()) }
     var resultLimitInput by remember { mutableStateOf(settings.resultLimit.toString()) }
@@ -35,18 +35,18 @@ fun SettingsScreen(
 
     Column(
         modifier = modifier.padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             text = "Application Settings",
-            style = MaterialTheme.typography.headlineMedium
+            style = MaterialTheme.typography.headlineMedium,
         )
 
         if (errorMessage != null) {
             Text(
                 text = errorMessage!!,
                 color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall,
             )
         }
 
@@ -55,7 +55,7 @@ fun SettingsScreen(
             onValueChange = { resultLimitInput = it },
             label = { Text("Result Limit (max rows)") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
         )
 
         OutlinedTextField(
@@ -63,7 +63,7 @@ fun SettingsScreen(
             onValueChange = { queryTimeoutInput = it },
             label = { Text("Query Timeout (seconds)") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
         )
 
         OutlinedTextField(
@@ -71,7 +71,7 @@ fun SettingsScreen(
             onValueChange = { connectionTimeoutInput = it },
             label = { Text("Connection Timeout (seconds)") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
         )
 
         OutlinedTextField(
@@ -79,12 +79,12 @@ fun SettingsScreen(
             onValueChange = { maxConnectionsInput = it },
             label = { Text("Max Connections") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
         )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Button(
                 onClick = {
@@ -93,7 +93,7 @@ fun SettingsScreen(
                             resultLimit = resultLimitInput.toInt(),
                             queryTimeoutSeconds = queryTimeoutInput.toInt(),
                             connectionTimeoutSeconds = connectionTimeoutInput.toInt(),
-                            maxConnections = maxConnectionsInput.toInt()
+                            maxConnections = maxConnectionsInput.toInt(),
                         )
                         AppPreferences.save(newSettings)
                         settings = newSettings
@@ -103,7 +103,7 @@ fun SettingsScreen(
                     } catch (e: IllegalArgumentException) {
                         errorMessage = e.message ?: "Invalid settings values. All values must be greater than 0."
                     }
-                }
+                },
             ) {
                 Text("Save")
             }
@@ -116,13 +116,13 @@ fun SettingsScreen(
                     connectionTimeoutInput = settings.connectionTimeoutSeconds.toString()
                     maxConnectionsInput = settings.maxConnections.toString()
                     AppPreferences.save(settings)
-                }
+                },
             ) {
                 Text("Reset to Defaults")
             }
 
             Button(
-                onClick = onClose
+                onClick = onClose,
             ) {
                 Text("Close")
             }
@@ -132,7 +132,7 @@ fun SettingsScreen(
 
         Text(
             text = "Debug",
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
         )
 
         Button(onClick = { refreshPoolStats() }) {
@@ -142,14 +142,14 @@ fun SettingsScreen(
         Text(
             text = "Connection pools: $poolCount",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         if (allPools.isEmpty()) {
             Text(
                 text = "No pools initialized.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -157,7 +157,7 @@ fun SettingsScreen(
                     Text(
                         text = "Pool ${id.take(8)}: active=${s.active}, idle=${s.idle}, total=${s.total}, waiting=${s.waiting}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

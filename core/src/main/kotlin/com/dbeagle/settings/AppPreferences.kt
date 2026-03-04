@@ -10,14 +10,12 @@ object AppPreferences {
     private const val KEY_CONNECTION_TIMEOUT = "connectionTimeoutSeconds"
     private const val KEY_MAX_CONNECTIONS = "maxConnections"
 
-    fun load(): AppSettings {
-        return AppSettings(
-            resultLimit = preferences.getInt(KEY_RESULT_LIMIT, AppSettings.DEFAULT_RESULT_LIMIT),
-            queryTimeoutSeconds = preferences.getInt(KEY_QUERY_TIMEOUT, AppSettings.DEFAULT_QUERY_TIMEOUT_SECONDS),
-            connectionTimeoutSeconds = preferences.getInt(KEY_CONNECTION_TIMEOUT, AppSettings.DEFAULT_CONNECTION_TIMEOUT_SECONDS),
-            maxConnections = preferences.getInt(KEY_MAX_CONNECTIONS, AppSettings.DEFAULT_MAX_CONNECTIONS)
-        )
-    }
+    fun load(): AppSettings = AppSettings(
+        resultLimit = preferences.getInt(KEY_RESULT_LIMIT, AppSettings.DEFAULT_RESULT_LIMIT),
+        queryTimeoutSeconds = preferences.getInt(KEY_QUERY_TIMEOUT, AppSettings.DEFAULT_QUERY_TIMEOUT_SECONDS),
+        connectionTimeoutSeconds = preferences.getInt(KEY_CONNECTION_TIMEOUT, AppSettings.DEFAULT_CONNECTION_TIMEOUT_SECONDS),
+        maxConnections = preferences.getInt(KEY_MAX_CONNECTIONS, AppSettings.DEFAULT_MAX_CONNECTIONS),
+    )
 
     fun save(settings: AppSettings) {
         preferences.putInt(KEY_RESULT_LIMIT, settings.resultLimit)

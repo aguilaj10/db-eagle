@@ -1,6 +1,5 @@
 package com.dbeagle.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,7 +20,7 @@ import java.util.*
 fun HistoryScreen(
     repository: QueryHistoryRepository,
     onLoadQuery: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var entries by remember { mutableStateOf(repository.getAll()) }
     var showClearDialog by remember { mutableStateOf(false) }
@@ -37,7 +36,7 @@ fun HistoryScreen(
                         repository.clear()
                         entries = emptyList()
                         showClearDialog = false
-                    }
+                    },
                 ) {
                     Text("Clear")
                 }
@@ -46,7 +45,7 @@ fun HistoryScreen(
                 TextButton(onClick = { showClearDialog = false }) {
                     Text("Cancel")
                 }
-            }
+            },
         )
     }
 
@@ -56,19 +55,19 @@ fun HistoryScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "${entries.size} ${if (entries.size == 1) "entry" else "entries"}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Button(
                 onClick = { showClearDialog = true },
                 enabled = entries.isNotEmpty(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
+                modifier = Modifier.height(32.dp),
             ) {
                 Text("Clear History", style = MaterialTheme.typography.labelMedium)
             }
@@ -79,23 +78,23 @@ fun HistoryScreen(
         if (entries.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "No query history yet.\nExecute queries in Query Editor to see them here.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(8.dp)
+                contentPadding = PaddingValues(8.dp),
             ) {
                 items(entries) { entry ->
                     HistoryEntryCard(
                         entry = entry,
-                        onClick = { onLoadQuery(entry.query) }
+                        onClick = { onLoadQuery(entry.query) },
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -107,7 +106,7 @@ fun HistoryScreen(
 @Composable
 private fun HistoryEntryCard(
     entry: QueryHistoryEntry,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
     val timestampText = dateFormat.format(Date(entry.timestamp))
@@ -116,27 +115,27 @@ private fun HistoryEntryCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(12.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = timestampText,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = "${entry.durationMs}ms",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
 
@@ -145,7 +144,7 @@ private fun HistoryEntryCard(
             Text(
                 text = entry.connectionProfileId,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary
+                color = MaterialTheme.colorScheme.secondary,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -155,7 +154,7 @@ private fun HistoryEntryCard(
                 style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }

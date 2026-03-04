@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.compose) apply false
     alias(libs.plugins.kover)
+    alias(libs.plugins.spotless)
 }
 
 dependencies {
@@ -16,7 +17,7 @@ kover {
         filters {
             excludes {
                 classes(
-                    "com.dbeagle.AppKt", 
+                    "com.dbeagle.AppKt",
                     "com.dbeagle.App*",
                     "com.dbeagle.di.*",
                     "com.dbeagle.edit.*",
@@ -25,7 +26,7 @@ kover {
                     "com.dbeagle.*Module",
                     "*.ComposableSingletons*",
                     "*\$\$serializer*",
-                    "*\$Companion"
+                    "*\$Companion",
                 )
             }
         }
@@ -34,7 +35,7 @@ kover {
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlinx.kover")
-    
+
     plugins.withType<org.jetbrains.kotlin.gradle.plugin.KotlinBasePluginWrapper> {
         extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
             compilerOptions {
@@ -42,9 +43,27 @@ subprojects {
             }
         }
     }
-    
+
     tasks.withType<JavaCompile>().configureEach {
         sourceCompatibility = "17"
         targetCompatibility = "17"
+    }
+}
+
+spotless {
+    kotlin {
+        target("**/*.kt")
+        targetExclude("**/build/**")
+        ktlint().editorConfigOverride(
+            mapOf(
+                "ktlint_standard_no-wildcard-imports" to "disabled",
+                "ktlint_standard_function-naming" to "disabled",
+            ),
+        )
+    }
+    kotlinGradle {
+        target("**/*.gradle.kts")
+        targetExclude("**/build/**")
+        ktlint()
     }
 }

@@ -3,6 +3,8 @@ package com.dbeagle.ui
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,12 +17,10 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
-import kotlinx.coroutines.launch
 
 @Composable
 fun ResultGrid(
@@ -28,7 +28,7 @@ fun ResultGrid(
     rows: List<List<String>>,
     pageSize: Int = 25,
     modifier: Modifier = Modifier,
-    onCellCommit: suspend (rowIndex: Int, columnName: String, newValue: String, rowSnapshot: List<String>) -> Result<Unit>
+    onCellCommit: suspend (rowIndex: Int, columnName: String, newValue: String, rowSnapshot: List<String>) -> Result<Unit>,
 ) {
     var localRows by remember(rows) { mutableStateOf(rows.map { it.toMutableList() }.toMutableList()) }
     var baselineRows by remember(rows) { mutableStateOf(rows.map { it.toList() }) }
@@ -50,7 +50,7 @@ fun ResultGrid(
                 TextButton(onClick = { gridError = null }) {
                     Text("OK")
                 }
-            }
+            },
         )
     }
 
@@ -61,28 +61,28 @@ fun ResultGrid(
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 "Total rows: ${localRows.size}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(
                     onClick = { currentPage = max(0, currentPage - 1) },
-                    enabled = currentPage > 0
+                    enabled = currentPage > 0,
                 ) {
                     Text("Prev")
                 }
                 Text(
                     " Page ${currentPage + 1} of $totalPages ",
                     modifier = Modifier.padding(horizontal = 16.dp),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 OutlinedButton(
                     onClick = { currentPage = min(totalPages - 1, currentPage + 1) },
-                    enabled = currentPage < totalPages - 1
+                    enabled = currentPage < totalPages - 1,
                 ) {
                     Text("Next")
                 }
@@ -99,14 +99,14 @@ fun ResultGrid(
                             modifier = Modifier
                                 .width(150.dp)
                                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                                .padding(8.dp)
+                                .padding(8.dp),
                         ) {
                             Text(
                                 text = col,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -119,7 +119,7 @@ fun ResultGrid(
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     itemsIndexed(
                         items = visibleRows,
-                        key = { rIdx, _ -> startIdx + rIdx }
+                        key = { rIdx, _ -> startIdx + rIdx },
                     ) { rIdx, row ->
                         val actualRowIdx = startIdx + rIdx
                         Row(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
@@ -157,7 +157,7 @@ fun ResultGrid(
                                                 actualRowIdx,
                                                 colName,
                                                 newValue,
-                                                rowSnapshot
+                                                rowSnapshot,
                                             )
                                             if (result.isFailure) {
                                                 val msg = result.exceptionOrNull()?.message ?: "Failed to persist update"
@@ -175,7 +175,7 @@ fun ResultGrid(
                                                 }
                                             }
                                         }
-                                    }
+                                    },
                                 )
                             }
                         }
@@ -190,7 +190,7 @@ fun ResultGrid(
 fun EditableCell(
     value: String,
     isDirty: Boolean,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
 ) {
     var isEditing by remember { mutableStateOf(false) }
     var text by remember(value) { mutableStateOf(value) }
@@ -201,18 +201,21 @@ fun EditableCell(
             .width(150.dp)
             .border(
                 width = if (isDirty) 2.dp else 1.dp,
-                color = if (isDirty) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                color = if (isDirty) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
             )
             .background(
-                if (isDirty) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                else MaterialTheme.colorScheme.surface
+                if (isDirty) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                } else {
+                    MaterialTheme.colorScheme.surface
+                },
             )
             .pointerInput(Unit) {
                 detectTapGestures(
-                    onDoubleTap = { isEditing = true }
+                    onDoubleTap = { isEditing = true },
                 )
             }
-            .padding(8.dp)
+            .padding(8.dp),
     ) {
         if (isEditing) {
             BasicTextField(
@@ -242,8 +245,8 @@ fun EditableCell(
                     },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
             )
             LaunchedEffect(Unit) {
                 focusRequester.requestFocus()
@@ -254,7 +257,7 @@ fun EditableCell(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }

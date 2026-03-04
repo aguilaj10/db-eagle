@@ -15,7 +15,7 @@ import java.util.UUID
 fun ConnectionDialog(
     initialProfile: ConnectionProfile?,
     onDismiss: () -> Unit,
-    onSave: (ConnectionProfile, String) -> Unit
+    onSave: (ConnectionProfile, String) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialProfile?.name ?: "") }
     var type by remember { mutableStateOf<DatabaseType>(initialProfile?.type ?: DatabaseType.PostgreSQL) }
@@ -34,19 +34,19 @@ fun ConnectionDialog(
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 ExposedDropdownMenuBox(
                     expanded = expanded,
-                    onExpandedChange = { expanded = it }
+                    onExpandedChange = { expanded = it },
                 ) {
                     OutlinedTextField(
                         value = if (isPostgreSQL) "PostgreSQL" else "SQLite",
@@ -54,25 +54,25 @@ fun ConnectionDialog(
                         readOnly = true,
                         label = { Text("Type") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth()
+                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        onDismissRequest = { expanded = false },
                     ) {
                         DropdownMenuItem(
                             text = { Text("PostgreSQL") },
                             onClick = {
                                 type = DatabaseType.PostgreSQL
                                 expanded = false
-                            }
+                            },
                         )
                         DropdownMenuItem(
                             text = { Text("SQLite") },
                             onClick = {
                                 type = DatabaseType.SQLite
                                 expanded = false
-                            }
+                            },
                         )
                     }
                 }
@@ -84,14 +84,14 @@ fun ConnectionDialog(
                             onValueChange = { host = it },
                             label = { Text("Host") },
                             singleLine = true,
-                            modifier = Modifier.weight(2f)
+                            modifier = Modifier.weight(2f),
                         )
                         OutlinedTextField(
                             value = port,
                             onValueChange = { port = it },
                             label = { Text("Port") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -101,7 +101,7 @@ fun ConnectionDialog(
                     onValueChange = { database = it },
                     label = { Text(if (isPostgreSQL) "Database" else "Database File Path") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 if (isPostgreSQL) {
@@ -110,7 +110,7 @@ fun ConnectionDialog(
                         onValueChange = { username = it },
                         label = { Text("Username") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
 
@@ -120,7 +120,7 @@ fun ConnectionDialog(
                     label = { Text(if (initialProfile == null) "Password" else "Password (re-enter to save)") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
@@ -136,10 +136,10 @@ fun ConnectionDialog(
                         port = pPort,
                         database = database,
                         username = if (isPostgreSQL) username else "",
-                        encryptedPassword = initialProfile?.encryptedPassword ?: ""
+                        encryptedPassword = initialProfile?.encryptedPassword ?: "",
                     )
                     onSave(newProfile, password)
-                }
+                },
             ) {
                 Text("Save")
             }
@@ -148,6 +148,6 @@ fun ConnectionDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }

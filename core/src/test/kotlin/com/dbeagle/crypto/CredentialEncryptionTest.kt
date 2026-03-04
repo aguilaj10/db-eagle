@@ -6,7 +6,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 
 class CredentialEncryptionTest {
-
     @Test
     fun `encrypt then decrypt returns original plaintext`() {
         val plaintext = "super-secret-password-123"

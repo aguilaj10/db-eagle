@@ -1,6 +1,5 @@
 package com.dbeagle.crypto
 
-import dev.whyoleg.cryptography.BinarySize.Companion.bits
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.symmetric.AES
 import dev.whyoleg.cryptography.providers.jdk.JDK
@@ -18,33 +17,39 @@ object CredentialEncryption {
     private val cryptoProvider = CryptographyProvider.JDK
     private val secureRandom = SecureRandom()
 
-    fun encrypt(plaintext: String, masterPassword: String): EncryptedData {
+    fun encrypt(
+        plaintext: String,
+        masterPassword: String,
+    ): EncryptedData {
         val salt = ByteArray(SALT_LENGTH_BYTES).apply { secureRandom.nextBytes(this) }
         val iv = ByteArray(IV_LENGTH_BYTES).apply { secureRandom.nextBytes(this) }
-        
+
         val derivedKey = deriveKey(masterPassword, salt)
-        
+
         val aes = cryptoProvider.get(AES.GCM)
         val key = aes.keyDecoder().decodeFromBlocking(AES.Key.Format.RAW, derivedKey)
-        
+
         val cipher = key.cipher()
         val ciphertext = cipher.encryptBlocking(plaintext.toByteArray(Charsets.UTF_8), iv)
-        
+
         return EncryptedData(
             ciphertext = ciphertext,
             iv = iv,
-            salt = salt
+            salt = salt,
         )
     }
 
-    fun decrypt(encrypted: EncryptedData, masterPassword: String): String {
+    fun decrypt(
+        encrypted: EncryptedData,
+        masterPassword: String,
+    ): String {
         val derivedKey = deriveKey(masterPassword, encrypted.salt)
-        
+
         val aes = cryptoProvider.get(AES.GCM)
         val key = aes.keyDecoder().decodeFromBlocking(AES.Key.Format.RAW, derivedKey)
-        
+
         val cipher = key.cipher()
-        
+
         return try {
             val decryptedBytes = cipher.decryptBlocking(encrypted.ciphertext, encrypted.iv)
             String(decryptedBytes, Charsets.UTF_8)
@@ -53,7 +58,10 @@ object CredentialEncryption {
         }
     }
 
-    private fun deriveKey(password: String, salt: ByteArray): ByteArray {
+    private fun deriveKey(
+        password: String,
+        salt: ByteArray,
+    ): ByteArray {
         val spec = PBEKeySpec(password.toCharArray(), salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS)
         val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
         return factory.generateSecret(spec).encoded

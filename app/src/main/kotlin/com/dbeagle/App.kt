@@ -1,56 +1,54 @@
 package com.dbeagle
 
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.dbeagle.crash.CrashReporter
 import com.dbeagle.di.appModule
 import com.dbeagle.edit.InlineUpdate
 import com.dbeagle.error.ErrorHandler
 import com.dbeagle.favorites.FileFavoritesRepository
-import com.dbeagle.favorites.FavoritesRepository
 import com.dbeagle.history.FileQueryHistoryRepository
-import com.dbeagle.history.QueryHistoryRepository
 import com.dbeagle.model.FavoriteQuery
 import com.dbeagle.model.QueryHistoryEntry
-import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.QueryResult
+import com.dbeagle.model.SchemaMetadata
+import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.query.QueryExecutor
 import com.dbeagle.session.SessionViewModel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.core.context.startKoin
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
-import com.dbeagle.pool.DatabaseConnectionPool
-import com.dbeagle.crash.CrashReporter
 import org.slf4j.LoggerFactory
 
 private data class MemoryStats(
     val usedBytes: Long,
     val freeBytes: Long,
     val totalBytes: Long,
-    val maxBytes: Long
+    val maxBytes: Long,
 ) {
     val usedMb: Long get() = usedBytes / (1024L * 1024L)
     val totalMb: Long get() = totalBytes / (1024L * 1024L)
@@ -67,7 +65,7 @@ private fun readMemoryStats(): MemoryStats {
         usedBytes = used,
         freeBytes = free,
         totalBytes = total,
-        maxBytes = max
+        maxBytes = max,
     )
 }
 
@@ -77,7 +75,7 @@ enum class NavigationTab(val title: String) {
     SchemaBrowser("Schema Browser"),
     Favorites("Favorites"),
     History("History"),
-    Settings("Settings")
+    Settings("Settings"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,7 +83,7 @@ fun main() {
     CrashReporter.install()
     val logger = LoggerFactory.getLogger("com.dbeagle.App")
     logger.info("DB Eagle starting...")
-    
+
     startKoin {
         modules(appModule)
     }
@@ -119,7 +117,7 @@ fun main() {
 
         val appCoroutineScope = rememberCoroutineScope()
         val snackbarHostState = remember { SnackbarHostState() }
-        
+
         val historyRepository = remember { FileQueryHistoryRepository() }
         val favoritesRepository = remember { FileFavoritesRepository() }
         var showSaveFavoriteDialog by remember { mutableStateOf(false) }
@@ -133,12 +131,12 @@ fun main() {
                     val favorite = FavoriteQuery(
                         name = name,
                         query = favoriteQueryDraft,
-                        tags = tags
+                        tags = tags,
                     )
                     favoritesRepository.save(favorite)
                     statusText = "Status: Saved to favorites"
                     showSaveFavoriteDialog = false
-                }
+                },
             )
         }
 
@@ -168,8 +166,10 @@ fun main() {
                         }
                         else -> false
                     }
-                } else false
-            }
+                } else {
+                    false
+                }
+            },
         ) {
             MaterialTheme {
                 Scaffold(
@@ -178,16 +178,16 @@ fun main() {
                             title = { Text("DB Eagle") },
                             colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             ),
                             actions = {
                                 IconButton(onClick = { selectedTab = NavigationTab.Settings }) {
                                     Icon(
                                         imageVector = Icons.Default.Settings,
-                                        contentDescription = "Settings"
+                                        contentDescription = "Settings",
                                     )
                                 }
-                            }
+                            },
                         )
                     },
                     bottomBar = {
@@ -196,7 +196,7 @@ fun main() {
                                 .fillMaxWidth()
                                 .height(32.dp)
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.CenterStart
+                            contentAlignment = Alignment.CenterStart,
                         ) {
                             Row(
                                 modifier = Modifier
@@ -204,24 +204,24 @@ fun main() {
                                     .padding(horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                 Text(
-                                     text = statusText,
-                                     style = MaterialTheme.typography.labelMedium,
-                                     modifier = Modifier.weight(1f)
-                                 )
+                                Text(
+                                    text = statusText,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
 
-                                 Text(
-                                     text = "Mem: ${memoryStats.usedMb}MB / ${memoryStats.maxMb}MB",
-                                     style = MaterialTheme.typography.labelMedium,
-                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                     modifier = Modifier.padding(end = 16.dp)
-                                 )
+                                Text(
+                                    text = "Mem: ${memoryStats.usedMb}MB / ${memoryStats.maxMb}MB",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(end = 16.dp),
+                                )
 
-                                 val stats = poolStats
-                                 val poolText = if (stats == null) {
-                                     "Pool: n/a"
-                                 } else {
-                                     "Pool a=${stats.active} i=${stats.idle} t=${stats.total} w=${stats.waiting}"
+                                val stats = poolStats
+                                val poolText = if (stats == null) {
+                                    "Pool: n/a"
+                                } else {
+                                    "Pool a=${stats.active} i=${stats.idle} t=${stats.total} w=${stats.waiting}"
                                 }
                                 val poolColor = when {
                                     stats == null -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -230,76 +230,76 @@ fun main() {
                                     else -> MaterialTheme.colorScheme.primary
                                 }
 
-                                 Text(
-                                     text = poolText,
-                                     style = MaterialTheme.typography.labelMedium,
-                                     color = poolColor,
-                                 )
-                                 
-                                 Spacer(Modifier.width(16.dp))
-                                 
-                                 TextButton(
-                                     onClick = {
-                                         val crashLog = CrashReporter.readCrashLog()
-                                         if (crashLog != null) {
-                                             try {
-                                                 val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                                 val selection = java.awt.datatransfer.StringSelection(crashLog)
-                                                 clipboard.setContents(selection, selection)
-                                                 statusText = "Status: Crash log copied to clipboard"
-                                                 logger.info("User action: Copied crash log to clipboard")
-                                             } catch (e: Exception) {
-                                                 statusText = "Status: Failed to copy to clipboard"
-                                                 logger.warn("Failed to copy crash log to clipboard", e)
-                                             }
-                                         } else {
-                                             statusText = "Status: No crash log found"
-                                             logger.info("User action: Attempted to copy crash log, but none exists")
-                                         }
-                                     },
-                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                     modifier = Modifier.height(28.dp)
-                                 ) {
-                                     Icon(
-                                         imageVector = Icons.Default.Warning,
-                                         contentDescription = "Report Issue",
-                                         modifier = Modifier.size(16.dp)
-                                     )
-                                     Spacer(Modifier.width(4.dp))
-                                     Text(
-                                         "Report Issue",
-                                         style = MaterialTheme.typography.labelSmall
-                                     )
-                                 }
+                                Text(
+                                    text = poolText,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = poolColor,
+                                )
+
+                                Spacer(Modifier.width(16.dp))
+
+                                TextButton(
+                                    onClick = {
+                                        val crashLog = CrashReporter.readCrashLog()
+                                        if (crashLog != null) {
+                                            try {
+                                                val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                                val selection = java.awt.datatransfer.StringSelection(crashLog)
+                                                clipboard.setContents(selection, selection)
+                                                statusText = "Status: Crash log copied to clipboard"
+                                                logger.info("User action: Copied crash log to clipboard")
+                                            } catch (e: Exception) {
+                                                statusText = "Status: Failed to copy to clipboard"
+                                                logger.warn("Failed to copy crash log to clipboard", e)
+                                            }
+                                        } else {
+                                            statusText = "Status: No crash log found"
+                                            logger.info("User action: Attempted to copy crash log, but none exists")
+                                        }
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(28.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = "Report Issue",
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        "Report Issue",
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
                             }
                         }
                     },
                     snackbarHost = {
                         SnackbarHost(hostState = snackbarHostState)
-                    }
+                    },
                 ) { innerPadding ->
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding)
+                            .padding(innerPadding),
                     ) {
                         // Left sidebar
                         Box(
                             modifier = Modifier
                                 .width(250.dp)
                                 .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.surface)
+                                .background(MaterialTheme.colorScheme.surface),
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxSize().padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Button(
-                                    onClick = { 
+                                    onClick = {
                                         selectedTab = NavigationTab.Connections
                                         triggerNewConnection = true
                                     },
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Text("New Connection")
                                 }
@@ -307,13 +307,13 @@ fun main() {
                                 Text(
                                     text = "Connections",
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = "(Active connection list placeholder)",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -323,7 +323,7 @@ fun main() {
                             modifier = Modifier
                                 .width(1.dp)
                                 .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.outlineVariant)
+                                .background(MaterialTheme.colorScheme.outlineVariant),
                         )
 
                         // Center content area
@@ -331,7 +331,7 @@ fun main() {
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.background)
+                                .background(MaterialTheme.colorScheme.background),
                         ) {
                             if (sessionOrder.isNotEmpty()) {
                                 val selectedConnectionTabIndex = sessionOrder.indexOf(activeProfileId).let { idx ->
@@ -340,7 +340,7 @@ fun main() {
 
                                 ScrollableTabRow(
                                     selectedTabIndex = selectedConnectionTabIndex,
-                                    edgePadding = 8.dp
+                                    edgePadding = 8.dp,
                                 ) {
                                     sessionOrder.forEach { profileId ->
                                         val label = sessionStates[profileId]?.profileName ?: profileId.take(8)
@@ -357,12 +357,12 @@ fun main() {
                                                                 sessionViewModel.closeSession(profileId)
                                                             }
                                                         },
-                                                        modifier = Modifier.size(28.dp)
+                                                        modifier = Modifier.size(28.dp),
                                                     ) {
                                                         Icon(Icons.Default.Close, contentDescription = "Close connection")
                                                     }
                                                 }
-                                            }
+                                            },
                                         )
                                     }
                                 }
@@ -370,20 +370,20 @@ fun main() {
 
                             ScrollableTabRow(
                                 selectedTabIndex = selectedTab.ordinal,
-                                edgePadding = 8.dp
+                                edgePadding = 8.dp,
                             ) {
                                 NavigationTab.entries.forEach { tab ->
                                     Tab(
                                         selected = selectedTab == tab,
                                         onClick = { selectedTab = tab },
-                                        text = { Text(tab.title) }
+                                        text = { Text(tab.title) },
                                     )
                                 }
                             }
-                            
+
                             Box(
                                 modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
+                                contentAlignment = Alignment.Center,
                             ) {
                                 when (selectedTab) {
                                     NavigationTab.Connections -> {
@@ -393,7 +393,7 @@ fun main() {
                                             snackbarHostState = snackbarHostState,
                                             coroutineScope = appCoroutineScope,
                                             triggerNewConnection = triggerNewConnection,
-                                            onNewConnectionTriggered = { triggerNewConnection = false }
+                                            onNewConnectionTriggered = { triggerNewConnection = false },
                                         )
                                     }
                                     NavigationTab.QueryEditor -> {
@@ -413,13 +413,13 @@ fun main() {
                                         if (showExportDialog) {
                                             com.dbeagle.ui.ExportDialog(
                                                 onDismiss = { showExportDialog = false },
-                                                    onExportRequested = { format, path, onProgress ->
+                                                onExportRequested = { format, path, onProgress ->
                                                     val result = lastQueryResult
                                                     if (result == null) {
                                                         statusText = "Status: No query result to export"
                                                         return@ExportDialog
                                                     }
-                                                    
+
                                                     try {
                                                         val outputFile = java.io.File(path)
                                                         val exporter = when (format) {
@@ -427,7 +427,7 @@ fun main() {
                                                             com.dbeagle.ui.ExportFormat.JSON -> com.dbeagle.export.JsonExporter()
                                                             com.dbeagle.ui.ExportFormat.SQL -> com.dbeagle.export.SqlExporter()
                                                         }
-                                                        
+
                                                         exporter.export(outputFile, result, result.resultSet) { rowCount, isDone ->
                                                             onProgress(rowCount, isDone)
                                                             if (isDone) {
@@ -437,48 +437,48 @@ fun main() {
                                                     } catch (e: Exception) {
                                                         statusText = "Status: Export failed: ${e.message}"
                                                     }
-                                                }
+                                                },
                                             )
                                         }
 
                                         Column(modifier = Modifier.fillMaxSize()) {
-                                         if (editError != null) {
-                                             AlertDialog(
-                                                 onDismissRequest = { editError = null },
-                                                 title = { Text("Edit Error") },
-                                                 text = { Text(editError ?: "") },
-                                                 confirmButton = {
-                                                     TextButton(onClick = { editError = null }) {
-                                                         Text("OK")
-                                                     }
-                                                 }
-                                             )
-                                         }
+                                            if (editError != null) {
+                                                AlertDialog(
+                                                    onDismissRequest = { editError = null },
+                                                    title = { Text("Edit Error") },
+                                                    text = { Text(editError ?: "") },
+                                                    confirmButton = {
+                                                        TextButton(onClick = { editError = null }) {
+                                                            Text("OK")
+                                                        }
+                                                    },
+                                                )
+                                            }
 
-                                             com.dbeagle.ui.SQLEditor(
-                                                 sql = sqlText,
-                                                 onSqlChange = {
-                                                     val pid = activeProfileId
-                                                     if (pid == null) {
-                                                         scratchSql = it
-                                                     } else {
-                                                         sessionViewModel.updateQueryEditorSql(pid, it)
-                                                     }
-                                                 },
-                                                 onCancel = {
-                                                     queryJob?.cancel()
-                                                     isRunning = false
-                                                     statusText = "Status: Query canceled"
-                                                 },
-                                                  onRun = {
-                                                     if (isRunning) return@SQLEditor
-                                                     val driver = activeDriver
-                                                     if (driver == null) {
-                                                         statusText = "Status: No active connection"
-                                                         return@SQLEditor
-                                                     }
+                                            com.dbeagle.ui.SQLEditor(
+                                                sql = sqlText,
+                                                onSqlChange = {
+                                                    val pid = activeProfileId
+                                                    if (pid == null) {
+                                                        scratchSql = it
+                                                    } else {
+                                                        sessionViewModel.updateQueryEditorSql(pid, it)
+                                                    }
+                                                },
+                                                onCancel = {
+                                                    queryJob?.cancel()
+                                                    isRunning = false
+                                                    statusText = "Status: Query canceled"
+                                                },
+                                                onRun = {
+                                                    if (isRunning) return@SQLEditor
+                                                    val driver = activeDriver
+                                                    if (driver == null) {
+                                                        statusText = "Status: No active connection"
+                                                        return@SQLEditor
+                                                    }
 
-                                                   queryJob = coroutineScope.launch {
+                                                    queryJob = coroutineScope.launch {
                                                         isRunning = true
                                                         queryError = null
                                                         val name = activeProfileName ?: "Connection"
@@ -495,152 +495,152 @@ fun main() {
 
                                                         val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
 
-                                                           val startNs = System.nanoTime()
-                                                             try {
-                                                                 val r = withContext(Dispatchers.IO) { QueryExecutor(driver).execute(sqlToRun) }
-                                                                 when (r) {
-                                                                     is QueryResult.Success -> {
-                                                                         sessionViewModel.recordQueryResult(pid, sqlToRun, r)
-                                                                         val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                                         statusText = "Status: ${r.rows.size} row(s) in ${durationMs}ms"
-                                                                         
-                                                                         historyRepository.add(
-                                                                             QueryHistoryEntry(
-                                                                                 query = sqlToRun,
-                                                                                 durationMs = durationMs,
-                                                                                 connectionProfileId = pid
-                                                                             )
-                                                                         )
-                                                                     }
-                                                                    is QueryResult.Error -> {
-                                                                        val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                                        statusText = "Status: Error in ${durationMs}ms: ${r.message}"
-                                                                        ErrorHandler.showQueryError(
-                                                                            snackbarHostState,
-                                                                            appCoroutineScope,
-                                                                            "Query error: ${r.message}"
-                                                                        )
-                                                                        
-                                                                        historyRepository.add(
-                                                                            QueryHistoryEntry(
-                                                                                query = sqlToRun,
-                                                                                durationMs = durationMs,
-                                                                                connectionProfileId = pid
-                                                                            )
-                                                                        )
-                                                                    }
+                                                        val startNs = System.nanoTime()
+                                                        try {
+                                                            val r = withContext(Dispatchers.IO) { QueryExecutor(driver).execute(sqlToRun) }
+                                                            when (r) {
+                                                                is QueryResult.Success -> {
+                                                                    sessionViewModel.recordQueryResult(pid, sqlToRun, r)
+                                                                    val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                                    statusText = "Status: ${r.rows.size} row(s) in ${durationMs}ms"
+
+                                                                    historyRepository.add(
+                                                                        QueryHistoryEntry(
+                                                                            query = sqlToRun,
+                                                                            durationMs = durationMs,
+                                                                            connectionProfileId = pid,
+                                                                        ),
+                                                                    )
                                                                 }
-                                                            } catch (e: CancellationException) {
-                                                                statusText = "Status: Query canceled"
-                                                            } catch (e: Exception) {
-                                                                val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                                statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
-                                                                ErrorHandler.showQueryError(
-                                                                    snackbarHostState,
-                                                                    appCoroutineScope,
-                                                                    "Query error: ${e.message ?: "Unknown error"}",
-                                                                    e
-                                                                )
-                                                           } finally {
-                                                               isRunning = false
-                                                           }
-                                                      }
-                                                  },
-                                                 isRunning = isRunning,
-                                                 onClear = {
-                                                     val pid = activeProfileId
-                                                     if (pid == null) scratchSql = "" else sessionViewModel.updateQueryEditorSql(pid, "")
-                                                 },
-                                                 onSaveToFavorites = {
-                                                     favoriteQueryDraft = sqlText
-                                                     showSaveFavoriteDialog = true
-                                                 },
-                                                 modifier = Modifier.weight(0.4f)
-                                             )
-                                            
+                                                                is QueryResult.Error -> {
+                                                                    val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                                    statusText = "Status: Error in ${durationMs}ms: ${r.message}"
+                                                                    ErrorHandler.showQueryError(
+                                                                        snackbarHostState,
+                                                                        appCoroutineScope,
+                                                                        "Query error: ${r.message}",
+                                                                    )
+
+                                                                    historyRepository.add(
+                                                                        QueryHistoryEntry(
+                                                                            query = sqlToRun,
+                                                                            durationMs = durationMs,
+                                                                            connectionProfileId = pid,
+                                                                        ),
+                                                                    )
+                                                                }
+                                                            }
+                                                        } catch (e: CancellationException) {
+                                                            statusText = "Status: Query canceled"
+                                                        } catch (e: Exception) {
+                                                            val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                            statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
+                                                            ErrorHandler.showQueryError(
+                                                                snackbarHostState,
+                                                                appCoroutineScope,
+                                                                "Query error: ${e.message ?: "Unknown error"}",
+                                                                e,
+                                                            )
+                                                        } finally {
+                                                            isRunning = false
+                                                        }
+                                                    }
+                                                },
+                                                isRunning = isRunning,
+                                                onClear = {
+                                                    val pid = activeProfileId
+                                                    if (pid == null) scratchSql = "" else sessionViewModel.updateQueryEditorSql(pid, "")
+                                                },
+                                                onSaveToFavorites = {
+                                                    favoriteQueryDraft = sqlText
+                                                    showSaveFavoriteDialog = true
+                                                },
+                                                modifier = Modifier.weight(0.4f),
+                                            )
+
                                             HorizontalDivider(thickness = 2.dp)
-                                            
+
                                             Row(
                                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.End
+                                                horizontalArrangement = Arrangement.End,
                                             ) {
                                                 Button(
                                                     onClick = { showExportDialog = true },
                                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                                    modifier = Modifier.height(32.dp)
+                                                    modifier = Modifier.height(32.dp),
                                                 ) {
                                                     Text("Export Data", style = MaterialTheme.typography.labelMedium)
                                                 }
                                             }
-                                            
-                                             com.dbeagle.ui.ResultGrid(
-                                                 columns = columns,
-                                                 rows = rows,
-                                                 pageSize = 25,
-                                                 modifier = Modifier.weight(0.6f),
-                                                 onCellCommit = { _, columnName, newValue, rowSnapshot ->
-                                                      val driver = activeDriver
-                                                      if (driver == null) {
-                                                          statusText = "Status: No active connection"
-                                                          return@ResultGrid Result.failure(IllegalStateException("No active connection"))
-                                                      }
 
-                                                      val lastSql = lastExecutedSql
-                                                      val table = lastSql?.let { InlineUpdate.inferTableNameFromSelectAll(it) }
-                                                      if (table.isNullOrBlank()) {
-                                                          val msg = "Inline edit requires last query like: SELECT * FROM <table>"
-                                                          editError = msg
-                                                          return@ResultGrid Result.failure(IllegalStateException(msg))
-                                                     }
+                                            com.dbeagle.ui.ResultGrid(
+                                                columns = columns,
+                                                rows = rows,
+                                                pageSize = 25,
+                                                modifier = Modifier.weight(0.6f),
+                                                onCellCommit = { _, columnName, newValue, rowSnapshot ->
+                                                    val driver = activeDriver
+                                                    if (driver == null) {
+                                                        statusText = "Status: No active connection"
+                                                        return@ResultGrid Result.failure(IllegalStateException("No active connection"))
+                                                    }
 
-                                                     val idIndex = columns.indexOfFirst { it.equals("id", ignoreCase = true) }
-                                                     if (idIndex < 0) {
-                                                         val msg = "Inline edit requires an 'id' column in result set"
-                                                         editError = msg
-                                                         return@ResultGrid Result.failure(IllegalStateException(msg))
-                                                     }
+                                                    val lastSql = lastExecutedSql
+                                                    val table = lastSql?.let { InlineUpdate.inferTableNameFromSelectAll(it) }
+                                                    if (table.isNullOrBlank()) {
+                                                        val msg = "Inline edit requires last query like: SELECT * FROM <table>"
+                                                        editError = msg
+                                                        return@ResultGrid Result.failure(IllegalStateException(msg))
+                                                    }
 
-                                                     val idValue = rowSnapshot.getOrNull(idIndex)
-                                                     if (idValue.isNullOrBlank()) {
-                                                         val msg = "Inline edit requires a non-empty id value"
-                                                         editError = msg
-                                                         return@ResultGrid Result.failure(IllegalStateException(msg))
-                                                     }
+                                                    val idIndex = columns.indexOfFirst { it.equals("id", ignoreCase = true) }
+                                                    if (idIndex < 0) {
+                                                        val msg = "Inline edit requires an 'id' column in result set"
+                                                        editError = msg
+                                                        return@ResultGrid Result.failure(IllegalStateException(msg))
+                                                    }
 
-                                                     val stmt = InlineUpdate.buildUpdateById(
-                                                         table = table,
-                                                         column = columnName,
-                                                         value = newValue,
-                                                         id = idValue
-                                                     )
+                                                    val idValue = rowSnapshot.getOrNull(idIndex)
+                                                    if (idValue.isNullOrBlank()) {
+                                                        val msg = "Inline edit requires a non-empty id value"
+                                                        editError = msg
+                                                        return@ResultGrid Result.failure(IllegalStateException(msg))
+                                                    }
 
-                                                     val r = try {
-                                                         withContext(Dispatchers.IO) { QueryExecutor(driver).execute(stmt.sql, stmt.params) }
-                                                     } catch (e: CancellationException) {
-                                                         throw e
-                                                     } catch (e: Exception) {
-                                                         val msg = e.message ?: "Unknown error"
-                                                         editError = msg
-                                                         statusText = "Status: Update failed: $msg"
-                                                         return@ResultGrid Result.failure(IllegalStateException(msg))
-                                                     }
+                                                    val stmt = InlineUpdate.buildUpdateById(
+                                                        table = table,
+                                                        column = columnName,
+                                                        value = newValue,
+                                                        id = idValue,
+                                                    )
 
-                                                     when (r) {
-                                                         is QueryResult.Success -> {
-                                                             statusText = "Status: Updated $table.$columnName for id=$idValue"
-                                                             Result.success(Unit)
-                                                         }
-                                                         is QueryResult.Error -> {
-                                                             val msg = r.message
-                                                             editError = msg
-                                                             statusText = "Status: Update failed: $msg"
-                                                             Result.failure(IllegalStateException(msg))
-                                                         }
-                                                     }
-                                                 }
-                                             )
-                                         }
-                                     }
+                                                    val r = try {
+                                                        withContext(Dispatchers.IO) { QueryExecutor(driver).execute(stmt.sql, stmt.params) }
+                                                    } catch (e: CancellationException) {
+                                                        throw e
+                                                    } catch (e: Exception) {
+                                                        val msg = e.message ?: "Unknown error"
+                                                        editError = msg
+                                                        statusText = "Status: Update failed: $msg"
+                                                        return@ResultGrid Result.failure(IllegalStateException(msg))
+                                                    }
+
+                                                    when (r) {
+                                                        is QueryResult.Success -> {
+                                                            statusText = "Status: Updated $table.$columnName for id=$idValue"
+                                                            Result.success(Unit)
+                                                        }
+                                                        is QueryResult.Error -> {
+                                                            val msg = r.message
+                                                            editError = msg
+                                                            statusText = "Status: Update failed: $msg"
+                                                            Result.failure(IllegalStateException(msg))
+                                                        }
+                                                    }
+                                                },
+                                            )
+                                        }
+                                    }
                                     NavigationTab.SchemaBrowser -> {
                                         val coroutineScope = rememberCoroutineScope()
                                         var schemaJob by remember(activeProfileId) { mutableStateOf<Job?>(null) }
@@ -668,7 +668,7 @@ fun main() {
                                                     com.dbeagle.ui.SchemaTreeNode.Table(
                                                         id = "table:$tableKey",
                                                         label = t.name,
-                                                        children = cached
+                                                        children = cached,
                                                     )
                                                 }
 
@@ -677,7 +677,7 @@ fun main() {
                                                 .map { v ->
                                                     com.dbeagle.ui.SchemaTreeNode.View(
                                                         id = "view:$v",
-                                                        label = v
+                                                        label = v,
                                                     )
                                                 }
 
@@ -686,7 +686,7 @@ fun main() {
                                                 .map { idx ->
                                                     com.dbeagle.ui.SchemaTreeNode.Index(
                                                         id = "index:$idx",
-                                                        label = idx
+                                                        label = idx,
                                                     )
                                                 }
 
@@ -694,24 +694,24 @@ fun main() {
                                                 com.dbeagle.ui.SchemaTreeNode.Section(
                                                     id = "section:tables",
                                                     label = "Tables",
-                                                    children = tables
+                                                    children = tables,
                                                 ),
                                                 com.dbeagle.ui.SchemaTreeNode.Section(
                                                     id = "section:views",
                                                     label = "Views",
-                                                    children = views
+                                                    children = views,
                                                 ),
                                                 com.dbeagle.ui.SchemaTreeNode.Section(
                                                     id = "section:indexes",
                                                     label = "Indexes",
-                                                    children = indexes
-                                                )
+                                                    children = indexes,
+                                                ),
                                             )
                                         }
 
                                         fun updateTableChildren(
                                             tableKey: String,
-                                            newChildren: List<com.dbeagle.ui.SchemaTreeNode.Column>
+                                            newChildren: List<com.dbeagle.ui.SchemaTreeNode.Column>,
                                         ) {
                                             if (pid == null) return
                                             sessionViewModel.updateSchemaState(pid) { s ->
@@ -729,17 +729,17 @@ fun main() {
                                                                         com.dbeagle.ui.SchemaTreeNode.Table(
                                                                             id = child.id,
                                                                             label = child.label,
-                                                                            children = newChildren
+                                                                            children = newChildren,
                                                                         )
                                                                     } else {
                                                                         child
                                                                     }
-                                                                }
+                                                                },
                                                             )
                                                         } else {
                                                             node
                                                         }
-                                                    }
+                                                    },
                                                 )
                                             }
                                         }
@@ -752,7 +752,7 @@ fun main() {
                                                     columnsCache = emptyMap(),
                                                     nodes = emptyList(),
                                                     dialogError = null,
-                                                    isLoading = false
+                                                    isLoading = false,
                                                 )
                                             }
                                         }
@@ -817,14 +817,14 @@ fun main() {
                                                     }) {
                                                         Text("OK")
                                                     }
-                                                }
+                                                },
                                             )
                                         }
 
                                         Column(modifier = Modifier.fillMaxSize()) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-                                                horizontalArrangement = Arrangement.End
+                                                horizontalArrangement = Arrangement.End,
                                             ) {
                                                 val hasConnection = activeDriver != null
                                                 if (isLoadingSchema) {
@@ -832,7 +832,7 @@ fun main() {
                                                         onClick = { schemaJob?.cancel() },
                                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                                        modifier = Modifier.height(32.dp)
+                                                        modifier = Modifier.height(32.dp),
                                                     ) {
                                                         Icon(Icons.Default.Close, contentDescription = "Cancel", modifier = Modifier.size(16.dp))
                                                         Spacer(Modifier.width(4.dp))
@@ -847,7 +847,7 @@ fun main() {
                                                         },
                                                         enabled = hasConnection && !isLoadingSchema,
                                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                                        modifier = Modifier.height(32.dp)
+                                                        modifier = Modifier.height(32.dp),
                                                     ) {
                                                         Text("Refresh", style = MaterialTheme.typography.labelMedium)
                                                     }
@@ -859,7 +859,7 @@ fun main() {
                                                     Text(
                                                         text = "No active connection. Connect to browse schema.",
                                                         style = MaterialTheme.typography.bodyMedium,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     )
                                                 }
                                             } else if (isLoadingSchema && schemaNodes.isEmpty()) {
@@ -896,13 +896,13 @@ fun main() {
                                                                         com.dbeagle.ui.SchemaTreeNode.Column(
                                                                             id = "col:$tableKey.${c.name}",
                                                                             label = c.name,
-                                                                            type = c.type
+                                                                            type = c.type,
                                                                         )
                                                                     }
                                                                 val now = System.currentTimeMillis()
                                                                 sessionViewModel.updateSchemaState(activePid) { s ->
                                                                     s.copy(
-                                                                        columnsCache = s.columnsCache + (tableKey to SessionViewModel.ColumnCacheEntry(now, cols))
+                                                                        columnsCache = s.columnsCache + (tableKey to SessionViewModel.ColumnCacheEntry(now, cols)),
                                                                     )
                                                                 }
                                                                 updateTableChildren(tableKey, cols)
@@ -918,7 +918,7 @@ fun main() {
                                                         }
                                                     },
                                                     onCopyName = { name -> println("App: Copy Name -> $name") },
-                                                    onViewData = { name -> println("App: View Data -> $name") }
+                                                    onViewData = { name -> println("App: View Data -> $name") },
                                                 )
                                             }
                                         }
@@ -931,7 +931,7 @@ fun main() {
                                                 if (pid == null) scratchSql = query else sessionViewModel.updateQueryEditorSql(pid, query)
                                                 selectedTab = NavigationTab.QueryEditor
                                             },
-                                            modifier = Modifier.fillMaxSize()
+                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     }
                                     NavigationTab.History -> {
@@ -942,37 +942,37 @@ fun main() {
                                                 if (pid == null) scratchSql = query else sessionViewModel.updateQueryEditorSql(pid, query)
                                                 selectedTab = NavigationTab.QueryEditor
                                             },
-                                            modifier = Modifier.fillMaxSize()
+                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     }
                                     NavigationTab.Settings -> {
                                         com.dbeagle.ui.SettingsScreen(
                                             onClose = { selectedTab = NavigationTab.Connections },
-                                            modifier = Modifier.fillMaxSize()
+                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     }
-                                     else -> {
-                                         Text(
-                                             text = "${selectedTab.title} Content\n(Placeholder)",
-                                             style = MaterialTheme.typography.headlineSmall,
-                                             color = MaterialTheme.colorScheme.onBackground
-                                         )
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 }
-             }
-         }
-     }
+                                    else -> {
+                                        Text(
+                                            text = "${selectedTab.title} Content\n(Placeholder)",
+                                            style = MaterialTheme.typography.headlineSmall,
+                                            color = MaterialTheme.colorScheme.onBackground,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
 private fun SaveFavoriteDialog(
     initialQuery: String,
     onDismiss: () -> Unit,
-    onSave: (name: String, tags: List<String>) -> Unit
+    onSave: (name: String, tags: List<String>) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var tagsText by remember { mutableStateOf("") }
@@ -987,7 +987,7 @@ private fun SaveFavoriteDialog(
                     onValueChange = { name = it },
                     label = { Text("Name") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -996,13 +996,13 @@ private fun SaveFavoriteDialog(
                     label = { Text("Tags (comma-separated)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    placeholder = { Text("sql, reports, etc.") }
+                    placeholder = { Text("sql, reports, etc.") },
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Query: ${initialQuery.take(100)}${if (initialQuery.length > 100) "..." else ""}",
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
@@ -1014,7 +1014,7 @@ private fun SaveFavoriteDialog(
                         .filter { it.isNotBlank() }
                     onSave(name, tags)
                 },
-                enabled = name.isNotBlank()
+                enabled = name.isNotBlank(),
             ) {
                 Text("Save")
             }
@@ -1023,6 +1023,6 @@ private fun SaveFavoriteDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }

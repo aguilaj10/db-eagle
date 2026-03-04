@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 data class EncryptedData(
     val ciphertext: ByteArray,
     val iv: ByteArray,
-    val salt: ByteArray
+    val salt: ByteArray,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

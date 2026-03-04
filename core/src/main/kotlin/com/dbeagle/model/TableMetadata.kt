@@ -8,5 +8,5 @@ data class TableMetadata(
     val schema: String,
     val columns: List<ColumnMetadata>,
     val primaryKey: List<String> = emptyList(),
-    val indexes: List<String> = emptyList()
+    val indexes: List<String> = emptyList(),
 )
