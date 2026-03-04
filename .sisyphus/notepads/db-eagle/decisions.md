@@ -203,3 +203,187 @@ Current pool stats: active=10, idle=0, total=10, waiting=3
 
 ## Navigation Structure
 Decided to keep the sidebar and content area components locally in App.kt for now (as simple Column and Box structures) since we are still building out the skeleton. Introduced a NavigationTab enum to cleanly type check and represent the five required tabs, preventing string-based UI switching.
+
+### Task 32 - Application Settings Design Decisions
+
+#### Decision 1: Java Preferences vs File-Based Config
+**Chosen**: Java Preferences API (`Preferences.userRoot().node("com.dbeagle.settings")`)
+**Alternatives Considered**:
+- Properties file in `~/.dbeagle/config.properties`
+- JSON file in `~/.config/dbeagle/settings.json`
+- In-memory only (reset on restart)
+
+**Rationale**:
+- OS-native storage: Windows Registry, macOS plist, Linux XDG (~/.java/.userPrefs)
+- Built-in Java API (no external dependencies)
+- Type-safe reads with defaults (`getInt(key, defaultValue)`)
+- Automatic creation of missing keys/nodes
+- Thread-safe by specification
+
+**Trade-off**: Less portable/inspectable than plain JSON file, but better OS integration
+
+#### Decision 2: Singleton Pattern for AppPreferences
+**Chosen**: Kotlin `object AppPreferences` with static `load()`/`save()` methods
+**Alternatives Considered**:
+- DI-injected service class
+- Extension functions on AppSettings
+- Repository pattern with interface
+
+**Rationale**:
+- Stateless utility: no per-instance state needed
+- Single shared preferences node across application
+- Simpler than DI injection for pure data access layer
+- Direct usage: `AppPreferences.load()` vs `get<IPreferencesRepository>().load()`
+
+#### Decision 3: Settings Scope (App-Global vs Per-Profile)
+**Chosen**: App-global settings (single AppSettings instance for all connections)
+**Alternatives Considered**:
+- Per-ConnectionProfile settings overrides
+- Hierarchical settings (global defaults + per-profile overrides)
+- Environment-based settings (dev/prod profiles)
+
+**Rationale**:
+- MVP simplicity: single settings screen, single source of truth
+- Most settings (resultLimit, timeouts) are user preferences, not connection-specific
+- ConnectionProfile.options map can store DB-specific overrides if needed later
+- Future enhancement: Add per-profile settings if users request it
+
+**Impact**: All connections share same resultLimit/timeout values; acceptable for single-user desktop app
+
+#### Decision 4: Dynamic Settings vs Restart-Required
+**Chosen**: Dynamic settings (QueryExecutor reads AppPreferences at construction time)
+**Alternatives Considered**:
+- Restart-required settings (read once in `main()`)
+- Observer pattern (QueryExecutor subscribes to settings changes)
+- Manual refresh (user clicks "Apply" button)
+
+**Rationale**:
+- Kotlin default parameter evaluation happens at call-site
+- New QueryExecutor instances automatically use latest settings
+- No need for observable state or manual refresh
+- Graceful degradation: falls back to DEFAULT_PAGE_SIZE if preferences read fails
+
+**Implementation Detail**: `defaultPageSize: Int = getDefaultPageSize()` where `getDefaultPageSize()` is a companion object function that reads preferences
+
+#### Decision 5: Settings UI Validation Strategy
+**Chosen**: Silent failure on invalid input (no error feedback)
+**Alternatives Considered**:
+- Real-time validation with `OutlinedTextField.isError`
+- Error dialog on Save failure
+- Disable Save button until all fields valid
+- Toast notification for validation errors
+
+**Rationale**:
+- MVP scope: functional > polished UX
+- `AppSettings` data class validates in `init` block (throws IllegalArgumentException)
+- Try-catch in Save button silently ignores invalid input
+- User can observe settings didn't persist by closing/reopening Settings tab
+
+**Trade-off**: Poor UX (no feedback), but acceptable for MVP settings screen
+
+#### Decision 6: No Settings Button in TopAppBar
+**Chosen**: Settings accessible via NavigationTab (tab row alongside Connections/QueryEditor/etc.)
+**Alternatives Considered**:
+- Gear icon button in TopAppBar trailing actions
+- Menu dropdown from TopAppBar
+- Keyboard shortcut only (Cmd+,)
+
+**Rationale**:
+- Plan mentioned "Settings button in TopAppBar" but didn't specify exact location
+- Existing UI uses tab-based navigation for all screens
+- Consistent pattern: all app screens accessible via tabs
+- TopAppBar currently has no trailing actions (simplest to not add one)
+
+**Future Enhancement**: Could add gear icon button if tabs become too crowded
+
+
+### Task 32 Hardening - UI/UX Decisions
+
+**Date:** 2026-03-04
+
+#### Settings Access: Dual Navigation Pattern
+**Decision**: Settings accessible via BOTH TopAppBar button AND navigation tab
+
+**Rationale**:
+- TopAppBar button: Quick access from any screen (plan requirement: "Settings button in TopAppBar")
+- Navigation tab: Consistent with other major sections (Connections, Query Editor, etc.)
+- No removal of tab: Adding TopAppBar button fulfills plan without breaking existing navigation
+- Desktop app convention: Settings in TopAppBar actions (gear icon) is standard pattern
+
+**Alternative considered**: Remove Settings from navigation tabs, only TopAppBar
+- Rejected: Tab navigation already implemented and functional
+- Adding TopAppBar button is additive, not replacement
+- Dual access provides flexibility (some users prefer toolbar, others tabs)
+
+#### Settings Validation Error Display
+**Decision**: Inline error text below heading (red text, error color scheme)
+
+**Alternatives considered**:
+1. **Snackbar toast** (like query errors)
+   - Rejected: Settings errors are modal context, not background operation
+   - User is focused on form, waiting for immediate feedback
+   
+2. **AlertDialog modal**
+   - Rejected: Too heavy-weight for form validation
+   - Interrupts flow unnecessarily
+   
+3. **OutlinedTextField.isError + supportingText**
+   - Rejected: Would require tracking which field is invalid
+   - Multiple fields might have errors (all >0 validation)
+   - Single error message simpler for multi-field validation
+
+**Chosen approach benefits**:
+- Error visible immediately below heading (top of form)
+- Persists until user fixes input and saves successfully
+- No dismiss action needed (fixing input clears error on next save)
+- Minimal implementation (single Text composable + nullable state)
+
+#### Evidence Generation in Integration Tests
+**Decision**: Dedicated test method generates evidence file with structured narrative
+
+**Rationale**:
+- QA scenarios require proof of behavior, not just build success
+- Integration test can exercise full flow: save → load → execute query
+- Evidence file format mimics test steps (human-readable, CI-executable)
+- Deterministic repo-root detection makes evidence path reliable
+
+**Alternative considered**: Capture Gradle test output via `| tee`
+- Rejected: Gradle output contains noise (build info, task UP-TO-DATE, etc.)
+- Hard to extract relevant proof lines from build logs
+- Evidence file should be clean, focused on QA scenario
+
+**Pattern established**:
+```kotlin
+@Test
+fun `generate evidence for task N`() {
+    val repoRoot = /* walk up to .sisyphus marker */
+    val evidenceFile = File(repoRoot, ".sisyphus/evidence/task-N-*.txt")
+    
+    val output = StringBuilder()
+    output.appendLine("Step 1: ...")
+    // ... execute scenario steps, log results
+    output.appendLine("=== QA Result: SUCCESS/FAILURE ===")
+    
+    evidenceFile.writeText(output.toString())
+    
+    // Assertions to fail test if scenario doesn't work
+    assertTrue(evidenceFile.exists())
+    assertTrue(output.contains("expected proof text"))
+}
+```
+
+#### Settings Persistence: Java Preferences (No Change)
+**Decision**: Continue using Java Preferences (no migration to file-based config)
+
+**Rationale**:
+- Already implemented and tested in initial Task 32 implementation
+- OS-native storage (Windows Registry, macOS plist, Linux XDG)
+- No migration needed (existing preferences preserved)
+- Hardening focused on UI/evidence, not persistence mechanism
+
+**Future consideration**: Per-profile settings overrides
+- Current design: app-global settings (all connections share limits)
+- Potential enhancement: ConnectionProfile.settingsOverrides map
+- Would require UI for per-profile settings dialog
+- Out of scope for Task 32 (plan specifies app-level settings only)
+

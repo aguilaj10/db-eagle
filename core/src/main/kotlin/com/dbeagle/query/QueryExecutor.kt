@@ -2,10 +2,11 @@ package com.dbeagle.query
 
 import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.QueryResult
+import com.dbeagle.settings.AppPreferences
 
 class QueryExecutor(
     private val driver: DatabaseDriver,
-    private val defaultPageSize: Int = DEFAULT_PAGE_SIZE
+    private val defaultPageSize: Int = getDefaultPageSize()
 ) {
     init {
         require(defaultPageSize > 0) { "defaultPageSize must be > 0" }
@@ -94,5 +95,13 @@ class QueryExecutor(
 
     companion object {
         const val DEFAULT_PAGE_SIZE: Int = 1000
+
+        private fun getDefaultPageSize(): Int {
+            return try {
+                AppPreferences.load().resultLimit
+            } catch (_: Exception) {
+                DEFAULT_PAGE_SIZE
+            }
+        }
     }
 }

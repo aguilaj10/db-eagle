@@ -29,13 +29,15 @@ import kotlinx.coroutines.launch
 import org.koin.core.context.startKoin
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
 
 enum class NavigationTab(val title: String) {
     Connections("Connections"),
     QueryEditor("Query Editor"),
     SchemaBrowser("Schema Browser"),
     Favorites("Favorites"),
-    History("History")
+    History("History"),
+    Settings("Settings")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,7 +99,15 @@ fun main() {
                             colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                            ),
+                            actions = {
+                                IconButton(onClick = { selectedTab = NavigationTab.Settings }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Settings"
+                                    )
+                                }
+                            }
                         )
                     },
                     bottomBar = {
@@ -737,6 +747,12 @@ fun main() {
                                                 if (pid == null) scratchSql = query else sessionViewModel.updateQueryEditorSql(pid, query)
                                                 selectedTab = NavigationTab.QueryEditor
                                             },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                    NavigationTab.Settings -> {
+                                        com.dbeagle.ui.SettingsScreen(
+                                            onClose = { selectedTab = NavigationTab.Connections },
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     }

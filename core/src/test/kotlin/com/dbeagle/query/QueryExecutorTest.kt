@@ -8,14 +8,17 @@ import com.dbeagle.model.ForeignKeyRelationship
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.TableMetadata
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import com.dbeagle.settings.AppPreferences
+import com.dbeagle.settings.AppSettings
+import kotlin.test.*
 import kotlinx.coroutines.runBlocking
 
 class QueryExecutorTest {
+    @BeforeTest
+    fun resetSettings() {
+        AppPreferences.save(AppSettings())
+    }
+
     @Test
     fun `paginates 5000 rows without loading all at once`() = runBlocking {
         val driver = FakePagingDriver(totalRows = 5000)

@@ -1656,3 +1656,244 @@ val repoRoot = generateSequence(File(System.getProperty("user.dir"))) { it.paren
 1. **Working directory assumptions**: Never use `../` paths in tests. Compute absolute paths from system properties or marker files.
 2. **Snackbar requires SnackbarHostState**: Must pass from Scaffold-level state down to query execution lambda.
 3. **Retry logic duplication**: Connection retry in AlertDialog duplicates onConnect logic. Future refactor: extract to reusable function.
+
+### Task 32 - Application Settings (Limits, Timeouts)
+
+#### Settings Architecture Pattern
+**Design**: Separate domain model (AppSettings data class) from persistence (AppPreferences singleton object wrapping Java Preferences)
+- `AppSettings`: immutable data class with validation in `init` block
+- `AppPreferences`: stateless singleton with `load()`/`save()` methods
+- Preferences node: `com.dbeagle.settings` (user-level, not system-level)
+
+**Rationale**:
+- Separation of concerns: domain model (settings values) vs persistence mechanism
+- Java Preferences API chosen over file-based config for OS-native storage (Windows Registry, macOS plist, Linux XDG)
+- Singleton pattern appropriate for stateless preference manager (no instance state needed)
+
+#### Dynamic Settings Application in QueryExecutor
+**Implementation**: QueryExecutor reads AppPreferences at construction time via lazy default parameter
+```kotlin
+class QueryExecutor(
+    private val driver: DatabaseDriver,
+    private val defaultPageSize: Int = getDefaultPageSize()
+)
+companion object {
+    private fun getDefaultPageSize(): Int {
+        return try {
+            AppPreferences.load().resultLimit
+        } catch (_: Exception) {
+            DEFAULT_PAGE_SIZE
+        }
+    }
+}
+```
+
+**Key Insight**: Kotlin default parameter evaluation happens at call-site, not at class definition time
+- Each `QueryExecutor()` instantiation reads fresh settings from preferences
+- No need for manual settings refresh or observer pattern
+- Graceful fallback to `DEFAULT_PAGE_SIZE` if preferences read fails
+
+#### Settings UI Integration
+**Pattern**: NavigationTab enum extension + tab-based navigation
+- Added `Settings("Settings")` entry to existing `NavigationTab` enum
+- SettingsScreen composable with text inputs + "Save" / "Reset to Defaults" / "Close" buttons
+- No validation UI feedback (silently ignores invalid input on Save)
+- Close button navigates back to Connections tab
+
+**Rationale**:
+- Minimal UI: no real-time validation or error toasts (acceptable for MVP settings)
+- Settings persist immediately on Save (no Apply/Cancel pattern needed)
+- No Settings button in TopAppBar (plan mentions it but didn't specify location; tab-based navigation sufficient)
+
+#### Test Isolation Challenge
+**Problem**: QueryExecutorTest started failing after settings implementation
+- Root cause: AppPreferences persists to user-level Java Preferences, leaking state across test runs
+- Test expecting 1000 rows got 500 because prior test saved `resultLimit=500`
+
+**Solution**: Added `@BeforeTest` hook to reset settings to defaults before each test
+```kotlin
+@BeforeTest
+fun resetSettings() {
+    AppPreferences.save(AppSettings())
+}
+```
+
+**Lesson**: When using user-level persistence (Java Preferences, file system), always reset state in test setup
+- Alternative: Use separate preferences node for tests (`com.dbeagle.settings.test`)
+- Chosen approach: Reset production preferences node before each test (simpler, tests real path)
+
+#### Evidence Generation Pattern
+**Approach**: Capture test output via `tee` to create evidence file
+```bash
+./gradlew :core:test --tests "*AppPreferencesTest" --tests "*QueryExecutorSettingsIntegrationTest" 2>&1 | tee .sisyphus/evidence/task-32-settings.txt
+```
+
+**Test Coverage**:
+1. `AppPreferencesTest`: Roundtrip persistence of all 4 settings (resultLimit, queryTimeout, connectionTimeout, maxConnections)
+2. `QueryExecutorSettingsIntegrationTest`: Verifies `resultLimit=500` causes QueryExecutor to request exactly 501 rows (500 + 1 for hasMore check)
+
+#### Default Values Rationale
+- **resultLimit = 1000**: Balances UI responsiveness (pagination) with developer convenience (most queries <1000 rows)
+- **queryTimeout = 60s**: Generous for ad-hoc queries; prevents indefinite hangs
+- **connectionTimeout = 30s**: Standard JDBC default (MySQL uses 30s, PostgreSQL uses OS-level)
+- **maxConnections = 10**: Conservative for single-user desktop app (prevents resource exhaustion)
+
+#### Future Enhancement Considerations
+- Settings persistence location: Java Preferences stores in OS-specific locations (Windows Registry, macOS ~/Library/Preferences, Linux ~/.java/.userPrefs)
+- Per-profile settings: Current design is app-global; could extend to per-ConnectionProfile overrides
+- Settings migration: No version tracking yet; future versions may need migration logic
+- Settings validation UI: Current design silently ignores invalid input; could add real-time feedback with `OutlinedTextField.isError`
+
+
+### Task 32 Hardening - TopAppBar Settings Button + Evidence Quality
+
+**Date:** 2026-03-04
+
+#### TopAppBar Actions Pattern
+**Implementation**: Added Settings IconButton to TopAppBar actions slot
+```kotlin
+TopAppBar(
+    title = { Text("DB Eagle") },
+    actions = {
+        IconButton(onClick = { selectedTab = NavigationTab.Settings }) {
+            Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings")
+        }
+    }
+)
+```
+
+**Key Points**:
+- Settings accessible via both TopAppBar button AND navigation tab (dual access)
+- Material Icons.Default.Settings provides standard gear icon
+- IconButton onClick navigates to Settings tab (same navigation mechanism as tab selection)
+- Rationale: TopAppBar actions are conventional placement for app-wide settings in desktop apps
+
+#### Settings UI Error Handling
+**Problem**: Empty catch block swallowed validation errors silently
+```kotlin
+// BEFORE (anti-pattern)
+try {
+    val newSettings = AppSettings(...)
+    AppPreferences.save(newSettings)
+} catch (_: Exception) {
+    // Silent failure - user sees nothing
+}
+```
+
+**Solution**: Added error state display
+```kotlin
+// AFTER
+var errorMessage by remember { mutableStateOf<String?>(null) }
+
+try {
+    val newSettings = AppSettings(...)
+    AppPreferences.save(newSettings)
+    errorMessage = null  // Clear on success
+} catch (e: NumberFormatException) {
+    errorMessage = "Invalid number format. Please enter valid integers."
+} catch (e: IllegalArgumentException) {
+    errorMessage = e.message ?: "Invalid settings values. All values must be greater than 0."
+}
+
+// Display in UI
+if (errorMessage != null) {
+    Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
+}
+```
+
+**Design Decision**: Inline error text (not Snackbar) because:
+- Settings screen is modal/focused (user waiting for feedback)
+- Error persists until corrected (not transient notification)
+- No need for dismiss action (fixing input clears error)
+
+#### Evidence Generation Pattern Refinement
+**Requirement**: Evidence must prove QA scenario, not just build success
+
+**Solution**: Added dedicated test that writes structured evidence
+```kotlin
+@Test
+fun `generate evidence for task 32`() = runBlocking {
+    // Find repo root by walking up until .sisyphus directory exists
+    val repoRoot = generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
+        .firstOrNull { File(it, ".sisyphus").exists() }
+        ?: File(System.getProperty("user.dir"))
+    
+    val evidenceFile = File(repoRoot, ".sisyphus/evidence/task-32-settings.txt")
+    
+    val output = StringBuilder()
+    output.appendLine("Step 1: Save custom settings with resultLimit=500")
+    // ... save settings and log values
+    
+    output.appendLine("Step 2: Load settings from persistence")
+    // ... load settings and verify match
+    
+    output.appendLine("Step 3: Execute query via QueryExecutor")
+    // ... execute query and verify row count
+    
+    evidenceFile.writeText(output.toString())
+}
+```
+
+**Evidence File Content** (example):
+```
+=== Task 32: Application Settings Evidence ===
+
+Step 1: Save custom settings with resultLimit=500
+Saved: resultLimit=500, queryTimeout=75, connectionTimeout=40, maxConnections=12
+
+Step 2: Load settings from persistence
+Loaded: resultLimit=500, queryTimeout=75, connectionTimeout=40, maxConnections=12
+Verification: resultLimit matches = true
+
+Step 3: Execute query via QueryExecutor
+Query executed: SELECT * FROM ( SELECT * FROM test_table ) AS q LIMIT ? OFFSET ?
+LIMIT parameter sent to driver: 501
+Rows returned: 500
+Verification: rows returned matches resultLimit = true
+
+=== QA Result: SUCCESS ===
+Settings persist correctly and resultLimit=500 causes QueryExecutor to return exactly 500 rows.
+```
+
+**Key Insights**:
+1. **Evidence proves behavior, not just compilation**: Shows saved values, loaded values, and query result count
+2. **Agent-executable in CI**: Test runs headless, no UI dependencies
+3. **Deterministic repo-root detection**: Walks parent directories until `.sisyphus` marker found
+4. **Human-readable structure**: Step-by-step narrative proves QA scenario
+
+#### Repo-Root Detection Reusable Pattern
+```kotlin
+val repoRoot = generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
+    .firstOrNull { File(it, ".sisyphus").exists() }
+    ?: File(System.getProperty("user.dir"))
+```
+
+**Why this pattern**:
+- Works regardless of Gradle working directory (app/, core/, data/, or root)
+- Walks up directory tree until `.sisyphus` marker found
+- Falls back to current directory if marker not found (graceful degradation)
+- Reusable for any test that needs repo-root relative paths
+- Already used in Task 29 (ER diagram) and Task 31 (error dialog evidence)
+
+#### Verification Strategy Hierarchy
+**Order of verification** (most to least reliable):
+1. **Integration test with evidence generation** (proves end-to-end behavior)
+2. **Unit tests** (proves individual components work)
+3. **Gradle build** (proves compilation success)
+4. **LSP diagnostics** (frequently times out, least reliable)
+
+**For Task 32**:
+- Evidence file proves settings persist and affect query execution ✓
+- Unit tests prove AppPreferences roundtrip ✓
+- Integration tests prove QueryExecutor reads settings ✓
+- Gradle test suite passes ✓
+
+#### Task 32 Completion Checklist
+- [x] Settings button in TopAppBar (Icons.Default.Settings)
+- [x] Settings screen with error feedback (no silent failures)
+- [x] Settings persist via Java Preferences (AppPreferences.save/load)
+- [x] QueryExecutor applies resultLimit dynamically (reads at construction)
+- [x] Evidence file proves QA scenario (save 500, load 500, query returns 500 rows)
+- [x] All tests pass (./gradlew test → BUILD SUCCESSFUL)
+- [x] Learnings appended to notepad (this section)
+
