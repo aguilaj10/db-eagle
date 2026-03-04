@@ -43,6 +43,7 @@ sealed class SchemaTreeNode(
 fun SchemaTree(
     nodes: List<SchemaTreeNode>,
     modifier: Modifier = Modifier,
+    onNodeExpansionChanged: (SchemaTreeNode, Boolean) -> Unit = { _, _ -> },
     onCopyName: (String) -> Unit = {},
     onViewData: (String) -> Unit = {}
 ) {
@@ -79,6 +80,7 @@ fun SchemaTree(
                 depth = depth,
                 isExpanded = expandedIds.contains(node.id),
                 onToggle = { toggleExpanded(node.id) },
+                onNodeExpansionChanged = onNodeExpansionChanged,
                 onCopyName = onCopyName,
                 onViewData = onViewData
             )
@@ -93,6 +95,7 @@ private fun SchemaTreeNodeItem(
     depth: Int,
     isExpanded: Boolean,
     onToggle: () -> Unit,
+    onNodeExpansionChanged: (SchemaTreeNode, Boolean) -> Unit,
     onCopyName: (String) -> Unit,
     onViewData: (String) -> Unit
 ) {
@@ -103,8 +106,10 @@ private fun SchemaTreeNodeItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .onClick {
-                    if (node.children.isNotEmpty()) {
+                    if (node is SchemaTreeNode.Table || node.children.isNotEmpty()) {
+                        val willExpand = !isExpanded
                         onToggle()
+                        onNodeExpansionChanged(node, willExpand)
                     }
                 }
                 .onClick(
@@ -120,7 +125,8 @@ private fun SchemaTreeNodeItem(
         ) {
             Spacer(modifier = Modifier.width((depth * 16).dp))
 
-            if (node.children.isNotEmpty()) {
+            val isExpandable = node is SchemaTreeNode.Table || node.children.isNotEmpty()
+            if (isExpandable) {
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,

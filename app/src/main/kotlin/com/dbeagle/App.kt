@@ -13,6 +13,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.dbeagle.di.appModule
 import com.dbeagle.driver.DatabaseDriver
+import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.QueryResult
 import com.dbeagle.query.QueryExecutor
 import kotlinx.coroutines.launch
@@ -256,54 +257,247 @@ fun main() {
                                         }
                                     }
                                     NavigationTab.SchemaBrowser -> {
-                                        val mockSchema = remember {
-                                            listOf(
+                                        val coroutineScope = rememberCoroutineScope()
+
+                                        val ttlMs = 5 * 60 * 1000L
+                                        var isLoadingSchema by remember { mutableStateOf(false) }
+                                        var schemaLoadedAtMs by remember { mutableStateOf<Long?>(null) }
+                                        var schemaNodes by remember { mutableStateOf<List<com.dbeagle.ui.SchemaTreeNode>>(emptyList()) }
+                                        var schemaDialogError by remember { mutableStateOf<String?>(null) }
+
+                                        data class ColumnCacheEntry(
+                                            val loadedAtMs: Long,
+                                            val columns: List<com.dbeagle.ui.SchemaTreeNode.Column>
+                                        )
+
+                                        var columnsCache by remember {
+                                            mutableStateOf<Map<String, ColumnCacheEntry>>(emptyMap())
+                                        }
+
+                                        fun isExpired(loadedAt: Long?): Boolean {
+                                            if (loadedAt == null) return true
+                                            return (System.currentTimeMillis() - loadedAt) > ttlMs
+                                        }
+
+                                        fun buildTree(schema: SchemaMetadata): List<com.dbeagle.ui.SchemaTreeNode> {
+                                            val tables = schema.tables
+                                                .sortedWith(compareBy({ it.schema }, { it.name }))
+                                                .map { t ->
+                                                    val tableKey = "${t.schema}.${t.name}"
+                                                    val cached = columnsCache[tableKey]?.columns ?: emptyList()
+                                                    com.dbeagle.ui.SchemaTreeNode.Table(
+                                                        id = "table:$tableKey",
+                                                        label = t.name,
+                                                        children = cached
+                                                    )
+                                                }
+
+                                            val views = schema.views
+                                                .sorted()
+                                                .map { v ->
+                                                    com.dbeagle.ui.SchemaTreeNode.View(
+                                                        id = "view:$v",
+                                                        label = v
+                                                    )
+                                                }
+
+                                            val indexes = schema.indexes
+                                                .sorted()
+                                                .map { idx ->
+                                                    com.dbeagle.ui.SchemaTreeNode.Index(
+                                                        id = "index:$idx",
+                                                        label = idx
+                                                    )
+                                                }
+
+                                            return listOf(
                                                 com.dbeagle.ui.SchemaTreeNode.Section(
-                                                    id = "tables",
+                                                    id = "section:tables",
                                                     label = "Tables",
-                                                    children = listOf(
-                                                        com.dbeagle.ui.SchemaTreeNode.Table(
-                                                            id = "table_users",
-                                                            label = "users",
-                                                            children = listOf(
-                                                                com.dbeagle.ui.SchemaTreeNode.Column(id = "col_users_id", label = "id", type = "INT"),
-                                                                com.dbeagle.ui.SchemaTreeNode.Column(id = "col_users_name", label = "name", type = "VARCHAR"),
-                                                                com.dbeagle.ui.SchemaTreeNode.Column(id = "col_users_email", label = "email", type = "VARCHAR")
-                                                            )
-                                                        ),
-                                                        com.dbeagle.ui.SchemaTreeNode.Table(
-                                                            id = "table_orders",
-                                                            label = "orders",
-                                                            children = listOf(
-                                                                com.dbeagle.ui.SchemaTreeNode.Column(id = "col_orders_id", label = "id", type = "INT"),
-                                                                com.dbeagle.ui.SchemaTreeNode.Column(id = "col_orders_user_id", label = "user_id", type = "INT"),
-                                                                com.dbeagle.ui.SchemaTreeNode.Column(id = "col_orders_total", label = "total", type = "DECIMAL")
-                                                            )
-                                                        )
-                                                    )
+                                                    children = tables
                                                 ),
                                                 com.dbeagle.ui.SchemaTreeNode.Section(
-                                                    id = "views",
+                                                    id = "section:views",
                                                     label = "Views",
-                                                    children = listOf(
-                                                        com.dbeagle.ui.SchemaTreeNode.View(id = "view_active_users", label = "active_users")
-                                                    )
+                                                    children = views
                                                 ),
                                                 com.dbeagle.ui.SchemaTreeNode.Section(
-                                                    id = "indexes",
+                                                    id = "section:indexes",
                                                     label = "Indexes",
-                                                    children = listOf(
-                                                        com.dbeagle.ui.SchemaTreeNode.Index(id = "idx_users_email", label = "users_email_idx")
-                                                    )
+                                                    children = indexes
                                                 )
                                             )
                                         }
 
-                                        com.dbeagle.ui.SchemaTree(
-                                            nodes = mockSchema,
-                                            onCopyName = { name -> println("App: Copy Name -> $name") },
-                                            onViewData = { name -> println("App: View Data -> $name") }
-                                        )
+                                        fun updateTableChildren(
+                                            tableKey: String,
+                                            newChildren: List<com.dbeagle.ui.SchemaTreeNode.Column>
+                                        ) {
+                                            schemaNodes = schemaNodes.map { node ->
+                                                if (node is com.dbeagle.ui.SchemaTreeNode.Section && node.id == "section:tables") {
+                                                    com.dbeagle.ui.SchemaTreeNode.Section(
+                                                        id = node.id,
+                                                        label = node.label,
+                                                        children = node.children.map { child ->
+                                                            if (
+                                                                child is com.dbeagle.ui.SchemaTreeNode.Table &&
+                                                                child.id == "table:$tableKey"
+                                                            ) {
+                                                                com.dbeagle.ui.SchemaTreeNode.Table(
+                                                                    id = child.id,
+                                                                    label = child.label,
+                                                                    children = newChildren
+                                                                )
+                                                            } else {
+                                                                child
+                                                            }
+                                                        }
+                                                    )
+                                                } else {
+                                                    node
+                                                }
+                                            }
+                                        }
+
+                                        fun forceRefresh() {
+                                            schemaLoadedAtMs = null
+                                            columnsCache = emptyMap()
+                                            schemaNodes = emptyList()
+                                        }
+
+                                        fun ensureSchemaLoaded(force: Boolean) {
+                                            val driver = activeDriver
+                                            if (driver == null) {
+                                                schemaNodes = emptyList()
+                                                schemaLoadedAtMs = null
+                                                columnsCache = emptyMap()
+                                                return
+                                            }
+
+                                            if (!force && !isExpired(schemaLoadedAtMs) && schemaNodes.isNotEmpty()) return
+                                            if (isLoadingSchema) return
+
+                                            coroutineScope.launch {
+                                                isLoadingSchema = true
+                                                val name = activeProfileName ?: "Connection"
+                                                statusText = "Status: Loading schema ($name)"
+                                                try {
+                                                    val schema = driver.getSchema()
+                                                    schemaNodes = buildTree(schema)
+                                                    schemaLoadedAtMs = System.currentTimeMillis()
+                                                    statusText = "Status: Schema loaded ($name)"
+                                                } catch (e: Exception) {
+                                                    statusText = "Status: Failed to load schema: ${e.message ?: "Error"}"
+                                                    schemaDialogError = e.message ?: "Failed to load schema"
+                                                } finally {
+                                                    isLoadingSchema = false
+                                                }
+                                            }
+                                        }
+
+                                        LaunchedEffect(selectedTab, activeDriver) {
+                                            if (selectedTab != NavigationTab.SchemaBrowser) return@LaunchedEffect
+                                            if (activeDriver == null) {
+                                                schemaNodes = emptyList()
+                                                schemaLoadedAtMs = null
+                                                columnsCache = emptyMap()
+                                                return@LaunchedEffect
+                                            }
+                                            forceRefresh()
+                                            ensureSchemaLoaded(force = false)
+                                        }
+
+                                        if (schemaDialogError != null) {
+                                            AlertDialog(
+                                                onDismissRequest = { schemaDialogError = null },
+                                                title = { Text("Schema Error") },
+                                                text = { Text(schemaDialogError ?: "") },
+                                                confirmButton = {
+                                                    TextButton(onClick = { schemaDialogError = null }) {
+                                                        Text("OK")
+                                                    }
+                                                }
+                                            )
+                                        }
+
+                                        Column(modifier = Modifier.fillMaxSize()) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.End
+                                            ) {
+                                                val hasConnection = activeDriver != null
+                                                Button(
+                                                    onClick = {
+                                                        if (!hasConnection) return@Button
+                                                        forceRefresh()
+                                                        ensureSchemaLoaded(force = true)
+                                                    },
+                                                    enabled = hasConnection && !isLoadingSchema,
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                    modifier = Modifier.height(32.dp)
+                                                ) {
+                                                    Text("Refresh", style = MaterialTheme.typography.labelMedium)
+                                                }
+                                            }
+
+                                            if (activeDriver == null) {
+                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                    Text(
+                                                        text = "No active connection. Connect to browse schema.",
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            } else if (isLoadingSchema && schemaNodes.isEmpty()) {
+                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                    CircularProgressIndicator()
+                                                }
+                                            } else {
+                                                com.dbeagle.ui.SchemaTree(
+                                                    nodes = schemaNodes,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    onNodeExpansionChanged = { node, expanded ->
+                                                        if (!expanded) return@SchemaTree
+                                                        if (node !is com.dbeagle.ui.SchemaTreeNode.Table) return@SchemaTree
+
+                                                        val driver = activeDriver ?: return@SchemaTree
+
+                                                        val tableKey = node.id.removePrefix("table:")
+                                                        val tableName = node.label
+                                                        val cached = columnsCache[tableKey]
+                                                        if (cached != null && !isExpired(cached.loadedAtMs)) {
+                                                            updateTableChildren(tableKey, cached.columns)
+                                                            return@SchemaTree
+                                                        }
+
+                                                        coroutineScope.launch {
+                                                            val name = activeProfileName ?: "Connection"
+                                                            statusText = "Status: Loading columns ($name: $tableName)"
+                                                            try {
+                                                                val cols = driver.getColumns(tableName)
+                                                                    .sortedBy { it.name }
+                                                                    .map { c ->
+                                                                        com.dbeagle.ui.SchemaTreeNode.Column(
+                                                                            id = "col:$tableKey.${c.name}",
+                                                                            label = c.name,
+                                                                            type = c.type
+                                                                        )
+                                                                    }
+                                                                val now = System.currentTimeMillis()
+                                                                columnsCache = columnsCache + (tableKey to ColumnCacheEntry(now, cols))
+                                                                updateTableChildren(tableKey, cols)
+                                                                statusText = "Status: Columns loaded ($name: $tableName)"
+                                                            } catch (e: Exception) {
+                                                                statusText = "Status: Failed to load columns: ${e.message ?: "Error"}"
+                                                                schemaDialogError = e.message ?: "Failed to load columns"
+                                                            }
+                                                        }
+                                                    },
+                                                    onCopyName = { name -> println("App: Copy Name -> $name") },
+                                                    onViewData = { name -> println("App: View Data -> $name") }
+                                                )
+                                            }
+                                        }
                                     }
                                     else -> {
                                         Text(

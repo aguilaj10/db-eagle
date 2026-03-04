@@ -159,3 +159,11 @@ All scaffolding goals achieved:
 
 ## Task 14: Screenshot constraints
 - As noted in inherited wisdom, capturing an actual `.png` screenshot of the Compose Window fails / is unfeasible in this headless test environment (no native compositor hooked for `java.awt.Robot` to take a snapshot of), so `task-14-app-run-log.txt` was produced as evidence instead.
+
+### Task 23 - Schema browser integration
+
+**Issue**: `lsp_diagnostics` tool timed out (method: initialize) when checking App.kt / SchemaTree.kt.
+- Impact: Non-blocking; verified via `./gradlew :app:compileKotlin test` instead.
+
+**Known gap**: `DatabaseDriver.getColumns(table: String)` does not accept schema.
+- Impact: For DBs with multiple schemas, lazy column loading may need a future driver API change.

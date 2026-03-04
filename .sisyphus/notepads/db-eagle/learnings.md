@@ -38,6 +38,19 @@ Compose Desktop 1.7.0 brings the core UI dependencies (ui, foundation, material3
 
 **Root Cause**: Transitive dependency tree includes `org.jetbrains.skiko:skiko:0.8.15` and `skiko-awt:0.8.15` but not the platform-specific `skiko-awt-runtime-*` variant.
 
+### Task 23 - Schema Browser Integration (Load Schema → Tree View)
+
+- Mapping convention used in UI:
+  - Root sections are static: Tables / Views / Indexes.
+  - Table node id: `table:{schema}.{name}` (schema from `TableMetadata.schema`).
+  - Column node id: `col:{schema}.{table}.{column}`.
+- Lazy columns:
+  - Column children are fetched on table expansion using `driver.getColumns(tableName)`.
+  - Note: current driver APIs take table name only (no schema), so UI uses `TableMetadata.schema` only for IDs/uniqueness.
+- Caching per plan:
+  - TTL cache (5 minutes) implemented for both schema and per-table columns.
+  - Manual refresh clears schema + column caches and reloads.
+
 #### Solution
 1. Add `compose-desktop` dependency (desktop module) to app/build.gradle.kts
 2. Add platform-specific **runtime-only** dependency: `org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.8.15`
