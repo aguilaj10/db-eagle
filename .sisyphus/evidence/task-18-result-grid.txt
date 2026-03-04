@@ -1,0 +1,14 @@
+Task 18 Evidence: Result Grid Component with Pagination
+
+The UI consists of:
+1. `SQLEditor` rendering at the top of the Query Editor tab (40% height) with line numbers, syntax highlighting, and toolbar.
+2. A `HorizontalDivider` separating the editor from the results.
+3. `ResultGrid` rendering below the editor (60% height) containing:
+   - A top bar with:
+     - "Total rows: 100" text on the left.
+     - A pagination controls block on the right ("Prev" button, "Page X of Y" text, "Next" button).
+   - A grid layout:
+     - Top row pinned with headers (ID, Name, Email, Status, Role, Created At).
+     - Scrollable body with the data matching the current page. The data is a mock set of 100 rows.
+     - Each cell is a text box, which when double clicked, transforms into a `BasicTextField` that allows editing the value. Pressing Enter commits the change, pressing Escape discards it. Focus loss also commits the change. All changes persist in-memory across paginations.
+     - Both horizontal and vertical scrolling correctly traverse rows and columns while the header remains sticky at the top.

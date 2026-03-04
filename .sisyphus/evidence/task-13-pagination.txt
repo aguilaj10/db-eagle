@@ -1,0 +1,33 @@
+Task 13: Query Execution Engine with Pagination - QA Evidence
+===========================================================
+
+## Commands
+
+Run core tests (includes QueryExecutorTest):
+
+```bash
+./gradlew test
+```
+
+Optional: run only pagination tests:
+
+```bash
+./gradlew :core:test --tests "com.dbeagle.query.QueryExecutorTest"
+```
+
+## Assertions verified by unit tests
+
+1) Pagination does not load all rows at once
+   - Fake driver configured for 5000 rows
+   - First page returns exactly 1000 rows
+   - Driver is invoked with LIMIT = pageSize + 1 (1001) and OFFSET = 0
+   - hasMore() is true on first page
+
+2) fetchNext returns subsequent pages
+   - fetchNext returns next 1000 rows
+   - After 5 pages total, hasMore() becomes false and fetchNext returns null
+   - Last page uses OFFSET = 4000
+
+3) Non-SELECT statements bypass pagination
+   - UPDATE statement delegates directly to DatabaseDriver.executeQuery
+   - Returned QueryResult.Success has resultSet == null

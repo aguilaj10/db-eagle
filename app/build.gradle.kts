@@ -15,6 +15,8 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.runtime)
     implementation(compose.desktop.currentOs)
+    
+    implementation(libs.kodeview)
 
     implementation(libs.koin.core)
 

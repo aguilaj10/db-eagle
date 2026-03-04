@@ -1,0 +1,108 @@
+Task 12: Connection Profile Persistence (Encrypted)
+===================================================
+
+## Overview
+Implemented encrypted connection profile persistence using Java Preferences and AES-GCM encryption.
+
+## Files Created/Modified
+
+### Created:
+1. core/src/main/kotlin/com/dbeagle/profile/MasterPasswordProvider.kt
+   - Interface for master password retrieval (dependency injection)
+   
+2. core/src/main/kotlin/com/dbeagle/profile/ConnectionProfileRepository.kt
+   - Repository interface with save/load/loadAll/delete methods
+   
+3. core/src/main/kotlin/com/dbeagle/profile/PreferencesBackedConnectionProfileRepository.kt
+   - Implementation using Java Preferences for storage
+   - Encrypts passwords using CredentialEncryption (AES-GCM)
+   - Stores profiles as JSON with separate encrypted password field
+   
+4. core/src/test/kotlin/com/dbeagle/profile/ConnectionProfileRepositoryTest.kt
+   - Comprehensive test suite covering all repository operations
+
+### Modified:
+1. gradle/libs.versions.toml
+   - Added kotlinx-coroutines-test dependency
+   
+2. core/build.gradle.kts
+   - Added testImplementation(libs.kotlinx.coroutines.test)
+
+## Implementation Details
+
+### Storage Format:
+- Java Preferences node: "com.dbeagle.profiles"
+- Each profile stored as JSON with key = profile.id
+- Profile JSON contains:
+  - All non-sensitive fields in plaintext
+  - encryptedPassword field as EncryptedData (ciphertext, iv, salt)
+  
+### Encryption:
+- Uses existing CredentialEncryption.kt with AES-GCM
+- Master password obtained via MasterPasswordProvider callback
+- PBKDF2 key derivation with 100,000 iterations
+- 32-byte salt, 12-byte IV per encrypted field
+
+### Master Password Provider:
+- Implemented as fun interface (SAM)
+- Suspend function for async UI integration
+- Allows UI layer to implement dialog/prompt separately
+
+### DatabaseType Handling:
+- DatabaseType is sealed class (PostgreSQL, SQLite objects)
+- Cannot use .name or valueOf() directly
+- Implemented manual discriminator mapping to/from String
+
+## Commands Run
+
+```bash
+# Create package directories
+mkdir -p /home/jonathan/desarrollo/db-eagle/core/src/main/kotlin/com/dbeagle/profile
+mkdir -p /home/jonathan/desarrollo/db-eagle/core/src/test/kotlin/com/dbeagle/profile
+
+# Run tests
+./gradlew :core:test --tests "com.dbeagle.profile.ConnectionProfileRepositoryTest"
+
+# Verify all tests pass
+./gradlew test
+```
+
+## Test Coverage
+
+All tests passing:
+1. ✅ save and load profile with encrypted password
+2. ✅ load returns null for non-existent profile
+3. ✅ loadAll returns all saved profiles
+4. ✅ loadAll returns empty list when no profiles exist
+5. ✅ delete removes profile
+6. ✅ wrong master password throws IllegalArgumentException on load
+7. ✅ password is stored encrypted in preferences (verified raw JSON)
+8. ✅ save overwrites existing profile with same id
+
+## Verification
+
+```bash
+# All tests pass
+./gradlew test
+> BUILD SUCCESSFUL
+```
+
+## Key Assertions
+
+Test suite verifies:
+- Plaintext password encrypted before storage
+- Decrypted password matches original after load
+- Wrong master password throws clear exception
+- Raw preferences storage does NOT contain plaintext password
+- Raw preferences storage DOES contain encrypted fields (ciphertext, iv, salt)
+- Profile metadata (name, host, port, etc) persists correctly
+- Multiple profiles can be saved/loaded
+- Delete operation removes profile
+- Overwrite existing profile works correctly
+
+## Notes
+
+- Repository is module-scoped to core (no UI dependencies)
+- Uses only stdlib + Java Preferences + kotlinx.serialization
+- Master password prompt deferred to UI via callback interface
+- Clean separation: core provides persistence, UI provides password source

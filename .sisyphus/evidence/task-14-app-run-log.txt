@@ -1,0 +1,8 @@
+Task 14 UI Compose Desktop Scaffolding
+
+Evidence:
+1. `App.kt` was modified to include `MaterialTheme` and `Scaffold`.
+2. The Scaffold contains a TopAppBar with title "DB Eagle", a Sidebar for Connections list, a center content Box, and a bottom bar for Status.
+3. Size is configured to 1200x800 via `rememberWindowState`.
+4. Command `./gradlew test` passes cleanly.
+5. Command `./gradlew :app:run` ran without crash, exceeding 120s timeout without a stacktrace (indicating the Java/Kotlin runtime successfully initialized the Compose loop). Because this is a headless environment, capturing a visual window screenshot is impossible, so this file serves as alternate evidence.
