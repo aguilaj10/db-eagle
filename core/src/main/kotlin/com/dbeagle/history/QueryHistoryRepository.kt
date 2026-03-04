@@ -1,0 +1,23 @@
+package com.dbeagle.history
+
+import com.dbeagle.model.QueryHistoryEntry
+
+/**
+ * Repository for persisting and retrieving query history entries.
+ */
+interface QueryHistoryRepository {
+    /**
+     * Adds a new entry to the history.
+     */
+    fun add(entry: QueryHistoryEntry)
+
+    /**
+     * Returns all entries, most recent first.
+     */
+    fun getAll(): List<QueryHistoryEntry>
+
+    /**
+     * Clears all history entries.
+     */
+    fun clear()
+}

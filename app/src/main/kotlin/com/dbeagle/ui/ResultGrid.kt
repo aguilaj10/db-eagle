@@ -18,15 +18,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import kotlin.math.min
+import kotlinx.coroutines.launch
 
 @Composable
 fun ResultGrid(
     columns: List<String>,
     rows: List<List<String>>,
     pageSize: Int = 25,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onCellCommit: suspend (rowIndex: Int, columnName: String, newValue: String, rowSnapshot: List<String>) -> Result<Unit>
 ) {
     var localRows by remember(rows) { mutableStateOf(rows.map { it.toMutableList() }.toMutableList()) }
+    var baselineRows by remember(rows) { mutableStateOf(rows.map { it.toList() }) }
     var currentPage by remember(rows) { mutableStateOf(0) }
 
     val totalPages = max(1, (localRows.size + pageSize - 1) / pageSize)
@@ -34,6 +37,21 @@ fun ResultGrid(
 
     val horizontalScrollState = rememberScrollState()
     val verticalScrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+
+    var gridError by remember { mutableStateOf<String?>(null) }
+    if (gridError != null) {
+        AlertDialog(
+            onDismissRequest = { gridError = null },
+            title = { Text("Edit Error") },
+            text = { Text(gridError ?: "") },
+            confirmButton = {
+                TextButton(onClick = { gridError = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         Row(
@@ -102,12 +120,55 @@ fun ResultGrid(
                         val actualRowIdx = startIdx + rIdx
                         Row(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
                             row.forEachIndexed { cIdx, cellValue ->
+                                val colName = columns.getOrNull(cIdx) ?: ""
+                                val baseline = baselineRows.getOrNull(actualRowIdx)?.getOrNull(cIdx)
+                                val isDirty = baseline != cellValue
+
                                 EditableCell(
                                     value = cellValue,
+                                    isDirty = isDirty,
                                     onValueChange = { newValue ->
+                                        val original = baselineRows.getOrNull(actualRowIdx)?.getOrNull(cIdx) ?: ""
+                                        if (colName.equals("id", ignoreCase = true)) {
+                                            gridError = "Editing the id column is not supported."
+                                            localRows = localRows.toMutableList().apply {
+                                                this[actualRowIdx] = this[actualRowIdx].toMutableList().apply {
+                                                    this[cIdx] = original
+                                                }
+                                            }
+                                            return@EditableCell
+                                        }
+
                                         localRows = localRows.toMutableList().apply {
                                             this[actualRowIdx] = this[actualRowIdx].toMutableList().apply {
                                                 this[cIdx] = newValue
+                                            }
+                                        }
+
+                                        if (newValue == original) return@EditableCell
+
+                                        val rowSnapshot = localRows.getOrNull(actualRowIdx)?.toList() ?: return@EditableCell
+                                        coroutineScope.launch {
+                                            val result = onCellCommit(
+                                                actualRowIdx,
+                                                colName,
+                                                newValue,
+                                                rowSnapshot
+                                            )
+                                            if (result.isFailure) {
+                                                val msg = result.exceptionOrNull()?.message ?: "Failed to persist update"
+                                                gridError = msg
+                                                localRows = localRows.toMutableList().apply {
+                                                    this[actualRowIdx] = this[actualRowIdx].toMutableList().apply {
+                                                        this[cIdx] = original
+                                                    }
+                                                }
+                                            } else {
+                                                baselineRows = baselineRows.toMutableList().apply {
+                                                    this[actualRowIdx] = this[actualRowIdx].toMutableList().apply {
+                                                        this[cIdx] = newValue
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -124,6 +185,7 @@ fun ResultGrid(
 @Composable
 fun EditableCell(
     value: String,
+    isDirty: Boolean,
     onValueChange: (String) -> Unit
 ) {
     var isEditing by remember { mutableStateOf(false) }
@@ -133,7 +195,14 @@ fun EditableCell(
     Box(
         modifier = Modifier
             .width(150.dp)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            .border(
+                width = if (isDirty) 2.dp else 1.dp,
+                color = if (isDirty) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+            )
+            .background(
+                if (isDirty) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                else MaterialTheme.colorScheme.surface
+            )
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = { isEditing = true }

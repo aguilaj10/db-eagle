@@ -6,6 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -13,6 +14,13 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.dbeagle.di.appModule
 import com.dbeagle.driver.DatabaseDriver
+import com.dbeagle.edit.InlineUpdate
+import com.dbeagle.favorites.FileFavoritesRepository
+import com.dbeagle.favorites.FavoritesRepository
+import com.dbeagle.history.FileQueryHistoryRepository
+import com.dbeagle.history.QueryHistoryRepository
+import com.dbeagle.model.FavoriteQuery
+import com.dbeagle.model.QueryHistoryEntry
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.QueryResult
 import com.dbeagle.query.QueryExecutor
@@ -39,6 +47,28 @@ fun main() {
 
         var activeProfileName by remember { mutableStateOf<String?>(null) }
         var activeDriver by remember { mutableStateOf<DatabaseDriver?>(null) }
+        
+        val historyRepository = remember { FileQueryHistoryRepository() }
+        val favoritesRepository = remember { FileFavoritesRepository() }
+        var queryEditorSql by remember { mutableStateOf("SELECT * FROM users;\n") }
+        var showSaveFavoriteDialog by remember { mutableStateOf(false) }
+
+        if (showSaveFavoriteDialog) {
+            SaveFavoriteDialog(
+                initialQuery = queryEditorSql,
+                onDismiss = { showSaveFavoriteDialog = false },
+                onSave = { name, tags ->
+                    val favorite = FavoriteQuery(
+                        name = name,
+                        query = queryEditorSql,
+                        tags = tags
+                    )
+                    favoritesRepository.save(favorite)
+                    statusText = "Status: Saved to favorites"
+                    showSaveFavoriteDialog = false
+                }
+            )
+        }
 
         Window(
             onCloseRequest = ::exitApplication,
@@ -152,11 +182,13 @@ fun main() {
                                         )
                                     }
                                     NavigationTab.QueryEditor -> {
-                                        var sqlQuery by remember { mutableStateOf("SELECT * FROM users;\n") }
+                                        var lastExecutedSql by remember { mutableStateOf<String?>(null) }
+                                        var lastQueryResult by remember { mutableStateOf<QueryResult.Success?>(null) }
                                         var columns by remember { mutableStateOf<List<String>>(emptyList()) }
                                         var rows by remember { mutableStateOf<List<List<String>>>(emptyList()) }
                                         var isRunning by remember { mutableStateOf(false) }
                                         var queryError by remember { mutableStateOf<String?>(null) }
+                                        var editError by remember { mutableStateOf<String?>(null) }
                                         val coroutineScope = rememberCoroutineScope()
 
                                         var showExportDialog by remember { mutableStateOf(false) }
@@ -164,15 +196,37 @@ fun main() {
                                         if (showExportDialog) {
                                             com.dbeagle.ui.ExportDialog(
                                                 onDismiss = { showExportDialog = false },
-                                                onExportRequested = { format, path ->
-                                                    println("App: Export requested - Format: $format, Path: $path")
+                                                onExportRequested = { format, path, onProgress ->
+                                                    val result = lastQueryResult
+                                                    if (result == null) {
+                                                        statusText = "Status: No query result to export"
+                                                        return@ExportDialog
+                                                    }
+                                                    
+                                                    try {
+                                                        val outputFile = java.io.File(path)
+                                                        val exporter = when (format) {
+                                                            com.dbeagle.ui.ExportFormat.CSV -> com.dbeagle.export.CsvExporter()
+                                                            com.dbeagle.ui.ExportFormat.JSON -> com.dbeagle.export.JsonExporter()
+                                                            com.dbeagle.ui.ExportFormat.SQL -> com.dbeagle.export.SqlExporter()
+                                                        }
+                                                        
+                                                        exporter.export(outputFile, result, result.resultSet) { rowCount, isDone ->
+                                                            onProgress(rowCount, isDone)
+                                                            if (isDone) {
+                                                                statusText = "Status: Exported $rowCount rows to $path"
+                                                            }
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        statusText = "Status: Export failed: ${e.message}"
+                                                    }
                                                 }
                                             )
                                         }
 
                                         Column(modifier = Modifier.fillMaxSize()) {
-                                            if (queryError != null) {
-                                                AlertDialog(
+                                         if (queryError != null) {
+                                             AlertDialog(
                                                     onDismissRequest = { queryError = null },
                                                     title = { Text("Query Error") },
                                                     text = { Text(queryError ?: "") },
@@ -181,13 +235,26 @@ fun main() {
                                                             Text("OK")
                                                         }
                                                     }
-                                                )
-                                            }
+                                             )
+                                         }
+
+                                         if (editError != null) {
+                                             AlertDialog(
+                                                 onDismissRequest = { editError = null },
+                                                 title = { Text("Edit Error") },
+                                                 text = { Text(editError ?: "") },
+                                                 confirmButton = {
+                                                     TextButton(onClick = { editError = null }) {
+                                                         Text("OK")
+                                                     }
+                                                 }
+                                             )
+                                         }
 
                                             com.dbeagle.ui.SQLEditor(
-                                                sql = sqlQuery,
-                                                onSqlChange = { sqlQuery = it },
-                                                onRun = {
+                                                sql = queryEditorSql,
+                                                onSqlChange = { queryEditorSql = it },
+                                                 onRun = {
                                                     if (isRunning) return@SQLEditor
                                                     val driver = activeDriver
                                                     if (driver == null) {
@@ -195,41 +262,63 @@ fun main() {
                                                         return@SQLEditor
                                                     }
 
-                                                    coroutineScope.launch {
-                                                        isRunning = true
-                                                        queryError = null
-                                                        val name = activeProfileName ?: "Connection"
-                                                        statusText = "Status: Running query ($name)"
+                                                     coroutineScope.launch {
+                                                         isRunning = true
+                                                         queryError = null
+                                                         val name = activeProfileName ?: "Connection"
+                                                         statusText = "Status: Running query ($name)"
 
-                                                        val startNs = System.nanoTime()
-                                                        try {
-                                                            when (val r = QueryExecutor(driver).execute(sqlQuery)) {
-                                                                is QueryResult.Success -> {
-                                                                    columns = r.columnNames
-                                                                    rows = r.rows.map { rowMap ->
-                                                                        r.columnNames.map { col -> rowMap[col] ?: "" }
-                                                                    }
-                                                                    val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                                    statusText = "Status: ${rows.size} row(s) in ${durationMs}ms"
-                                                                }
-                                                                is QueryResult.Error -> {
-                                                                    val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                                    statusText = "Status: Error in ${durationMs}ms: ${r.message}"
-                                                                    queryError = r.message
-                                                                }
-                                                            }
-                                                        } catch (e: Exception) {
-                                                            val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                            statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
-                                                            queryError = e.message ?: "Error"
-                                                        } finally {
-                                                            isRunning = false
-                                                        }
-                                                    }
-                                                },
+                                                         val startNs = System.nanoTime()
+                                                           try {
+                                                               when (val r = QueryExecutor(driver).execute(queryEditorSql)) {
+                                                                   is QueryResult.Success -> {
+                                                                       lastExecutedSql = queryEditorSql
+                                                                       lastQueryResult = r
+                                                                       columns = r.columnNames
+                                                                       rows = r.rows.map { rowMap ->
+                                                                           r.columnNames.map { col -> rowMap[col] ?: "" }
+                                                                       }
+                                                                       val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                                       statusText = "Status: ${rows.size} row(s) in ${durationMs}ms"
+                                                                       
+                                                                       activeProfileName?.let { profileId ->
+                                                                           historyRepository.add(
+                                                                               QueryHistoryEntry(
+                                                                                   query = queryEditorSql,
+                                                                                   durationMs = durationMs,
+                                                                                   connectionProfileId = profileId
+                                                                               )
+                                                                           )
+                                                                       }
+                                                                   }
+                                                                  is QueryResult.Error -> {
+                                                                      val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                                      statusText = "Status: Error in ${durationMs}ms: ${r.message}"
+                                                                      queryError = r.message
+                                                                      
+                                                                      activeProfileName?.let { profileId ->
+                                                                          historyRepository.add(
+                                                                              QueryHistoryEntry(
+                                                                                  query = queryEditorSql,
+                                                                                  durationMs = durationMs,
+                                                                                  connectionProfileId = profileId
+                                                                              )
+                                                                          )
+                                                                      }
+                                                                  }
+                                                              }
+                                                          } catch (e: Exception) {
+                                                              val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                              statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
+                                                              queryError = e.message ?: "Error"
+                                                          } finally {
+                                                              isRunning = false
+                                                          }
+                                                     }
+                                                 },
                                                 isRunning = isRunning,
-                                                onClear = { sqlQuery = "" },
-                                                onSaveToFavorites = { },
+                                                onClear = { queryEditorSql = "" },
+                                                onSaveToFavorites = { showSaveFavoriteDialog = true },
                                                 modifier = Modifier.weight(0.4f)
                                             )
                                             
@@ -248,14 +337,63 @@ fun main() {
                                                 }
                                             }
                                             
-                                            com.dbeagle.ui.ResultGrid(
-                                                columns = columns,
-                                                rows = rows,
-                                                pageSize = 25,
-                                                modifier = Modifier.weight(0.6f)
-                                            )
-                                        }
-                                    }
+                                             com.dbeagle.ui.ResultGrid(
+                                                 columns = columns,
+                                                 rows = rows,
+                                                 pageSize = 25,
+                                                 modifier = Modifier.weight(0.6f),
+                                                 onCellCommit = { _, columnName, newValue, rowSnapshot ->
+                                                     val driver = activeDriver
+                                                     if (driver == null) {
+                                                         statusText = "Status: No active connection"
+                                                         return@ResultGrid Result.failure(IllegalStateException("No active connection"))
+                                                     }
+
+                                                     val lastSql = lastExecutedSql
+                                                     val table = lastSql?.let { InlineUpdate.inferTableNameFromSelectAll(it) }
+                                                     if (table.isNullOrBlank()) {
+                                                         val msg = "Inline edit requires last query like: SELECT * FROM <table>"
+                                                         editError = msg
+                                                         return@ResultGrid Result.failure(IllegalStateException(msg))
+                                                     }
+
+                                                     val idIndex = columns.indexOfFirst { it.equals("id", ignoreCase = true) }
+                                                     if (idIndex < 0) {
+                                                         val msg = "Inline edit requires an 'id' column in result set"
+                                                         editError = msg
+                                                         return@ResultGrid Result.failure(IllegalStateException(msg))
+                                                     }
+
+                                                     val idValue = rowSnapshot.getOrNull(idIndex)
+                                                     if (idValue.isNullOrBlank()) {
+                                                         val msg = "Inline edit requires a non-empty id value"
+                                                         editError = msg
+                                                         return@ResultGrid Result.failure(IllegalStateException(msg))
+                                                     }
+
+                                                     val stmt = InlineUpdate.buildUpdateById(
+                                                         table = table,
+                                                         column = columnName,
+                                                         value = newValue,
+                                                         id = idValue
+                                                     )
+
+                                                     when (val r = QueryExecutor(driver).execute(stmt.sql, stmt.params)) {
+                                                         is QueryResult.Success -> {
+                                                             statusText = "Status: Updated $table.$columnName for id=$idValue"
+                                                             Result.success(Unit)
+                                                         }
+                                                         is QueryResult.Error -> {
+                                                             val msg = r.message
+                                                             editError = msg
+                                                             statusText = "Status: Update failed: $msg"
+                                                             Result.failure(IllegalStateException(msg))
+                                                         }
+                                                     }
+                                                 }
+                                             )
+                                         }
+                                     }
                                     NavigationTab.SchemaBrowser -> {
                                         val coroutineScope = rememberCoroutineScope()
 
@@ -499,19 +637,99 @@ fun main() {
                                             }
                                         }
                                     }
-                                    else -> {
-                                        Text(
-                                            text = "${selectedTab.title} Content\n(Placeholder)",
-                                            style = MaterialTheme.typography.headlineSmall,
-                                            color = MaterialTheme.colorScheme.onBackground
+                                    NavigationTab.Favorites -> {
+                                        com.dbeagle.ui.FavoritesScreen(
+                                            repository = favoritesRepository,
+                                            onLoadQuery = { query ->
+                                                queryEditorSql = query
+                                                selectedTab = NavigationTab.QueryEditor
+                                            },
+                                            modifier = Modifier.fillMaxSize()
                                         )
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
+                                    NavigationTab.History -> {
+                                        com.dbeagle.ui.HistoryScreen(
+                                            repository = historyRepository,
+                                            onLoadQuery = { query ->
+                                                queryEditorSql = query
+                                                selectedTab = NavigationTab.QueryEditor
+                                            },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                     else -> {
+                                         Text(
+                                             text = "${selectedTab.title} Content\n(Placeholder)",
+                                             style = MaterialTheme.typography.headlineSmall,
+                                             color = MaterialTheme.colorScheme.onBackground
+                                         )
+                                     }
+                                 }
+                             }
+                         }
+                     }
+                 }
+             }
+         }
+     }
+}
+
+@Composable
+private fun SaveFavoriteDialog(
+    initialQuery: String,
+    onDismiss: () -> Unit,
+    onSave: (name: String, tags: List<String>) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var tagsText by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Save to Favorites") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = tagsText,
+                    onValueChange = { tagsText = it },
+                    label = { Text("Tags (comma-separated)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("sql, reports, etc.") }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Query: ${initialQuery.take(100)}${if (initialQuery.length > 100) "..." else ""}",
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val tags = tagsText.split(",")
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                    onSave(name, tags)
+                },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
-    }
+    )
 }
+

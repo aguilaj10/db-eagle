@@ -1012,6 +1012,13 @@ Future database types can extend DatabaseType sealed class and add URL construct
 - Query Editor executes SQL via `QueryExecutor(driver).execute(sql)` and maps `QueryResult.Success.rows: List<Map<String, String>>` into `ResultGrid` rows by iterating `columnNames` and reading `rowMap[col] ?: ""`.
 - `SQLEditor` takes `isRunning` to disable Run, show a small spinner, and prevent double-run.
 
+## Task 24 - Inline grid edits persisted via UPDATE
+
+- QueryExecutor routes non-SELECT statements directly to DatabaseDriver.executeQuery(sql, params).
+- SQLiteDriver (and others) return update counts as QueryResult.Success with columnNames=["updatedCount"].
+- For minimal inline edit persistence, passing a suspend callback from App -> ResultGrid is sufficient; ResultGrid can optimistically update UI, then revert on failure.
+- Dirty highlight can be implemented by comparing current localRows vs a baselineRows snapshot; after successful persistence update the baseline value so highlight clears.
+
 ## Task 11: Driver Registry + Plugin Loading
 
 **Date:** 2026-03-03
@@ -1267,3 +1274,218 @@ Compose Desktop's ScrollableTabRow works nicely for horizontally stacking dynami
 - After a successful `driver.connect(...)`, immediately call `driver.getSchema()` (discard result) to validate the schema path works; if it fails, treat the connect as failed and rollback via `driver.disconnect()` + `DatabaseConnectionPool.closePool(profileId)`.
 - Prefer explicit status updates during connect/disconnect (e.g., "Connecting...", "Connected", "Disconnecting...", "Disconnected") via the existing `onStatusTextChanged` callback instead of relying only on derived state.
 - `functions.lsp_diagnostics` may time out on this repo due to long `kotlin-language-server` initialize; Gradle compile/tests are the reliable verification path when LSP tooling doesn’t respond in time.
+
+## Task 25: Query History Persistence + UI
+
+**Date:** 2026-03-03
+
+### Architecture Choices
+
+1. **Repository Pattern**:
+   - Interface: `QueryHistoryRepository` (core/history)
+   - Implementation: `FileQueryHistoryRepository` (core/history)
+   - Separates persistence contract from implementation
+   - Allows future swap to DB-backed storage without changing consumers
+
+2. **File Persistence Strategy**:
+   - Location: `~/.dbeagle/history.json`
+   - Format: JSON via kotlinx.serialization (already in use)
+   - Atomic writes: temp file + Files.move(REPLACE_EXISTING, ATOMIC_MOVE)
+   - Auto-creates parent directory on first write
+   - Gracefully handles missing/empty file on read
+
+3. **History Entry Order**:
+   - Most recent first (prepend on add)
+   - getAll() returns List with newest entry at index 0
+   - UI displays chronologically without needing to reverse
+
+### UI Implementation
+
+1. **State Hoisting**:
+   - Moved `sqlQuery` state from QueryEditor scope to App scope
+   - Named `queryEditorSql` to distinguish from local query variables
+   - Enables History screen to update editor state via callback
+   - Pattern: `onLoadQuery = { query -> queryEditorSql = query; selectedTab = QueryEditor }`
+
+2. **HistoryScreen Composable**:
+   - LazyColumn for efficient rendering of large histories
+   - Card-based UI with clickable entries
+   - Shows: timestamp (formatted), duration, profile ID, SQL preview (3 lines max)
+   - Clear button with confirmation dialog
+   - Entry count badge
+   - Empty state message when no history
+
+3. **History Recording**:
+   - Records on both Success and Error results
+   - Captures: query text, duration, profile ID
+   - Uses activeProfileName (not activeDriver.getName()) as identifier
+   - Consistent with existing duration measurement (System.nanoTime())
+
+### Testing Strategy
+
+1. **Restart Simulation**:
+   - Test creates repo1, adds entries, then creates repo2 with same file path
+   - Proves persistence survives repository re-instantiation
+   - Key test: `persistence survives repository re-instantiation`
+
+2. **Clear Persistence**:
+   - Test verifies clear() persists empty state to file
+   - Creates new repository after clear to confirm empty
+   - Key test: `clear removes all entries and persists empty state`
+
+3. **Edge Cases Covered**:
+   - Empty file handling
+   - Missing file (first run)
+   - Parent directory creation
+   - Thread.sleep(10) between adds for timestamp ordering
+
+### Gotchas & Lessons
+
+1. **QueryHistoryEntry Model**:
+   - Already existed from Task 2 (no duplicate creation needed)
+   - Has UUID-based ID generation (unique per entry)
+   - Timestamp defaults to System.currentTimeMillis()
+   - @Serializable annotation already present
+
+2. **JSON Serialization**:
+   - kotlinx.serialization handles UUID and Long types correctly
+   - prettyPrint = true for human-readable debug (file size acceptable)
+   - Empty list serialized as "[]" (not empty string)
+
+3. **Atomic File Writes**:
+   - StandardCopyOption.ATOMIC_MOVE may not be truly atomic on all filesystems
+   - Good enough for desktop app (not critical distributed system)
+   - Temp file cleanup via try/catch prevents orphaned files
+
+4. **State Management**:
+   - remember { } for repository instance persists across recompositions
+   - var entries by remember inside HistoryScreen refreshes on clear
+   - LazyColumn automatically handles list changes via items(entries)
+
+### Dependencies
+
+- No new dependencies added
+- Reused: kotlinx.serialization, Compose Material3, existing models
+- Repository pattern keeps UI layer testable (mock repository)
+
+### Future Enhancements (Out of Scope)
+
+- Search/filter history by SQL text or profile
+- Export history to CSV/JSON
+- Pagination for large histories (>1000 entries)
+- Automatic history pruning (keep last N days)
+- History entry detail view (full SQL, execution plan)
+- Diff view comparing two history entries
+
+### Task 25 Hardening - Atomic Move Fallback & Missing-File Test Coverage
+
+#### Problem: Atomic Move Not Supported on All Filesystems
+- `Files.move(..., StandardCopyOption.ATOMIC_MOVE)` fails with `UnsupportedOperationException` on filesystems that don't support atomic operations
+- Examples: NFS mounts, SMB/CIFS shares, some remote storage systems
+- Original code threw exception on unsupported filesystems, preventing persistence entirely
+
+#### Solution: Graceful Fallback Pattern
+Implemented nested try-catch in `save()` method:
+1. Attempt atomic move first (safest, prevents file corruption on crash)
+2. Catch `UnsupportedOperationException` specifically
+3. Fallback to non-atomic move with `REPLACE_EXISTING` flag
+4. Keep temp file cleanup in outer catch block to cover all exception paths
+
+**Key Design Points**:
+- Only catches `UnsupportedOperationException` (atomic move unsupported), not all exceptions
+- Other exceptions (disk full, permission denied, etc.) still propagate correctly
+- Temp file deleted in all paths (no resource leak)
+- No performance penalty for supported filesystems (atomic move tried first)
+
+#### Testing Missing-File Behavior
+**Original Test Issue**: Test claimed to verify "missing file" behavior but init block always created the file
+- Repository constructor calls `mkdirs()` and writes "[]" if file doesn't exist
+- Test only verified the file wasn't pre-existing; never actually tested missing-file path
+
+**Updated Test**:
+1. Assert file doesn't exist initially
+2. Create repository (forces init block to create file)
+3. Delete the file after initialization
+4. Call `getAll()` on missing file
+5. Verify empty list returned (not crash, not exception)
+
+This ensures the condition "if (!historyFile.exists()) return emptyList()" is actually exercised during testing.
+
+#### Test Coverage Gap Prevention
+- Simple inspection: If test creates repo and checks state WITHOUT deleting file, it's not testing missing-file path
+- Solution: Explicitly delete file and verify its absence before calling method
+- Lesson: Tests must actively create the scenario they claim to test, not assume it exists
+
+#### Robustness Inheritance
+- Fallback behavior applies to all callers: `add()`, `clear()`, any future `save()` calls
+- No public API changes needed
+- Existing tests pass without modification (except the test that now properly verifies missing-file)
+
+### Task 25 Hardening - Atomic Move Exception Handling
+
+#### Exception Type Nuance: UnsupportedOperationException vs AtomicMoveNotSupportedException
+
+**Discovery**: When using `Files.move(..., StandardCopyOption.ATOMIC_MOVE)`, different filesystems throw different exception types:
+
+1. **UnsupportedOperationException** (from java.lang.UnsupportedOperationException)
+   - Thrown by POSIX filesystems that don't support atomic moves
+   - Generic exception, not filesystem-specific
+   - Older/traditional fallback expectation
+
+2. **AtomicMoveNotSupportedException** (from java.nio.file.AtomicMoveNotSupportedException)
+   - Thrown by certain filesystem types (NFS mounts, SMB shares, specialized filesystems)
+   - IOException subclass, more semantically specific to atomic move failure
+   - Modern filesystems may throw this instead of generic UnsupportedOperationException
+
+**Robustness Lesson**:
+- Catch BOTH exception types in atomic move fallback logic
+- Single catch for UnsupportedOperationException is insufficient
+- Different filesystem implementations throw different exceptions for the same semantic failure
+- Always check Java NIO documentation for filesystem-specific exception hierarchy
+
+**Implementation Pattern**:
+```kotlin
+try {
+    Files.move(path1, path2, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+} catch (e: UnsupportedOperationException) {
+    // Fallback for traditional filesystem responses
+    Files.move(path1, path2, StandardCopyOption.REPLACE_EXISTING)
+} catch (e: AtomicMoveNotSupportedException) {
+    // Fallback for modern/specialized filesystem responses
+    Files.move(path1, path2, StandardCopyOption.REPLACE_EXISTING)
+}
+```
+
+**Why Both Matter**:
+- Skipping AtomicMoveNotSupportedException catch leaves NFS/SMB mounts vulnerable to crashes
+- Skipping UnsupportedOperationException catch leaves traditional POSIX filesystems vulnerable
+- Desktop apps running in enterprise environments often encounter diverse filesystem types
+- Better to be defensive and catch both than to assume a single exception type
+
+#### Task Artifact Cleanup
+
+**Removed**: `test_output.txt` from repository root
+- Accidental test output file that was untracked
+- Cleanup prevents clutter and maintains repository hygiene
+
+
+## Task 26: Favorites System (2026-03-03)
+- Successfully implemented full favorites system following existing repository patterns
+- FileFavoritesRepository mirrors FileQueryHistoryRepository's safe write semantics (temp file + atomic move)
+- FavoritesScreen mirrors HistoryScreen's card-based layout and navigation patterns
+- Search functionality implemented with case-insensitive matching across name/query/tags
+- SaveFavoriteDialog integrated into App.kt with state hoisting for queryEditorSql
+- All 10 test cases pass, verifying save/load/delete/search/persistence
+- UI follows Material3 design with tag chips and edit/delete actions on cards
+- Cross-tab navigation works: clicking favorite loads SQL and switches to Query Editor tab
+
+## Export Functionality (Task 27)
+- ResultExporter interface provides streaming export with progress callbacks
+- CSV escaping: wrap fields containing comma/quote/newline in quotes; escape internal quotes by doubling
+- JSON escaping: escape backslash, quote, newline, carriage return, tab
+- SQL escaping: escape single quotes by doubling (O'Brien → O''Brien)
+- Export streams via PaginatedResultSet.fetchNext() to keep memory bounded for large result sets
+- ExportDialog shows LinearProgressIndicator for >1000 rows; otherwise CircularProgressIndicator
+- Tests use runBlocking (not runTest) for DatabaseDriver suspend functions in data module
+- ConnectionProfile requires encryptedPassword field (not password)
+- SQLiteDriver.disconnect() closes connection (not close())

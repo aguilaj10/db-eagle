@@ -9,7 +9,6 @@ import androidx.compose.ui.unit.dp
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.HeadlessException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class ExportFormat {
@@ -20,11 +19,13 @@ enum class ExportFormat {
 @Composable
 fun ExportDialog(
     onDismiss: () -> Unit,
-    onExportRequested: (ExportFormat, String) -> Unit
+    onExportRequested: suspend (ExportFormat, String, (Int, Boolean) -> Unit) -> Unit
 ) {
     var selectedFormat by remember { mutableStateOf(ExportFormat.CSV) }
     var filePath by remember { mutableStateOf("") }
     var isExporting by remember { mutableStateOf(false) }
+    var exportedRowCount by remember { mutableStateOf(0) }
+    var showProgress by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     AlertDialog(
@@ -95,9 +96,15 @@ fun ExportDialog(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Exporting data...", style = MaterialTheme.typography.bodySmall)
+                        if (showProgress) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Exported $exportedRowCount rows...", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Exporting data...", style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
@@ -106,11 +113,17 @@ fun ExportDialog(
             Button(
                 onClick = {
                     isExporting = true
+                    exportedRowCount = 0
+                    showProgress = false
                     coroutineScope.launch {
-                        delay(1500) // Mock export delay
-                        onExportRequested(selectedFormat, filePath)
-                        isExporting = false
-                        onDismiss()
+                        onExportRequested(selectedFormat, filePath) { rowCount, isDone ->
+                            exportedRowCount = rowCount
+                            showProgress = rowCount > 1000
+                            if (isDone) {
+                                isExporting = false
+                                onDismiss()
+                            }
+                        }
                     }
                 },
                 enabled = filePath.isNotBlank() && !isExporting

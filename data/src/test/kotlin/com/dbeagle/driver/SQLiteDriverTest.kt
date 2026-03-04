@@ -4,6 +4,7 @@ import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
 import com.dbeagle.model.QueryResult
+import com.dbeagle.query.QueryExecutor
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -74,6 +75,34 @@ class SQLiteDriverTest {
         result as QueryResult.Success
         assertEquals(listOf("name"), result.columnNames)
         assertEquals("Alice", result.rows.single()["name"])
+    }
+
+    @Test
+    fun testUpdatePersistsViaQueryExecutorWithParams() = runBlocking {
+        val before = driver.executeQuery(
+            sql = "SELECT name FROM users WHERE id = ?",
+            params = listOf(1)
+        )
+        assertTrue(before is QueryResult.Success)
+        before as QueryResult.Success
+        assertEquals("Alice", before.rows.single()["name"])
+
+        val update = QueryExecutor(driver).execute(
+            sql = "UPDATE users SET name = ? WHERE id = ?",
+            params = listOf("AliceUpdated", 1)
+        )
+        assertTrue(update is QueryResult.Success)
+        update as QueryResult.Success
+        assertEquals(listOf("updatedCount"), update.columnNames)
+        assertEquals("1", update.rows.single()["updatedCount"])
+
+        val after = driver.executeQuery(
+            sql = "SELECT name FROM users WHERE id = ?",
+            params = listOf(1)
+        )
+        assertTrue(after is QueryResult.Success)
+        after as QueryResult.Success
+        assertEquals("AliceUpdated", after.rows.single()["name"])
     }
 
     @Test

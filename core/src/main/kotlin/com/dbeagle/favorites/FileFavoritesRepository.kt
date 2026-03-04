@@ -1,0 +1,81 @@
+package com.dbeagle.favorites
+
+import com.dbeagle.model.FavoriteQuery
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
+class FileFavoritesRepository(
+    private val favoritesFile: File = File(System.getProperty("user.home"), ".dbeagle/favorites.json")
+) : FavoritesRepository {
+
+    private val json = Json { prettyPrint = true }
+
+    init {
+        favoritesFile.parentFile?.mkdirs()
+        if (!favoritesFile.exists()) {
+            favoritesFile.writeText("[]")
+        }
+    }
+
+    override fun save(favorite: FavoriteQuery) {
+        val current = getAll().toMutableList()
+        val existingIndex = current.indexOfFirst { it.id == favorite.id }
+        
+        if (existingIndex >= 0) {
+            current[existingIndex] = favorite.copy(lastModified = System.currentTimeMillis())
+        } else {
+            current.add(favorite)
+        }
+        
+        persist(current)
+    }
+
+    override fun getAll(): List<FavoriteQuery> {
+        if (!favoritesFile.exists()) return emptyList()
+        val text = favoritesFile.readText().trim()
+        if (text.isEmpty() || text == "[]") return emptyList()
+        return json.decodeFromString<List<FavoriteQuery>>(text)
+            .sortedByDescending { it.lastModified }
+    }
+
+    override fun getById(id: String): FavoriteQuery? {
+        return getAll().firstOrNull { it.id == id }
+    }
+
+    override fun delete(id: String) {
+        val current = getAll().filter { it.id != id }
+        persist(current)
+    }
+
+    override fun search(query: String): List<FavoriteQuery> {
+        if (query.isBlank()) return getAll()
+        
+        val lowerQuery = query.lowercase()
+        return getAll().filter { favorite ->
+            favorite.name.lowercase().contains(lowerQuery) ||
+            favorite.query.lowercase().contains(lowerQuery) ||
+            favorite.tags.any { it.lowercase().contains(lowerQuery) }
+        }
+    }
+
+    private fun persist(favorites: List<FavoriteQuery>) {
+        val tempFile = File.createTempFile("favorites", ".json", favoritesFile.parentFile)
+        try {
+            tempFile.writeText(json.encodeToString(favorites))
+            try {
+                Files.move(tempFile.toPath(), favoritesFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (e: UnsupportedOperationException) {
+                Files.move(tempFile.toPath(), favoritesFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } catch (e: AtomicMoveNotSupportedException) {
+                Files.move(tempFile.toPath(), favoritesFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } catch (e: Exception) {
+            tempFile.delete()
+            throw e
+        }
+    }
+}
