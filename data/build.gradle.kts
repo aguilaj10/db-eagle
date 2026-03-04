@@ -20,6 +20,7 @@ dependencies {
     testImplementation(libs.kotlin.test)
     testImplementation(libs.testcontainers)
     testImplementation(libs.testcontainers.postgres)
+    testRuntimeOnly(libs.logback.classic)
 }
 
 tasks.test {
