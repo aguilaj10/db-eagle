@@ -41,7 +41,10 @@ import org.koin.core.context.startKoin
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import com.dbeagle.pool.DatabaseConnectionPool
+import com.dbeagle.crash.CrashReporter
+import org.slf4j.LoggerFactory
 
 private data class MemoryStats(
     val usedBytes: Long,
@@ -79,6 +82,10 @@ enum class NavigationTab(val title: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 fun main() {
+    CrashReporter.install()
+    val logger = LoggerFactory.getLogger("com.dbeagle.App")
+    logger.info("DB Eagle starting...")
+    
     startKoin {
         modules(appModule)
     }
@@ -223,11 +230,47 @@ fun main() {
                                     else -> MaterialTheme.colorScheme.primary
                                 }
 
-                                Text(
-                                    text = poolText,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = poolColor,
-                                )
+                                 Text(
+                                     text = poolText,
+                                     style = MaterialTheme.typography.labelMedium,
+                                     color = poolColor,
+                                 )
+                                 
+                                 Spacer(Modifier.width(16.dp))
+                                 
+                                 TextButton(
+                                     onClick = {
+                                         val crashLog = CrashReporter.readCrashLog()
+                                         if (crashLog != null) {
+                                             try {
+                                                 val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                                 val selection = java.awt.datatransfer.StringSelection(crashLog)
+                                                 clipboard.setContents(selection, selection)
+                                                 statusText = "Status: Crash log copied to clipboard"
+                                                 logger.info("User action: Copied crash log to clipboard")
+                                             } catch (e: Exception) {
+                                                 statusText = "Status: Failed to copy to clipboard"
+                                                 logger.warn("Failed to copy crash log to clipboard", e)
+                                             }
+                                         } else {
+                                             statusText = "Status: No crash log found"
+                                             logger.info("User action: Attempted to copy crash log, but none exists")
+                                         }
+                                     },
+                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                     modifier = Modifier.height(28.dp)
+                                 ) {
+                                     Icon(
+                                         imageVector = Icons.Default.Warning,
+                                         contentDescription = "Report Issue",
+                                         modifier = Modifier.size(16.dp)
+                                     )
+                                     Spacer(Modifier.width(4.dp))
+                                     Text(
+                                         "Report Issue",
+                                         style = MaterialTheme.typography.labelSmall
+                                     )
+                                 }
                             }
                         }
                     },

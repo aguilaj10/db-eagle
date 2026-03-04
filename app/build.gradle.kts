@@ -19,10 +19,10 @@ dependencies {
 
     implementation(libs.koin.core)
 
-    runtimeOnly(libs.slf4j.simple)
+    implementation(libs.slf4j.api)
+    implementation(libs.logback.classic)
 
     testImplementation(libs.kotlin.test)
-    testRuntimeOnly(libs.slf4j.simple)
 }
 
 tasks.test {

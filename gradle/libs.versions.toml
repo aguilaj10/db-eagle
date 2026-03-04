@@ -53,7 +53,8 @@ exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "e
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 
 # Logging
-slf4j-simple = { module = "org.slf4j:slf4j-simple", version = "2.0.13" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version = "1.5.6" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version = "2.0.13" }
 
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 

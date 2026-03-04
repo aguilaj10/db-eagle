@@ -18,7 +18,6 @@ dependencies {
     implementation(libs.koin.core)
 
     testImplementation(libs.kotlin.test)
-    testRuntimeOnly(libs.slf4j.simple)
     testImplementation(libs.testcontainers)
     testImplementation(libs.testcontainers.postgres)
 }
