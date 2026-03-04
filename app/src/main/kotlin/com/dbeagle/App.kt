@@ -14,6 +14,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.dbeagle.di.appModule
 import com.dbeagle.edit.InlineUpdate
+import com.dbeagle.error.ErrorHandler
 import com.dbeagle.favorites.FileFavoritesRepository
 import com.dbeagle.favorites.FavoritesRepository
 import com.dbeagle.history.FileQueryHistoryRepository
@@ -60,6 +61,7 @@ fun main() {
         var favoriteQueryDraft by remember { mutableStateOf("") }
 
         val appCoroutineScope = rememberCoroutineScope()
+        val snackbarHostState = remember { SnackbarHostState() }
         
         val historyRepository = remember { FileQueryHistoryRepository() }
         val favoritesRepository = remember { FileFavoritesRepository() }
@@ -112,6 +114,9 @@ fun main() {
                                 style = MaterialTheme.typography.labelMedium
                             )
                         }
+                    },
+                    snackbarHost = {
+                        SnackbarHost(hostState = snackbarHostState)
                     }
                 ) { innerPadding ->
                     Row(
@@ -223,6 +228,8 @@ fun main() {
                                         com.dbeagle.ui.ConnectionManagerScreen(
                                             sessionViewModel = sessionViewModel,
                                             onStatusTextChanged = { statusText = it },
+                                            snackbarHostState = snackbarHostState,
+                                            coroutineScope = appCoroutineScope,
                                         )
                                     }
                                     NavigationTab.QueryEditor -> {
@@ -270,19 +277,6 @@ fun main() {
                                         }
 
                                         Column(modifier = Modifier.fillMaxSize()) {
-                                         if (queryError != null) {
-                                             AlertDialog(
-                                                    onDismissRequest = { queryError = null },
-                                                    title = { Text("Query Error") },
-                                                    text = { Text(queryError ?: "") },
-                                                    confirmButton = {
-                                                        TextButton(onClick = { queryError = null }) {
-                                                            Text("OK")
-                                                        }
-                                                    }
-                                             )
-                                         }
-
                                          if (editError != null) {
                                              AlertDialog(
                                                  onDismissRequest = { editError = null },
@@ -329,13 +323,30 @@ fun main() {
 
                                                           val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
 
-                                                          val startNs = System.nanoTime()
-                                                            try {
-                                                                when (val r = QueryExecutor(driver).execute(sqlToRun)) {
-                                                                    is QueryResult.Success -> {
-                                                                        sessionViewModel.recordQueryResult(pid, sqlToRun, r)
+                                                           val startNs = System.nanoTime()
+                                                             try {
+                                                                 when (val r = QueryExecutor(driver).execute(sqlToRun)) {
+                                                                     is QueryResult.Success -> {
+                                                                         sessionViewModel.recordQueryResult(pid, sqlToRun, r)
+                                                                         val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                                         statusText = "Status: ${r.rows.size} row(s) in ${durationMs}ms"
+                                                                         
+                                                                         historyRepository.add(
+                                                                             QueryHistoryEntry(
+                                                                                 query = sqlToRun,
+                                                                                 durationMs = durationMs,
+                                                                                 connectionProfileId = pid
+                                                                             )
+                                                                         )
+                                                                     }
+                                                                    is QueryResult.Error -> {
                                                                         val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                                        statusText = "Status: ${r.rows.size} row(s) in ${durationMs}ms"
+                                                                        statusText = "Status: Error in ${durationMs}ms: ${r.message}"
+                                                                        ErrorHandler.showQueryError(
+                                                                            snackbarHostState,
+                                                                            appCoroutineScope,
+                                                                            "Query error: ${r.message}"
+                                                                        )
                                                                         
                                                                         historyRepository.add(
                                                                             QueryHistoryEntry(
@@ -345,28 +356,20 @@ fun main() {
                                                                             )
                                                                         )
                                                                     }
-                                                                   is QueryResult.Error -> {
-                                                                       val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                                       statusText = "Status: Error in ${durationMs}ms: ${r.message}"
-                                                                       queryError = r.message
-                                                                       
-                                                                       historyRepository.add(
-                                                                           QueryHistoryEntry(
-                                                                               query = sqlToRun,
-                                                                               durationMs = durationMs,
-                                                                               connectionProfileId = pid
-                                                                           )
-                                                                       )
-                                                                   }
-                                                               }
-                                                           } catch (e: Exception) {
-                                                               val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                               statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
-                                                              queryError = e.message ?: "Error"
-                                                          } finally {
-                                                              isRunning = false
-                                                          }
-                                                     }
+                                                                }
+                                                            } catch (e: Exception) {
+                                                                val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                                statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
+                                                                ErrorHandler.showQueryError(
+                                                                    snackbarHostState,
+                                                                    appCoroutineScope,
+                                                                    "Query error: ${e.message ?: "Unknown error"}",
+                                                                    e
+                                                                )
+                                                           } finally {
+                                                               isRunning = false
+                                                           }
+                                                      }
                                                   },
                                                  isRunning = isRunning,
                                                  onClear = {

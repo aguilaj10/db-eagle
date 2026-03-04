@@ -1,11 +1,11 @@
 package com.dbeagle.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
@@ -18,22 +18,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.dbeagle.driver.DataDrivers
 import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.driver.DatabaseDriverRegistry
-import com.dbeagle.model.ConnectionProfile
+import com.dbeagle.driver.DataDrivers
+import com.dbeagle.error.ErrorHandler
 import com.dbeagle.model.ConnectionConfig
+import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
-import com.dbeagle.pool.DatabaseConnectionPool
-import com.dbeagle.session.SessionViewModel
 import com.dbeagle.profile.MasterPasswordProvider
 import com.dbeagle.profile.PreferencesBackedConnectionProfileRepository
+import com.dbeagle.pool.DatabaseConnectionPool
+import com.dbeagle.session.SessionViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
 fun ConnectionManagerScreen(
     sessionViewModel: SessionViewModel,
     onStatusTextChanged: (String) -> Unit = {},
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
 ) {
     var masterPassword by remember { mutableStateOf<String?>(null) }
     
@@ -46,6 +50,8 @@ fun ConnectionManagerScreen(
             masterPassword = masterPassword!!,
             sessionViewModel = sessionViewModel,
             onStatusTextChanged = onStatusTextChanged,
+            snackbarHostState = snackbarHostState,
+            coroutineScope = coroutineScope,
         )
     }
 }
@@ -87,10 +93,9 @@ fun ConnectionListScreen(
     masterPassword: String,
     sessionViewModel: SessionViewModel,
     onStatusTextChanged: (String) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    
-    // Simplest instantiation inline for this task
     val repository = remember(masterPassword) {
         PreferencesBackedConnectionProfileRepository(
             masterPasswordProvider = MasterPasswordProvider { masterPassword }
@@ -105,7 +110,8 @@ fun ConnectionListScreen(
     val connectingProfileId by sessionViewModel.connectingProfileId.collectAsState()
     val activeProfileId by sessionViewModel.activeProfileId.collectAsState()
 
-    var dialogError by remember { mutableStateOf<String?>(null) }
+    var connectionErrorMessage by remember { mutableStateOf<String?>(null) }
+    var retryConnection by remember { mutableStateOf<ConnectionProfile?>(null) }
     
     var showDialog by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
@@ -255,7 +261,11 @@ fun ConnectionListScreen(
                                         }
                                         DatabaseConnectionPool.closePool(profile.id)
                                         updateStatus()
-                                        dialogError = "Failed to connect: ${e.message}"
+                                        connectionErrorMessage = ErrorHandler.getConnectionErrorMessage(
+                                            "Failed to connect: ${e.message}",
+                                            e
+                                        )
+                                        retryConnection = profile
                                     } finally {
                                         sessionViewModel.setConnecting(null)
                                     }
@@ -311,7 +321,11 @@ fun ConnectionListScreen(
                         showDialog = false
                         refreshProfiles()
                     } catch (e: Exception) {
-                        dialogError = "Failed to save profile: ${e.message}"
+                        connectionErrorMessage = ErrorHandler.getConnectionErrorMessage(
+                            "Failed to save profile: ${e.message}",
+                            e
+                        )
+                        retryConnection = null
                         showDialog = false
                     }
                 }
@@ -319,14 +333,101 @@ fun ConnectionListScreen(
         )
     }
 
-    if (dialogError != null) {
+    if (connectionErrorMessage != null) {
         AlertDialog(
-            onDismissRequest = { dialogError = null },
+            onDismissRequest = {
+                connectionErrorMessage = null
+                retryConnection = null
+            },
             title = { Text("Connection Error") },
-            text = { Text(dialogError ?: "") },
+            text = { Text(connectionErrorMessage ?: "") },
             confirmButton = {
-                TextButton(onClick = { dialogError = null }) {
-                    Text("OK")
+                if (retryConnection != null) {
+                    TextButton(onClick = {
+                        val profile = retryConnection
+                        connectionErrorMessage = null
+                        retryConnection = null
+                        if (profile != null) {
+                            coroutineScope.launch {
+                                sessionViewModel.setConnecting(profile.id)
+                                var driver: DatabaseDriver? = null
+                                try {
+                                    val loaded = repository.load(profile.id)
+                                        ?: throw IllegalStateException("Profile not found")
+
+                                    val prototype = DatabaseDriverRegistry.getDriver(loaded.type)
+                                        ?: throw IllegalStateException(
+                                            "No driver registered for type: ${loaded.type}"
+                                        )
+
+                                    driver = try {
+                                        prototype::class.java.getDeclaredConstructor().newInstance()
+                                    } catch (e: Exception) {
+                                        throw IllegalStateException(
+                                            "Driver for type ${loaded.type} must have a no-arg constructor",
+                                            e
+                                        )
+                                    }
+
+                                    val password = loaded.encryptedPassword
+                                    val configProfile = loaded.copy(
+                                        options = loaded.options + ("password" to password)
+                                    )
+
+                                    onStatusTextChanged("Status: Connecting (${loaded.name})")
+
+                                    DatabaseConnectionPool.getConnection(loaded, password).use { _ -> }
+
+                                    driver!!.connect(ConnectionConfig(profile = configProfile))
+
+                                    try {
+                                        driver!!.getSchema()
+                                    } catch (schemaError: Exception) {
+                                        try {
+                                            driver!!.disconnect()
+                                        } catch (_: Exception) {
+                                        } finally {
+                                            DatabaseConnectionPool.closePool(loaded.id)
+                                        }
+                                        throw schemaError
+                                    }
+
+                                    sessionViewModel.openSession(
+                                        profileId = loaded.id,
+                                        profileName = loaded.name,
+                                        driver = driver!!
+                                    )
+                                    updateActiveConnection(loaded.id)
+
+                                    onStatusTextChanged("Status: Connected (${loaded.name})")
+                                } catch (e: Exception) {
+                                    try {
+                                        driver?.disconnect()
+                                    } catch (_: Exception) {
+                                    }
+                                    DatabaseConnectionPool.closePool(profile.id)
+                                    updateStatus()
+                                    connectionErrorMessage = ErrorHandler.getConnectionErrorMessage(
+                                        "Failed to connect: ${e.message}",
+                                        e
+                                    )
+                                    retryConnection = profile
+                                } finally {
+                                    sessionViewModel.setConnecting(null)
+                                }
+                            }
+                        }
+                    }) {
+                        Text("Retry")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    connectionErrorMessage = null
+                    retryConnection = null
+                }) {
+                    Text("Cancel")
                 }
             }
         )
