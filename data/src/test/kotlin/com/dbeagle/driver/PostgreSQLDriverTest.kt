@@ -5,13 +5,11 @@ import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
 import com.dbeagle.model.QueryResult
 import com.dbeagle.pool.DatabaseConnectionPool
-import java.sql.Connection
 import org.testcontainers.containers.PostgreSQLContainer
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PostgreSQLDriverTest {
@@ -33,7 +31,7 @@ class PostgreSQLDriverTest {
             if (dockerAvailable) {
                 seedSchema(postgresContainer!!)
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Docker not available - tests will be skipped
             dockerAvailable = false
         }
@@ -43,14 +41,14 @@ class PostgreSQLDriverTest {
     fun teardown() {
         try {
             DatabaseConnectionPool.closeAllPools()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore cleanup errors
         }
 
         try {
             postgresContainer?.stop()
             postgresContainer = null
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore cleanup errors
         }
     }
@@ -65,7 +63,6 @@ class PostgreSQLDriverTest {
 
         val result = driver.executeQuery("SELECT 1 as one")
         assertTrue(result is QueryResult.Success)
-        result as QueryResult.Success
         assertEquals(listOf("one"), result.columnNames)
         assertEquals("1", result.rows.single()["one"])
 
@@ -82,7 +79,6 @@ class PostgreSQLDriverTest {
 
         val result = driver.executeQuery("SELECT * FROM users ORDER BY id LIMIT 10")
         assertTrue(result is QueryResult.Success)
-        result as QueryResult.Success
 
         assertTrue("id" in result.columnNames)
         assertTrue("name" in result.columnNames)

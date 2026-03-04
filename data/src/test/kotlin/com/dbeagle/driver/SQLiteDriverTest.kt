@@ -60,7 +60,7 @@ class SQLiteDriverTest {
     fun testExecuteQuerySelect1() = runBlocking {
         val result = driver.executeQuery("SELECT 1 as one")
         assertTrue(result is QueryResult.Success)
-        result as QueryResult.Success
+
         assertEquals(listOf("one"), result.columnNames)
         assertEquals("1", result.rows.single()["one"])
     }
@@ -72,7 +72,7 @@ class SQLiteDriverTest {
             params = listOf(1)
         )
         assertTrue(result is QueryResult.Success)
-        result as QueryResult.Success
+
         assertEquals(listOf("name"), result.columnNames)
         assertEquals("Alice", result.rows.single()["name"])
     }
@@ -84,7 +84,6 @@ class SQLiteDriverTest {
             params = listOf(1)
         )
         assertTrue(before is QueryResult.Success)
-        before as QueryResult.Success
         assertEquals("Alice", before.rows.single()["name"])
 
         val update = QueryExecutor(driver).execute(
@@ -92,7 +91,7 @@ class SQLiteDriverTest {
             params = listOf("AliceUpdated", 1)
         )
         assertTrue(update is QueryResult.Success)
-        update as QueryResult.Success
+
         assertEquals(listOf("updatedCount"), update.columnNames)
         assertEquals("1", update.rows.single()["updatedCount"])
 
@@ -101,7 +100,6 @@ class SQLiteDriverTest {
             params = listOf(1)
         )
         assertTrue(after is QueryResult.Success)
-        after as QueryResult.Success
         assertEquals("AliceUpdated", after.rows.single()["name"])
     }
 

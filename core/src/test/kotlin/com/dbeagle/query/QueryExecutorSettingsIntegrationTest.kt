@@ -45,8 +45,7 @@ class QueryExecutorSettingsIntegrationTest : BaseTest() {
         val result = executor.execute("SELECT * FROM test_table")
 
         assertTrue(result is QueryResult.Success)
-        val success = result as QueryResult.Success
-        assertEquals(500, success.rows.size)
+        assertEquals(500, result.rows.size)
 
         assertNotNull(driver.queryExecuted)
         assertTrue(driver.queryExecuted!!.contains("LIMIT ?"))

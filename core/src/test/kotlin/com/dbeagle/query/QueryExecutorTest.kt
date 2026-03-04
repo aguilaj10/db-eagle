@@ -7,7 +7,6 @@ import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.ForeignKeyRelationship
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
-import com.dbeagle.model.TableMetadata
 import com.dbeagle.settings.AppPreferences
 import com.dbeagle.settings.AppSettings
 import kotlin.test.*
@@ -27,21 +26,21 @@ class QueryExecutorTest {
         val first = executor.execute("SELECT * FROM big_table") as QueryResult.Success
         assertEquals(1000, first.rows.size)
         assertNotNull(first.resultSet)
-        assertTrue(first.resultSet!!.hasMore())
+        assertTrue(first.resultSet.hasMore())
         assertEquals(1001, driver.lastRequestedLimit)
         assertEquals(0, driver.lastRequestedOffset)
 
         var current: QueryResult.Success? = first
         var pages = 1
         while (current?.resultSet?.hasMore() == true) {
-            current = current.resultSet!!.fetchNext()
+            current = current.resultSet.fetchNext()
             pages++
         }
 
         assertEquals(5, pages)
         assertNotNull(current)
-        assertEquals(1000, current!!.rows.size)
-        assertTrue(current.resultSet?.hasMore() == false)
+        assertEquals(1000, current.rows.size)
+        assertEquals(current.resultSet?.hasMore(), false)
         assertEquals(1001, driver.lastRequestedLimit)
         assertEquals(4000, driver.lastRequestedOffset)
     }
@@ -63,8 +62,8 @@ class QueryExecutorTest {
             page = page.resultSet!!.fetchNext()!!
         }
         assertEquals("4000", page.rows.first()["id"])
-        assertTrue(page.resultSet!!.hasMore() == false)
-        assertNull(page.resultSet!!.fetchNext())
+        assertEquals(page.resultSet?.hasMore(), false)
+        assertNull(page.resultSet?.fetchNext())
     }
 
     @Test

@@ -38,10 +38,9 @@ class DatabaseDriverTest {
         
         val testResult = driver.executeQuery("SELECT 1", emptyList())
         assertTrue(testResult is QueryResult.Success, "Query should succeed")
-        
-        val success = testResult as QueryResult.Success
-        assertEquals(listOf("column1"), success.columnNames)
-        assertEquals(1, success.rows.size)
+
+        assertEquals(listOf("column1"), testResult.columnNames)
+        assertEquals(1, testResult.rows.size)
         
         val isAlive = driver.testConnection()
         assertTrue(isAlive, "Test connection should return true")
