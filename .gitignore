@@ -53,3 +53,6 @@ local.properties
 !.sisyphus/notepads/
 !.sisyphus/plans/
 /.sisyphus/evidence/task-24-data-edit.txt
+/.sisyphus/evidence/task-25-history.txt
+/.sisyphus/evidence/task-26-favorites.txt
+/.sisyphus/evidence/task-27-export-csv.txt
