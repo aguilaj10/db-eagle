@@ -26,10 +26,12 @@ import com.dbeagle.model.QueryResult
 import com.dbeagle.query.QueryExecutor
 import com.dbeagle.session.SessionViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import org.koin.core.context.startKoin
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
+import com.dbeagle.pool.DatabaseConnectionPool
 
 enum class NavigationTab(val title: String) {
     Connections("Connections"),
@@ -58,6 +60,15 @@ fun main() {
         val activeSession = activeProfileId?.let { sessionStates[it] }
         val activeDriver = activeProfileId?.let { sessionViewModel.getDriver(it) }
         val activeProfileName = activeSession?.profileName
+
+        var poolStats by remember { mutableStateOf<DatabaseConnectionPool.PoolStats?>(null) }
+
+        LaunchedEffect(activeProfileId) {
+            while (true) {
+                poolStats = activeProfileId?.let { DatabaseConnectionPool.getPoolStats(it) }
+                delay(1_000)
+            }
+        }
 
         var scratchSql by remember { mutableStateOf(SessionViewModel.DEFAULT_SQL) }
         var favoriteQueryDraft by remember { mutableStateOf("") }
@@ -118,11 +129,37 @@ fun main() {
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.CenterStart
                         ) {
-                            Text(
-                                text = statusText,
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                                style = MaterialTheme.typography.labelMedium
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = statusText,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                val stats = poolStats
+                                val poolText = if (stats == null) {
+                                    "Pool: n/a"
+                                } else {
+                                    "Pool a=${stats.active} i=${stats.idle} t=${stats.total} w=${stats.waiting}"
+                                }
+                                val poolColor = when {
+                                    stats == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    stats.waiting > 0 -> MaterialTheme.colorScheme.error
+                                    stats.total > 0 && stats.active == stats.total -> MaterialTheme.colorScheme.tertiary
+                                    else -> MaterialTheme.colorScheme.primary
+                                }
+
+                                Text(
+                                    text = poolText,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = poolColor,
+                                )
+                            }
                         }
                     },
                     snackbarHost = {

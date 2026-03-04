@@ -387,3 +387,9 @@ fun `generate evidence for task N`() {
 - Would require UI for per-profile settings dialog
 - Out of scope for Task 32 (plan specifies app-level settings only)
 
+### Task 33 - Leak Detection Evidence Strategy
+
+#### Decision: Use SQLite (file-backed temp DB) for deterministic leak detection evidence
+- **Chosen**: A data-module test that uses HikariCP + SQLite and intentionally holds a connection longer than leakDetectionThreshold.
+- **Rationale**: Avoids Docker/TestContainers dependency so the evidence generation runs reliably in headless/CI environments.
+- **Evidence**: Test captures the Hikari WARN line "Connection leak detection triggered" and writes it to `.sisyphus/evidence/task-33-leak-detection.txt`.

@@ -986,6 +986,12 @@ Future database types can extend DatabaseType sealed class and add URL construct
 
 **Date:** 2026-03-03
 
+### Task 33 - Connection Pooling Optimization + Leak Detection
+
+- HikariCP leak detection threshold tuned to 30s (30_000ms) to meet plan evidence requirements.
+- Deterministic leak detection evidence can be generated without Docker by using SQLite + a file-backed temp DB (avoid :memory: connection lifetime caveats).
+- Capturing leak WARNs for evidence works by temporarily redirecting System.out/System.err during the test run; Hikari logs are emitted via SLF4J.
+
 ### Wiring pattern (UI → persistence → registry → real driver)
 - **Profiles list**: Load via `PreferencesBackedConnectionProfileRepository.loadAll()` but immediately scrub `encryptedPassword` before storing profiles in Compose state.
 - **Connect flow**: On connect click, re-load the single profile via `repository.load(profileId)` to obtain the decrypted password, then pass it to the driver **only at connect time** via `profile.options["password"]`.
@@ -1896,4 +1902,3 @@ val repoRoot = generateSequence(File(System.getProperty("user.dir"))) { it.paren
 - [x] Evidence file proves QA scenario (save 500, load 500, query returns 500 rows)
 - [x] All tests pass (./gradlew test → BUILD SUCCESSFUL)
 - [x] Learnings appended to notepad (this section)
-

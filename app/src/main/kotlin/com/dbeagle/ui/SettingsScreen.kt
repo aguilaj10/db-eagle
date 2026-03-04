@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.settings.AppPreferences
 import com.dbeagle.settings.AppSettings
 
@@ -19,6 +20,18 @@ fun SettingsScreen(
     var connectionTimeoutInput by remember { mutableStateOf(settings.connectionTimeoutSeconds.toString()) }
     var maxConnectionsInput by remember { mutableStateOf(settings.maxConnections.toString()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    var poolCount by remember { mutableStateOf(0) }
+    var allPools by remember { mutableStateOf<Map<String, DatabaseConnectionPool.PoolStats>>(emptyMap()) }
+
+    fun refreshPoolStats() {
+        poolCount = DatabaseConnectionPool.getPoolCount()
+        allPools = DatabaseConnectionPool.getAllPoolStats()
+    }
+
+    LaunchedEffect(Unit) {
+        refreshPoolStats()
+    }
 
     Column(
         modifier = modifier.padding(24.dp),
@@ -112,6 +125,41 @@ fun SettingsScreen(
                 onClick = onClose
             ) {
                 Text("Close")
+            }
+        }
+
+        HorizontalDivider()
+
+        Text(
+            text = "Debug",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Button(onClick = { refreshPoolStats() }) {
+            Text("Refresh Pool Stats")
+        }
+
+        Text(
+            text = "Connection pools: $poolCount",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        if (allPools.isEmpty()) {
+            Text(
+                text = "No pools initialized.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                allPools.toSortedMap().forEach { (id, s) ->
+                    Text(
+                        text = "Pool ${id.take(8)}: active=${s.active}, idle=${s.idle}, total=${s.total}, waiting=${s.waiting}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

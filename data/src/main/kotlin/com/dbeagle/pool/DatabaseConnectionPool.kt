@@ -6,7 +6,6 @@ import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import java.sql.Connection
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 
 /**
  * HikariCP-based connection pool manager for database connections.
@@ -19,7 +18,7 @@ import java.util.concurrent.TimeUnit
  * - Connection timeout: 30 seconds
  * - Idle timeout: 10 minutes
  * - Max lifetime: 30 minutes
- * - Leak detection threshold: 60 seconds
+ * - Leak detection threshold: 30 seconds
  * 
  * Pool exhaustion throws SQLException with retry suggestion.
  */
@@ -31,7 +30,14 @@ object DatabaseConnectionPool {
     private const val DEFAULT_CONNECTION_TIMEOUT_MS = 30_000L // 30 seconds
     private const val DEFAULT_IDLE_TIMEOUT_MS = 600_000L // 10 minutes
     private const val DEFAULT_MAX_LIFETIME_MS = 1_800_000L // 30 minutes
-    private const val DEFAULT_LEAK_DETECTION_THRESHOLD_MS = 60_000L // 60 seconds
+    private const val DEFAULT_LEAK_DETECTION_THRESHOLD_MS = 30_000L // 30 seconds
+
+    data class PoolStats(
+        val active: Int,
+        val idle: Int,
+        val total: Int,
+        val waiting: Int,
+    )
     
     /**
      * Get a connection from the pool for the given profile.
@@ -99,6 +105,23 @@ object DatabaseConnectionPool {
      * @return Number of initialized pools
      */
     fun getPoolCount(): Int = pools.size
+
+    fun getPoolStats(profileId: String): PoolStats? {
+        val dataSource = pools[profileId] ?: return null
+        val mx = dataSource.hikariPoolMXBean ?: return null
+        return PoolStats(
+            active = mx.activeConnections,
+            idle = mx.idleConnections,
+            total = mx.totalConnections,
+            waiting = mx.threadsAwaitingConnection,
+        )
+    }
+
+    fun getAllPoolStats(): Map<String, PoolStats> {
+        return pools.keys.associateWith { id ->
+            getPoolStats(id) ?: PoolStats(active = 0, idle = 0, total = 0, waiting = 0)
+        }
+    }
     
     /**
      * Check if a pool exists for the given profile ID.
