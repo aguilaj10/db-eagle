@@ -256,3 +256,28 @@ Cannot measure UI FPS / rendering performance in this headless environment; rely
 
 **Decision**: Task 40 focused on MSI installer generation; optional signing deferred to CI/CD implementation (not blocking).
 
+
+### Task 41 - RPM Packaging Environment Constraint (Expected)
+
+**Issue**: Cannot execute `./gradlew :app:packageRpm` on Debian-based Linux
+
+**Context**:
+- RPM packaging requires `rpmbuild` tooling (rpm-build package)
+- JDK's `jpackage --type rpm` delegates to system rpm tools
+- Current environment: Ubuntu/Debian-based (no rpm-build installed)
+- Error: "Invalid or unsupported type: [rpm]"
+
+**Verification Strategy**:
+- ✅ Gradle configuration validation: Build graph includes :app:packageRpm task
+- ✅ DEB packaging: Fully functional (75M installer created)
+- ✅ Compilation test: `./gradlew :app:compileKotlin` (PASS)
+- ❌ Real RPM generation: Requires Fedora/RHEL or rpm-build installation
+
+**Workaround**:
+1. Install rpm tools: `sudo apt-get install rpm` (Debian/Ubuntu)
+2. Use native RPM-based system: Fedora, RHEL, CentOS, Rocky Linux
+3. CI/CD: Use Fedora or RHEL-based GitHub Actions runners
+
+**Resolution**: Expected behavior - not a bug. RPM packaging validated via task graph and configuration; actual installer requires rpm-capable build environment.
+
+**Related**: Task 39 (DMG requires macOS), Task 40 (MSI requires Windows)
