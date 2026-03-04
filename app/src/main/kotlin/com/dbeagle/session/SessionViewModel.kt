@@ -91,13 +91,17 @@ class SessionViewModel(
         val driver = drivers.remove(profileId)
         if (driver != null) {
             try {
-                driver.disconnect()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    driver.disconnect()
+                }
             } catch (_: Exception) {
             }
         }
 
         try {
-            closePool(profileId)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                closePool(profileId)
+            }
         } catch (_: Exception) {
         }
 

@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +32,10 @@ import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.session.SessionViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 
 @Composable
 fun ConnectionManagerScreen(
@@ -115,6 +120,7 @@ fun ConnectionListScreen(
     
     var showDialog by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
+    var connectingJob by remember { mutableStateOf<Job?>(null) }
 
     fun refreshProfiles() {
         coroutineScope.launch {
@@ -200,9 +206,12 @@ fun ConnectionListScreen(
                             isConnected = connectedProfileIds.contains(profile.id),
                             isConnecting = connectingProfileId == profile.id,
                             isBusy = connectingProfileId != null,
+                            onCancelConnect = {
+                                connectingJob?.cancel()
+                            },
                             onConnect = {
                                 if (connectingProfileId != null) return@ConnectionRow
-                                coroutineScope.launch {
+                                connectingJob = coroutineScope.launch {
                                     sessionViewModel.setConnecting(profile.id)
                                     var driver: DatabaseDriver? = null
                                     try {
@@ -230,20 +239,20 @@ fun ConnectionListScreen(
 
                                         onStatusTextChanged("Status: Connecting (${loaded.name})")
 
-                                        DatabaseConnectionPool.getConnection(loaded, password).use { _ -> }
-
-                                        driver!!.connect(ConnectionConfig(profile = configProfile))
-
-                                        try {
-                                            driver!!.getSchema()
-                                        } catch (schemaError: Exception) {
+                                        withContext(Dispatchers.IO) {
+                                            DatabaseConnectionPool.getConnection(loaded, password).use { _ -> }
+                                            driver!!.connect(ConnectionConfig(profile = configProfile))
                                             try {
-                                                driver!!.disconnect()
-                                            } catch (_: Exception) {
-                                            } finally {
-                                                DatabaseConnectionPool.closePool(loaded.id)
+                                                driver!!.getSchema()
+                                            } catch (schemaError: Exception) {
+                                                try {
+                                                    driver!!.disconnect()
+                                                } catch (_: Exception) {
+                                                } finally {
+                                                    DatabaseConnectionPool.closePool(loaded.id)
+                                                }
+                                                throw schemaError
                                             }
-                                            throw schemaError
                                         }
 
                                         sessionViewModel.openSession(
@@ -254,6 +263,10 @@ fun ConnectionListScreen(
                                         updateActiveConnection(loaded.id)
 
                                         onStatusTextChanged("Status: Connected (${loaded.name})")
+                                    } catch (e: CancellationException) {
+                                        try { driver?.disconnect() } catch (_: Exception) {}
+                                        DatabaseConnectionPool.closePool(profile.id)
+                                        updateStatus()
                                     } catch (e: Exception) {
                                         try {
                                             driver?.disconnect()
@@ -268,6 +281,9 @@ fun ConnectionListScreen(
                                         retryConnection = profile
                                     } finally {
                                         sessionViewModel.setConnecting(null)
+                                        if (connectingJob?.isActive != true) {
+                                            connectingJob = null
+                                        }
                                     }
                                 }
                             },
@@ -348,7 +364,7 @@ fun ConnectionListScreen(
                         connectionErrorMessage = null
                         retryConnection = null
                         if (profile != null) {
-                            coroutineScope.launch {
+                            connectingJob = coroutineScope.launch {
                                 sessionViewModel.setConnecting(profile.id)
                                 var driver: DatabaseDriver? = null
                                 try {
@@ -376,20 +392,22 @@ fun ConnectionListScreen(
 
                                     onStatusTextChanged("Status: Connecting (${loaded.name})")
 
-                                    DatabaseConnectionPool.getConnection(loaded, password).use { _ -> }
+                                    withContext(Dispatchers.IO) {
+                                        DatabaseConnectionPool.getConnection(loaded, password).use { _ -> }
 
-                                    driver!!.connect(ConnectionConfig(profile = configProfile))
+                                        driver!!.connect(ConnectionConfig(profile = configProfile))
 
-                                    try {
-                                        driver!!.getSchema()
-                                    } catch (schemaError: Exception) {
                                         try {
-                                            driver!!.disconnect()
-                                        } catch (_: Exception) {
-                                        } finally {
-                                            DatabaseConnectionPool.closePool(loaded.id)
+                                            driver!!.getSchema()
+                                        } catch (schemaError: Exception) {
+                                            try {
+                                                driver!!.disconnect()
+                                            } catch (_: Exception) {
+                                            } finally {
+                                                DatabaseConnectionPool.closePool(loaded.id)
+                                            }
+                                            throw schemaError
                                         }
-                                        throw schemaError
                                     }
 
                                     sessionViewModel.openSession(
@@ -400,6 +418,10 @@ fun ConnectionListScreen(
                                     updateActiveConnection(loaded.id)
 
                                     onStatusTextChanged("Status: Connected (${loaded.name})")
+                                } catch (e: CancellationException) {
+                                    try { driver?.disconnect() } catch (_: Exception) {}
+                                    DatabaseConnectionPool.closePool(profile.id)
+                                    updateStatus()
                                 } catch (e: Exception) {
                                     try {
                                         driver?.disconnect()
@@ -443,7 +465,8 @@ fun ConnectionRow(
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onCancelConnect: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -497,10 +520,15 @@ fun ConnectionRow(
 
             Box {
                 if (isConnecting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        IconButton(onClick = onCancelConnect) {
+                            Icon(Icons.Default.Clear, contentDescription = "Cancel Connection")
+                        }
+                    }
                 } else {
                     IconButton(onClick = { expanded = true }, enabled = !isBusy) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More options")

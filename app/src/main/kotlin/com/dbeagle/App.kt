@@ -26,6 +26,10 @@ import com.dbeagle.model.QueryResult
 import com.dbeagle.query.QueryExecutor
 import com.dbeagle.session.SessionViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import org.koin.core.context.startKoin
 import androidx.compose.material.icons.Icons
@@ -282,6 +286,7 @@ fun main() {
                                     NavigationTab.QueryEditor -> {
                                         val coroutineScope = rememberCoroutineScope()
                                         var isRunning by remember(activeProfileId) { mutableStateOf(false) }
+                                        var queryJob by remember(activeProfileId) { mutableStateOf<Job?>(null) }
                                         var queryError by remember(activeProfileId) { mutableStateOf<String?>(null) }
                                         var editError by remember(activeProfileId) { mutableStateOf<String?>(null) }
                                         var showExportDialog by remember(activeProfileId) { mutableStateOf(false) }
@@ -347,6 +352,11 @@ fun main() {
                                                          sessionViewModel.updateQueryEditorSql(pid, it)
                                                      }
                                                  },
+                                                 onCancel = {
+                                                     queryJob?.cancel()
+                                                     isRunning = false
+                                                     statusText = "Status: Query canceled"
+                                                 },
                                                   onRun = {
                                                      if (isRunning) return@SQLEditor
                                                      val driver = activeDriver
@@ -355,7 +365,7 @@ fun main() {
                                                          return@SQLEditor
                                                      }
 
-                                                      coroutineScope.launch {
+                                                      queryJob = coroutineScope.launch {
                                                           isRunning = true
                                                           queryError = null
                                                           val name = activeProfileName ?: "Connection"
@@ -372,7 +382,8 @@ fun main() {
 
                                                            val startNs = System.nanoTime()
                                                              try {
-                                                                 when (val r = QueryExecutor(driver).execute(sqlToRun)) {
+                                                                 val r = withContext(Dispatchers.IO) { QueryExecutor(driver).execute(sqlToRun) }
+                                                                 when (r) {
                                                                      is QueryResult.Success -> {
                                                                          sessionViewModel.recordQueryResult(pid, sqlToRun, r)
                                                                          val durationMs = (System.nanoTime() - startNs) / 1_000_000
@@ -404,6 +415,8 @@ fun main() {
                                                                         )
                                                                     }
                                                                 }
+                                                            } catch (e: CancellationException) {
+                                                                statusText = "Status: Query canceled"
                                                             } catch (e: Exception) {
                                                                 val durationMs = (System.nanoTime() - startNs) / 1_000_000
                                                                 statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
@@ -486,7 +499,18 @@ fun main() {
                                                          id = idValue
                                                      )
 
-                                                     when (val r = QueryExecutor(driver).execute(stmt.sql, stmt.params)) {
+                                                     val r = try {
+                                                         withContext(Dispatchers.IO) { QueryExecutor(driver).execute(stmt.sql, stmt.params) }
+                                                     } catch (e: CancellationException) {
+                                                         throw e
+                                                     } catch (e: Exception) {
+                                                         val msg = e.message ?: "Unknown error"
+                                                         editError = msg
+                                                         statusText = "Status: Update failed: $msg"
+                                                         return@ResultGrid Result.failure(IllegalStateException(msg))
+                                                     }
+
+                                                     when (r) {
                                                          is QueryResult.Success -> {
                                                              statusText = "Status: Updated $table.$columnName for id=$idValue"
                                                              Result.success(Unit)
@@ -504,6 +528,7 @@ fun main() {
                                      }
                                     NavigationTab.SchemaBrowser -> {
                                         val coroutineScope = rememberCoroutineScope()
+                                        var schemaJob by remember(activeProfileId) { mutableStateOf<Job?>(null) }
 
                                         val ttlMs = 5 * 60 * 1000L
                                         val pid = activeProfileId
@@ -633,18 +658,21 @@ fun main() {
                                             if (!force && !isExpired(current.loadedAtMs) && current.nodes.isNotEmpty()) return
                                             if (current.isLoading) return
 
-                                            coroutineScope.launch {
+                                            schemaJob?.cancel()
+                                            schemaJob = coroutineScope.launch {
                                                 val name = activeProfileName ?: "Connection"
                                                 statusText = "Status: Loading schema ($name)"
                                                 sessionViewModel.updateSchemaState(pid) { it.copy(isLoading = true, dialogError = null) }
                                                 try {
-                                                    val schema = driver.getSchema()
+                                                    val schema = withContext(Dispatchers.IO) { driver.getSchema() }
                                                     val nodes = buildTree(schema)
                                                     val now = System.currentTimeMillis()
                                                     sessionViewModel.updateSchemaState(pid) {
                                                         it.copy(nodes = nodes, loadedAtMs = now, isLoading = false)
                                                     }
                                                     statusText = "Status: Schema loaded ($name)"
+                                                } catch (e: CancellationException) {
+                                                    statusText = "Status: Schema load canceled"
                                                 } catch (e: Exception) {
                                                     statusText = "Status: Failed to load schema: ${e.message ?: "Error"}"
                                                     sessionViewModel.updateSchemaState(pid) {
@@ -684,17 +712,30 @@ fun main() {
                                                 horizontalArrangement = Arrangement.End
                                             ) {
                                                 val hasConnection = activeDriver != null
-                                                Button(
-                                                    onClick = {
-                                                        if (!hasConnection) return@Button
-                                                        forceRefresh()
-                                                        ensureSchemaLoaded(force = true)
-                                                    },
-                                                    enabled = hasConnection && !isLoadingSchema,
-                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                                    modifier = Modifier.height(32.dp)
-                                                ) {
-                                                    Text("Refresh", style = MaterialTheme.typography.labelMedium)
+                                                if (isLoadingSchema) {
+                                                    Button(
+                                                        onClick = { schemaJob?.cancel() },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                        modifier = Modifier.height(32.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Close, contentDescription = "Cancel", modifier = Modifier.size(16.dp))
+                                                        Spacer(Modifier.width(4.dp))
+                                                        Text("Cancel", style = MaterialTheme.typography.labelMedium)
+                                                    }
+                                                } else {
+                                                    Button(
+                                                        onClick = {
+                                                            if (!hasConnection) return@Button
+                                                            forceRefresh()
+                                                            ensureSchemaLoaded(force = true)
+                                                        },
+                                                        enabled = hasConnection && !isLoadingSchema,
+                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                        modifier = Modifier.height(32.dp)
+                                                    ) {
+                                                        Text("Refresh", style = MaterialTheme.typography.labelMedium)
+                                                    }
                                                 }
                                             }
 
@@ -734,7 +775,7 @@ fun main() {
                                                             val name = activeProfileName ?: "Connection"
                                                             statusText = "Status: Loading columns ($name: $tableName)"
                                                             try {
-                                                                val cols = driver.getColumns(tableName)
+                                                                val cols = withContext(Dispatchers.IO) { driver.getColumns(tableName) }
                                                                     .sortedBy { it.name }
                                                                     .map { c ->
                                                                         com.dbeagle.ui.SchemaTreeNode.Column(
@@ -751,6 +792,8 @@ fun main() {
                                                                 }
                                                                 updateTableChildren(tableKey, cols)
                                                                 statusText = "Status: Columns loaded ($name: $tableName)"
+                                                            } catch (e: CancellationException) {
+                                                                statusText = "Status: Query canceled"
                                                             } catch (e: Exception) {
                                                                 statusText = "Status: Failed to load columns: ${e.message ?: "Error"}"
                                                                 sessionViewModel.updateSchemaState(activePid) {

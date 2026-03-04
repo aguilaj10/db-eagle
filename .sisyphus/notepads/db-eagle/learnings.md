@@ -1902,3 +1902,8 @@ val repoRoot = generateSequence(File(System.getProperty("user.dir"))) { it.paren
 - [x] Evidence file proves QA scenario (save 500, load 500, query returns 500 rows)
 - [x] All tests pass (./gradlew test → BUILD SUCCESSFUL)
 - [x] Learnings appended to notepad (this section)
+
+## Task 34: UI Responsiveness and Async Loading
+- **Observation:** When wrapping Compose DB actions into coroutines, `CancellationException` needs explicit catch-blocks or to be allowed to bubble up if we are swallowing `Exception`. Otherwise, canceling a `Job` (like hitting a Cancel button on an active query) may trigger an generic error state rather than a clean cancellation state in UI.
+- **Pattern:** Always use `withContext(Dispatchers.IO)` around `driver.*` calls and `QueryExecutor` because standard JDBC/DB drivers block the thread. Leaving them in the main Compose coroutine scope (which defaults to Main) leads to severe UI freezes on slow remote connections.
+- Compose coroutine cancellation flows should always rethrow or cleanly catch `CancellationException` before a broad `Exception` catch block to avoid surfacing task cancellation as an application error.
