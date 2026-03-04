@@ -2516,3 +2516,8 @@ release:
 - `.sisyphus/evidence/task-42-github-release.txt` - Full documentation of implementation
 - This notebook entry - Learnings and design decisions
 
+### Landing Page and Downloads
+- Landing page created at `docs/index.html`.
+- Configured for GitHub Pages serving from `/docs` folder at `https://aguilaj10.github.io/db-eagle/`.
+- Download buttons link directly to GitHub Releases latest: `https://github.com/aguilaj10/db-eagle/releases/latest`.
+- Screenshots from `.sisyphus/evidence` and branding icons were copied to `docs/assets/`.
