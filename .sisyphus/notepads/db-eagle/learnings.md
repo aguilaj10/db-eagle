@@ -986,6 +986,11 @@ Future database types can extend DatabaseType sealed class and add URL construct
 
 **Date:** 2026-03-03
 
+### Task 36 - Memory indicator + large result set handling
+
+- Status bar memory readout can be derived from `Runtime.getRuntime()`; represent as used/max MB for a stable, low-noise indicator.
+- To release large prior query results promptly on re-run, clear the stored result state before executing the next query.
+
 ### Task 33 - Connection Pooling Optimization + Leak Detection
 
 - HikariCP leak detection threshold tuned to 30s (30_000ms) to meet plan evidence requirements.

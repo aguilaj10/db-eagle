@@ -15,6 +15,8 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import kotlin.math.min
@@ -36,7 +38,6 @@ fun ResultGrid(
     currentPage = min(currentPage, totalPages - 1)
 
     val horizontalScrollState = rememberScrollState()
-    val verticalScrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
 
     var gridError by remember { mutableStateOf<String?>(null) }
@@ -115,8 +116,11 @@ fun ResultGrid(
                 val endIdx = min(startIdx + pageSize, localRows.size)
                 val visibleRows = if (localRows.isEmpty()) emptyList() else localRows.subList(startIdx, endIdx)
 
-                Column(modifier = Modifier.verticalScroll(verticalScrollState)) {
-                    visibleRows.forEachIndexed { rIdx, row ->
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    itemsIndexed(
+                        items = visibleRows,
+                        key = { rIdx, _ -> startIdx + rIdx }
+                    ) { rIdx, row ->
                         val actualRowIdx = startIdx + rIdx
                         Row(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
                             row.forEachIndexed { cIdx, cellValue ->

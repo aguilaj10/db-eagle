@@ -189,3 +189,7 @@ All scaffolding goals achieved:
 - All 4 Kotlin modules compile without errors
 - Call site in App.kt now resolves without compilation errors
 - Cancel button conditionally renders only during query execution (isRunning == true)
+
+### Task 36 - Headless profiling limitation (Expected)
+
+Cannot measure UI FPS / rendering performance in this headless environment; relying on code-level virtualization (LazyColumn) + compile/test verification.

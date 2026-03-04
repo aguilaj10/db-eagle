@@ -43,6 +43,31 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import com.dbeagle.pool.DatabaseConnectionPool
 
+private data class MemoryStats(
+    val usedBytes: Long,
+    val freeBytes: Long,
+    val totalBytes: Long,
+    val maxBytes: Long
+) {
+    val usedMb: Long get() = usedBytes / (1024L * 1024L)
+    val totalMb: Long get() = totalBytes / (1024L * 1024L)
+    val maxMb: Long get() = maxBytes / (1024L * 1024L)
+}
+
+private fun readMemoryStats(): MemoryStats {
+    val rt = Runtime.getRuntime()
+    val total = rt.totalMemory()
+    val free = rt.freeMemory()
+    val used = total - free
+    val max = rt.maxMemory()
+    return MemoryStats(
+        usedBytes = used,
+        freeBytes = free,
+        totalBytes = total,
+        maxBytes = max
+    )
+}
+
 enum class NavigationTab(val title: String) {
     Connections("Connections"),
     QueryEditor("Query Editor"),
@@ -72,10 +97,12 @@ fun main() {
         val activeProfileName = activeSession?.profileName
 
         var poolStats by remember { mutableStateOf<DatabaseConnectionPool.PoolStats?>(null) }
+        var memoryStats by remember { mutableStateOf(readMemoryStats()) }
 
         LaunchedEffect(activeProfileId) {
             while (true) {
                 poolStats = activeProfileId?.let { DatabaseConnectionPool.getPoolStats(it) }
+                memoryStats = readMemoryStats()
                 delay(1_000)
             }
         }
@@ -170,17 +197,24 @@ fun main() {
                                     .padding(horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(
-                                    text = statusText,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                 Text(
+                                     text = statusText,
+                                     style = MaterialTheme.typography.labelMedium,
+                                     modifier = Modifier.weight(1f)
+                                 )
 
-                                val stats = poolStats
-                                val poolText = if (stats == null) {
-                                    "Pool: n/a"
-                                } else {
-                                    "Pool a=${stats.active} i=${stats.idle} t=${stats.total} w=${stats.waiting}"
+                                 Text(
+                                     text = "Mem: ${memoryStats.usedMb}MB / ${memoryStats.maxMb}MB",
+                                     style = MaterialTheme.typography.labelMedium,
+                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                     modifier = Modifier.padding(end = 16.dp)
+                                 )
+
+                                 val stats = poolStats
+                                 val poolText = if (stats == null) {
+                                     "Pool: n/a"
+                                 } else {
+                                     "Pool a=${stats.active} i=${stats.idle} t=${stats.total} w=${stats.waiting}"
                                 }
                                 val poolColor = when {
                                     stats == null -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -401,20 +435,22 @@ fun main() {
                                                          return@SQLEditor
                                                      }
 
-                                                      queryJob = coroutineScope.launch {
-                                                          isRunning = true
-                                                          queryError = null
-                                                          val name = activeProfileName ?: "Connection"
-                                                          statusText = "Status: Running query ($name)"
+                                                   queryJob = coroutineScope.launch {
+                                                        isRunning = true
+                                                        queryError = null
+                                                        val name = activeProfileName ?: "Connection"
+                                                        statusText = "Status: Running query ($name)"
 
-                                                          val pid = activeProfileId
-                                                          if (pid == null) {
-                                                              statusText = "Status: No active connection"
-                                                              isRunning = false
-                                                              return@launch
-                                                          }
+                                                        val pid = activeProfileId
+                                                        if (pid == null) {
+                                                            statusText = "Status: No active connection"
+                                                            isRunning = false
+                                                            return@launch
+                                                        }
 
-                                                          val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
+                                                        sessionViewModel.clearQueryResult(pid)
+
+                                                        val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
 
                                                            val startNs = System.nanoTime()
                                                              try {

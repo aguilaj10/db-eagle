@@ -1,0 +1,32 @@
+Task 36: Memory Profiling + Large Result Set Optimization
+
+What changed:
+- App.kt: clear previous query results before running a new query (SessionViewModel.clearQueryResult(profileId)).
+- App.kt: status bar now shows a simple memory indicator derived from Runtime (used/max MB).
+- ResultGrid.kt: keeps LazyColumn virtualization (does not render all rows at once).
+- SessionViewModel.kt: truncates stored cell strings to 500 chars at record time.
+
+Notes:
+- Memory indicator is based on JVM heap Runtime stats (not OS RSS).
+- Headless environment limitation: cannot reliably measure UI FPS/rendering smoothness here.
+
+Verification:
+- ./gradlew :app:compileKotlin
+- ./gradlew test
+
+Outputs:
+- :app:compileKotlin -> BUILD SUCCESSFUL
+  - warning: ConnectionDialog.kt uses deprecated Modifier.menuAnchor() overload
+- test -> BUILD SUCCESSFUL
+
+Gradle output excerpt:
+```
+> Task :app:compileKotlin
+w: file:///home/jonathan/desarrollo/db-eagle/app/src/main/kotlin/com/dbeagle/ui/ConnectionDialog.kt:57:45 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+
+BUILD SUCCESSFUL
+
+> Task :app:test
+
+BUILD SUCCESSFUL
+```

@@ -120,7 +120,12 @@ class SessionViewModel(
 
     fun recordQueryResult(profileId: String, executedSql: String, result: QueryResult.Success) {
         val columns = result.columnNames
-        val rows = result.rows.map { rowMap -> columns.map { col -> rowMap[col] ?: "" } }
+        val rows = result.rows.map { rowMap ->
+            columns.map { col ->
+                val cellValue = rowMap[col] ?: ""
+                truncateCell(cellValue)
+            }
+        }
         updateSession(profileId) {
             it.copy(
                 lastExecutedSql = executedSql,
@@ -150,6 +155,9 @@ class SessionViewModel(
         val current = _sessionStates.value[profileId] ?: return
         _sessionStates.value = _sessionStates.value + (profileId to transform(current))
     }
+
+    private fun truncateCell(value: String): String =
+        if (value.length > 500) value.substring(0, 500) else value
 
     companion object {
         const val DEFAULT_SQL: String = "SELECT * FROM users;\n"
