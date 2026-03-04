@@ -13,7 +13,6 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.dbeagle.di.appModule
-import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.edit.InlineUpdate
 import com.dbeagle.favorites.FileFavoritesRepository
 import com.dbeagle.favorites.FavoritesRepository
@@ -24,8 +23,11 @@ import com.dbeagle.model.QueryHistoryEntry
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.QueryResult
 import com.dbeagle.query.QueryExecutor
+import com.dbeagle.session.SessionViewModel
 import kotlinx.coroutines.launch
 import org.koin.core.context.startKoin
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 
 enum class NavigationTab(val title: String) {
     Connections("Connections"),
@@ -45,22 +47,32 @@ fun main() {
         var selectedTab by remember { mutableStateOf(NavigationTab.Connections) }
         var statusText by remember { mutableStateOf("Status: Disconnected") }
 
-        var activeProfileName by remember { mutableStateOf<String?>(null) }
-        var activeDriver by remember { mutableStateOf<DatabaseDriver?>(null) }
+        val sessionViewModel = remember { SessionViewModel() }
+        val sessionOrder by sessionViewModel.sessionOrder.collectAsState()
+        val sessionStates by sessionViewModel.sessionStates.collectAsState()
+        val activeProfileId by sessionViewModel.activeProfileId.collectAsState()
+
+        val activeSession = activeProfileId?.let { sessionStates[it] }
+        val activeDriver = activeProfileId?.let { sessionViewModel.getDriver(it) }
+        val activeProfileName = activeSession?.profileName
+
+        var scratchSql by remember { mutableStateOf(SessionViewModel.DEFAULT_SQL) }
+        var favoriteQueryDraft by remember { mutableStateOf("") }
+
+        val appCoroutineScope = rememberCoroutineScope()
         
         val historyRepository = remember { FileQueryHistoryRepository() }
         val favoritesRepository = remember { FileFavoritesRepository() }
-        var queryEditorSql by remember { mutableStateOf("SELECT * FROM users;\n") }
         var showSaveFavoriteDialog by remember { mutableStateOf(false) }
 
         if (showSaveFavoriteDialog) {
             SaveFavoriteDialog(
-                initialQuery = queryEditorSql,
+                initialQuery = favoriteQueryDraft,
                 onDismiss = { showSaveFavoriteDialog = false },
                 onSave = { name, tags ->
                     val favorite = FavoriteQuery(
                         name = name,
-                        query = queryEditorSql,
+                        query = favoriteQueryDraft,
                         tags = tags
                     )
                     favoritesRepository.save(favorite)
@@ -154,6 +166,41 @@ fun main() {
                                 .fillMaxHeight()
                                 .background(MaterialTheme.colorScheme.background)
                         ) {
+                            if (sessionOrder.isNotEmpty()) {
+                                val selectedConnectionTabIndex = sessionOrder.indexOf(activeProfileId).let { idx ->
+                                    if (idx >= 0) idx else 0
+                                }
+
+                                ScrollableTabRow(
+                                    selectedTabIndex = selectedConnectionTabIndex,
+                                    edgePadding = 8.dp
+                                ) {
+                                    sessionOrder.forEach { profileId ->
+                                        val label = sessionStates[profileId]?.profileName ?: profileId.take(8)
+                                        Tab(
+                                            selected = activeProfileId == profileId,
+                                            onClick = { sessionViewModel.setActiveProfile(profileId) },
+                                            text = {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(label)
+                                                    Spacer(Modifier.width(8.dp))
+                                                    IconButton(
+                                                        onClick = {
+                                                            appCoroutineScope.launch {
+                                                                sessionViewModel.closeSession(profileId)
+                                                            }
+                                                        },
+                                                        modifier = Modifier.size(28.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Close, contentDescription = "Close connection")
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
                             ScrollableTabRow(
                                 selectedTabIndex = selectedTab.ordinal,
                                 edgePadding = 8.dp
@@ -174,29 +221,27 @@ fun main() {
                                 when (selectedTab) {
                                     NavigationTab.Connections -> {
                                         com.dbeagle.ui.ConnectionManagerScreen(
+                                            sessionViewModel = sessionViewModel,
                                             onStatusTextChanged = { statusText = it },
-                                            onActiveConnectionChanged = { _, name, driver ->
-                                                activeProfileName = name
-                                                activeDriver = driver
-                                            }
                                         )
                                     }
                                     NavigationTab.QueryEditor -> {
-                                        var lastExecutedSql by remember { mutableStateOf<String?>(null) }
-                                        var lastQueryResult by remember { mutableStateOf<QueryResult.Success?>(null) }
-                                        var columns by remember { mutableStateOf<List<String>>(emptyList()) }
-                                        var rows by remember { mutableStateOf<List<List<String>>>(emptyList()) }
-                                        var isRunning by remember { mutableStateOf(false) }
-                                        var queryError by remember { mutableStateOf<String?>(null) }
-                                        var editError by remember { mutableStateOf<String?>(null) }
                                         val coroutineScope = rememberCoroutineScope()
+                                        var isRunning by remember(activeProfileId) { mutableStateOf(false) }
+                                        var queryError by remember(activeProfileId) { mutableStateOf<String?>(null) }
+                                        var editError by remember(activeProfileId) { mutableStateOf<String?>(null) }
+                                        var showExportDialog by remember(activeProfileId) { mutableStateOf(false) }
 
-                                        var showExportDialog by remember { mutableStateOf(false) }
+                                        val sqlText = activeSession?.queryEditorSql ?: scratchSql
+                                        val lastExecutedSql = activeSession?.lastExecutedSql
+                                        val lastQueryResult = activeSession?.lastQueryResult
+                                        val columns = activeSession?.resultColumns ?: emptyList()
+                                        val rows = activeSession?.resultRows ?: emptyList()
 
                                         if (showExportDialog) {
                                             com.dbeagle.ui.ExportDialog(
                                                 onDismiss = { showExportDialog = false },
-                                                onExportRequested = { format, path, onProgress ->
+                                                    onExportRequested = { format, path, onProgress ->
                                                     val result = lastQueryResult
                                                     if (result == null) {
                                                         statusText = "Status: No query result to export"
@@ -251,76 +296,89 @@ fun main() {
                                              )
                                          }
 
-                                            com.dbeagle.ui.SQLEditor(
-                                                sql = queryEditorSql,
-                                                onSqlChange = { queryEditorSql = it },
-                                                 onRun = {
-                                                    if (isRunning) return@SQLEditor
-                                                    val driver = activeDriver
-                                                    if (driver == null) {
-                                                        statusText = "Status: No active connection"
-                                                        return@SQLEditor
-                                                    }
+                                             com.dbeagle.ui.SQLEditor(
+                                                 sql = sqlText,
+                                                 onSqlChange = {
+                                                     val pid = activeProfileId
+                                                     if (pid == null) {
+                                                         scratchSql = it
+                                                     } else {
+                                                         sessionViewModel.updateQueryEditorSql(pid, it)
+                                                     }
+                                                 },
+                                                  onRun = {
+                                                     if (isRunning) return@SQLEditor
+                                                     val driver = activeDriver
+                                                     if (driver == null) {
+                                                         statusText = "Status: No active connection"
+                                                         return@SQLEditor
+                                                     }
 
-                                                     coroutineScope.launch {
-                                                         isRunning = true
-                                                         queryError = null
-                                                         val name = activeProfileName ?: "Connection"
-                                                         statusText = "Status: Running query ($name)"
+                                                      coroutineScope.launch {
+                                                          isRunning = true
+                                                          queryError = null
+                                                          val name = activeProfileName ?: "Connection"
+                                                          statusText = "Status: Running query ($name)"
 
-                                                         val startNs = System.nanoTime()
-                                                           try {
-                                                               when (val r = QueryExecutor(driver).execute(queryEditorSql)) {
-                                                                   is QueryResult.Success -> {
-                                                                       lastExecutedSql = queryEditorSql
-                                                                       lastQueryResult = r
-                                                                       columns = r.columnNames
-                                                                       rows = r.rows.map { rowMap ->
-                                                                           r.columnNames.map { col -> rowMap[col] ?: "" }
-                                                                       }
+                                                          val pid = activeProfileId
+                                                          if (pid == null) {
+                                                              statusText = "Status: No active connection"
+                                                              isRunning = false
+                                                              return@launch
+                                                          }
+
+                                                          val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
+
+                                                          val startNs = System.nanoTime()
+                                                            try {
+                                                                when (val r = QueryExecutor(driver).execute(sqlToRun)) {
+                                                                    is QueryResult.Success -> {
+                                                                        sessionViewModel.recordQueryResult(pid, sqlToRun, r)
+                                                                        val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                                        statusText = "Status: ${r.rows.size} row(s) in ${durationMs}ms"
+                                                                        
+                                                                        historyRepository.add(
+                                                                            QueryHistoryEntry(
+                                                                                query = sqlToRun,
+                                                                                durationMs = durationMs,
+                                                                                connectionProfileId = pid
+                                                                            )
+                                                                        )
+                                                                    }
+                                                                   is QueryResult.Error -> {
                                                                        val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                                       statusText = "Status: ${rows.size} row(s) in ${durationMs}ms"
+                                                                       statusText = "Status: Error in ${durationMs}ms: ${r.message}"
+                                                                       queryError = r.message
                                                                        
-                                                                       activeProfileName?.let { profileId ->
-                                                                           historyRepository.add(
-                                                                               QueryHistoryEntry(
-                                                                                   query = queryEditorSql,
-                                                                                   durationMs = durationMs,
-                                                                                   connectionProfileId = profileId
-                                                                               )
+                                                                       historyRepository.add(
+                                                                           QueryHistoryEntry(
+                                                                               query = sqlToRun,
+                                                                               durationMs = durationMs,
+                                                                               connectionProfileId = pid
                                                                            )
-                                                                       }
+                                                                       )
                                                                    }
-                                                                  is QueryResult.Error -> {
-                                                                      val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                                      statusText = "Status: Error in ${durationMs}ms: ${r.message}"
-                                                                      queryError = r.message
-                                                                      
-                                                                      activeProfileName?.let { profileId ->
-                                                                          historyRepository.add(
-                                                                              QueryHistoryEntry(
-                                                                                  query = queryEditorSql,
-                                                                                  durationMs = durationMs,
-                                                                                  connectionProfileId = profileId
-                                                                              )
-                                                                          )
-                                                                      }
-                                                                  }
-                                                              }
-                                                          } catch (e: Exception) {
-                                                              val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                                              statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
+                                                               }
+                                                           } catch (e: Exception) {
+                                                               val durationMs = (System.nanoTime() - startNs) / 1_000_000
+                                                               statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
                                                               queryError = e.message ?: "Error"
                                                           } finally {
                                                               isRunning = false
                                                           }
                                                      }
+                                                  },
+                                                 isRunning = isRunning,
+                                                 onClear = {
+                                                     val pid = activeProfileId
+                                                     if (pid == null) scratchSql = "" else sessionViewModel.updateQueryEditorSql(pid, "")
                                                  },
-                                                isRunning = isRunning,
-                                                onClear = { queryEditorSql = "" },
-                                                onSaveToFavorites = { showSaveFavoriteDialog = true },
-                                                modifier = Modifier.weight(0.4f)
-                                            )
+                                                 onSaveToFavorites = {
+                                                     favoriteQueryDraft = sqlText
+                                                     showSaveFavoriteDialog = true
+                                                 },
+                                                 modifier = Modifier.weight(0.4f)
+                                             )
                                             
                                             HorizontalDivider(thickness = 2.dp)
                                             
@@ -343,18 +401,18 @@ fun main() {
                                                  pageSize = 25,
                                                  modifier = Modifier.weight(0.6f),
                                                  onCellCommit = { _, columnName, newValue, rowSnapshot ->
-                                                     val driver = activeDriver
-                                                     if (driver == null) {
-                                                         statusText = "Status: No active connection"
-                                                         return@ResultGrid Result.failure(IllegalStateException("No active connection"))
-                                                     }
+                                                      val driver = activeDriver
+                                                      if (driver == null) {
+                                                          statusText = "Status: No active connection"
+                                                          return@ResultGrid Result.failure(IllegalStateException("No active connection"))
+                                                      }
 
-                                                     val lastSql = lastExecutedSql
-                                                     val table = lastSql?.let { InlineUpdate.inferTableNameFromSelectAll(it) }
-                                                     if (table.isNullOrBlank()) {
-                                                         val msg = "Inline edit requires last query like: SELECT * FROM <table>"
-                                                         editError = msg
-                                                         return@ResultGrid Result.failure(IllegalStateException(msg))
+                                                      val lastSql = lastExecutedSql
+                                                      val table = lastSql?.let { InlineUpdate.inferTableNameFromSelectAll(it) }
+                                                      if (table.isNullOrBlank()) {
+                                                          val msg = "Inline edit requires last query like: SELECT * FROM <table>"
+                                                          editError = msg
+                                                          return@ResultGrid Result.failure(IllegalStateException(msg))
                                                      }
 
                                                      val idIndex = columns.indexOfFirst { it.equals("id", ignoreCase = true) }
@@ -398,19 +456,13 @@ fun main() {
                                         val coroutineScope = rememberCoroutineScope()
 
                                         val ttlMs = 5 * 60 * 1000L
-                                        var isLoadingSchema by remember { mutableStateOf(false) }
-                                        var schemaLoadedAtMs by remember { mutableStateOf<Long?>(null) }
-                                        var schemaNodes by remember { mutableStateOf<List<com.dbeagle.ui.SchemaTreeNode>>(emptyList()) }
-                                        var schemaDialogError by remember { mutableStateOf<String?>(null) }
-
-                                        data class ColumnCacheEntry(
-                                            val loadedAtMs: Long,
-                                            val columns: List<com.dbeagle.ui.SchemaTreeNode.Column>
-                                        )
-
-                                        var columnsCache by remember {
-                                            mutableStateOf<Map<String, ColumnCacheEntry>>(emptyMap())
-                                        }
+                                        val pid = activeProfileId
+                                        val schemaState = pid?.let { sessionStates[it]?.schema } ?: SessionViewModel.SchemaUiState()
+                                        val isLoadingSchema = schemaState.isLoading
+                                        val schemaLoadedAtMs = schemaState.loadedAtMs
+                                        val schemaNodes = schemaState.nodes
+                                        val schemaDialogError = schemaState.dialogError
+                                        val columnsCache = schemaState.columnsCache
 
                                         fun isExpired(loadedAt: Long?): Boolean {
                                             if (loadedAt == null) return true
@@ -471,87 +523,105 @@ fun main() {
                                             tableKey: String,
                                             newChildren: List<com.dbeagle.ui.SchemaTreeNode.Column>
                                         ) {
-                                            schemaNodes = schemaNodes.map { node ->
-                                                if (node is com.dbeagle.ui.SchemaTreeNode.Section && node.id == "section:tables") {
-                                                    com.dbeagle.ui.SchemaTreeNode.Section(
-                                                        id = node.id,
-                                                        label = node.label,
-                                                        children = node.children.map { child ->
-                                                            if (
-                                                                child is com.dbeagle.ui.SchemaTreeNode.Table &&
-                                                                child.id == "table:$tableKey"
-                                                            ) {
-                                                                com.dbeagle.ui.SchemaTreeNode.Table(
-                                                                    id = child.id,
-                                                                    label = child.label,
-                                                                    children = newChildren
-                                                                )
-                                                            } else {
-                                                                child
-                                                            }
+                                            if (pid == null) return
+                                            sessionViewModel.updateSchemaState(pid) { s ->
+                                                s.copy(
+                                                    nodes = s.nodes.map { node ->
+                                                        if (node is com.dbeagle.ui.SchemaTreeNode.Section && node.id == "section:tables") {
+                                                            com.dbeagle.ui.SchemaTreeNode.Section(
+                                                                id = node.id,
+                                                                label = node.label,
+                                                                children = node.children.map { child ->
+                                                                    if (
+                                                                        child is com.dbeagle.ui.SchemaTreeNode.Table &&
+                                                                        child.id == "table:$tableKey"
+                                                                    ) {
+                                                                        com.dbeagle.ui.SchemaTreeNode.Table(
+                                                                            id = child.id,
+                                                                            label = child.label,
+                                                                            children = newChildren
+                                                                        )
+                                                                    } else {
+                                                                        child
+                                                                    }
+                                                                }
+                                                            )
+                                                        } else {
+                                                            node
                                                         }
-                                                    )
-                                                } else {
-                                                    node
-                                                }
+                                                    }
+                                                )
                                             }
                                         }
 
                                         fun forceRefresh() {
-                                            schemaLoadedAtMs = null
-                                            columnsCache = emptyMap()
-                                            schemaNodes = emptyList()
+                                            if (pid == null) return
+                                            sessionViewModel.updateSchemaState(pid) { s ->
+                                                s.copy(
+                                                    loadedAtMs = null,
+                                                    columnsCache = emptyMap(),
+                                                    nodes = emptyList(),
+                                                    dialogError = null,
+                                                    isLoading = false
+                                                )
+                                            }
                                         }
 
                                         fun ensureSchemaLoaded(force: Boolean) {
                                             val driver = activeDriver
                                             if (driver == null) {
-                                                schemaNodes = emptyList()
-                                                schemaLoadedAtMs = null
-                                                columnsCache = emptyMap()
+                                                if (pid != null) {
+                                                    sessionViewModel.updateSchemaState(pid) { s ->
+                                                        s.copy(nodes = emptyList(), loadedAtMs = null, columnsCache = emptyMap())
+                                                    }
+                                                }
                                                 return
                                             }
 
-                                            if (!force && !isExpired(schemaLoadedAtMs) && schemaNodes.isNotEmpty()) return
-                                            if (isLoadingSchema) return
+                                            if (pid == null) return
+                                            val current = sessionStates[pid]?.schema ?: return
+                                            if (!force && !isExpired(current.loadedAtMs) && current.nodes.isNotEmpty()) return
+                                            if (current.isLoading) return
 
                                             coroutineScope.launch {
-                                                isLoadingSchema = true
                                                 val name = activeProfileName ?: "Connection"
                                                 statusText = "Status: Loading schema ($name)"
+                                                sessionViewModel.updateSchemaState(pid) { it.copy(isLoading = true, dialogError = null) }
                                                 try {
                                                     val schema = driver.getSchema()
-                                                    schemaNodes = buildTree(schema)
-                                                    schemaLoadedAtMs = System.currentTimeMillis()
+                                                    val nodes = buildTree(schema)
+                                                    val now = System.currentTimeMillis()
+                                                    sessionViewModel.updateSchemaState(pid) {
+                                                        it.copy(nodes = nodes, loadedAtMs = now, isLoading = false)
+                                                    }
                                                     statusText = "Status: Schema loaded ($name)"
                                                 } catch (e: Exception) {
                                                     statusText = "Status: Failed to load schema: ${e.message ?: "Error"}"
-                                                    schemaDialogError = e.message ?: "Failed to load schema"
+                                                    sessionViewModel.updateSchemaState(pid) {
+                                                        it.copy(isLoading = false, dialogError = e.message ?: "Failed to load schema")
+                                                    }
                                                 } finally {
-                                                    isLoadingSchema = false
+                                                    sessionViewModel.updateSchemaState(pid) { it.copy(isLoading = false) }
                                                 }
                                             }
                                         }
 
-                                        LaunchedEffect(selectedTab, activeDriver) {
+                                        LaunchedEffect(selectedTab, activeProfileId) {
                                             if (selectedTab != NavigationTab.SchemaBrowser) return@LaunchedEffect
-                                            if (activeDriver == null) {
-                                                schemaNodes = emptyList()
-                                                schemaLoadedAtMs = null
-                                                columnsCache = emptyMap()
-                                                return@LaunchedEffect
-                                            }
-                                            forceRefresh()
                                             ensureSchemaLoaded(force = false)
                                         }
 
                                         if (schemaDialogError != null) {
                                             AlertDialog(
-                                                onDismissRequest = { schemaDialogError = null },
+                                                onDismissRequest = {
+                                                    if (pid != null) sessionViewModel.updateSchemaState(pid) { it.copy(dialogError = null) }
+                                                },
                                                 title = { Text("Schema Error") },
                                                 text = { Text(schemaDialogError ?: "") },
                                                 confirmButton = {
-                                                    TextButton(onClick = { schemaDialogError = null }) {
+                                                    TextButton(onClick = {
+                                                        if (pid != null) sessionViewModel.updateSchemaState(pid) { it.copy(dialogError = null) }
+                                                    }) {
                                                         Text("OK")
                                                     }
                                                 }
@@ -600,6 +670,8 @@ fun main() {
 
                                                         val driver = activeDriver ?: return@SchemaTree
 
+                                                        val activePid = pid ?: return@SchemaTree
+
                                                         val tableKey = node.id.removePrefix("table:")
                                                         val tableName = node.label
                                                         val cached = columnsCache[tableKey]
@@ -622,12 +694,18 @@ fun main() {
                                                                         )
                                                                     }
                                                                 val now = System.currentTimeMillis()
-                                                                columnsCache = columnsCache + (tableKey to ColumnCacheEntry(now, cols))
+                                                                sessionViewModel.updateSchemaState(activePid) { s ->
+                                                                    s.copy(
+                                                                        columnsCache = s.columnsCache + (tableKey to SessionViewModel.ColumnCacheEntry(now, cols))
+                                                                    )
+                                                                }
                                                                 updateTableChildren(tableKey, cols)
                                                                 statusText = "Status: Columns loaded ($name: $tableName)"
                                                             } catch (e: Exception) {
                                                                 statusText = "Status: Failed to load columns: ${e.message ?: "Error"}"
-                                                                schemaDialogError = e.message ?: "Failed to load columns"
+                                                                sessionViewModel.updateSchemaState(activePid) {
+                                                                    it.copy(dialogError = e.message ?: "Failed to load columns")
+                                                                }
                                                             }
                                                         }
                                                     },
@@ -641,7 +719,8 @@ fun main() {
                                         com.dbeagle.ui.FavoritesScreen(
                                             repository = favoritesRepository,
                                             onLoadQuery = { query ->
-                                                queryEditorSql = query
+                                                val pid = activeProfileId
+                                                if (pid == null) scratchSql = query else sessionViewModel.updateQueryEditorSql(pid, query)
                                                 selectedTab = NavigationTab.QueryEditor
                                             },
                                             modifier = Modifier.fillMaxSize()
@@ -651,7 +730,8 @@ fun main() {
                                         com.dbeagle.ui.HistoryScreen(
                                             repository = historyRepository,
                                             onLoadQuery = { query ->
-                                                queryEditorSql = query
+                                                val pid = activeProfileId
+                                                if (pid == null) scratchSql = query else sessionViewModel.updateQueryEditorSql(pid, query)
                                                 selectedTab = NavigationTab.QueryEditor
                                             },
                                             modifier = Modifier.fillMaxSize()
@@ -732,4 +812,3 @@ private fun SaveFavoriteDialog(
         }
     )
 }
-

@@ -25,14 +25,15 @@ import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.DatabaseType
 import com.dbeagle.pool.DatabaseConnectionPool
+import com.dbeagle.session.SessionViewModel
 import com.dbeagle.profile.MasterPasswordProvider
 import com.dbeagle.profile.PreferencesBackedConnectionProfileRepository
 import kotlinx.coroutines.launch
 
 @Composable
 fun ConnectionManagerScreen(
+    sessionViewModel: SessionViewModel,
     onStatusTextChanged: (String) -> Unit = {},
-    onActiveConnectionChanged: (activeProfileId: String?, activeProfileName: String?, activeDriver: DatabaseDriver?) -> Unit = { _, _, _ -> }
 ) {
     var masterPassword by remember { mutableStateOf<String?>(null) }
     
@@ -43,8 +44,8 @@ fun ConnectionManagerScreen(
     } else {
         ConnectionListScreen(
             masterPassword = masterPassword!!,
+            sessionViewModel = sessionViewModel,
             onStatusTextChanged = onStatusTextChanged,
-            onActiveConnectionChanged = onActiveConnectionChanged
         )
     }
 }
@@ -84,8 +85,8 @@ fun MasterPasswordDialog(onPasswordEntered: (String) -> Unit) {
 @Composable
 fun ConnectionListScreen(
     masterPassword: String,
+    sessionViewModel: SessionViewModel,
     onStatusTextChanged: (String) -> Unit,
-    onActiveConnectionChanged: (activeProfileId: String?, activeProfileName: String?, activeDriver: DatabaseDriver?) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
     
@@ -100,10 +101,9 @@ fun ConnectionListScreen(
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    var connectedProfileIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var connectingProfileId by remember { mutableStateOf<String?>(null) }
-    val activeDrivers = remember { mutableStateMapOf<String, DatabaseDriver>() }
-    var activeProfileId by remember { mutableStateOf<String?>(null) }
+    val connectedProfileIds by sessionViewModel.connectedProfileIds.collectAsState()
+    val connectingProfileId by sessionViewModel.connectingProfileId.collectAsState()
+    val activeProfileId by sessionViewModel.activeProfileId.collectAsState()
 
     var dialogError by remember { mutableStateOf<String?>(null) }
     
@@ -150,10 +150,7 @@ fun ConnectionListScreen(
     }
 
     fun updateActiveConnection(profileId: String?) {
-        activeProfileId = profileId
-        val driver = profileId?.let(activeDrivers::get)
-        val name = profileId?.let { id -> profiles.firstOrNull { it.id == id }?.name }
-        onActiveConnectionChanged(profileId, name, driver)
+        sessionViewModel.setActiveProfile(profileId)
     }
 
     Scaffold(
@@ -200,7 +197,7 @@ fun ConnectionListScreen(
                             onConnect = {
                                 if (connectingProfileId != null) return@ConnectionRow
                                 coroutineScope.launch {
-                                    connectingProfileId = profile.id
+                                    sessionViewModel.setConnecting(profile.id)
                                     var driver: DatabaseDriver? = null
                                     try {
                                         val loaded = repository.load(profile.id)
@@ -243,9 +240,11 @@ fun ConnectionListScreen(
                                             throw schemaError
                                         }
 
-                                        activeDrivers[loaded.id] = driver!!
-                                        connectedProfileIds = connectedProfileIds + loaded.id
-
+                                        sessionViewModel.openSession(
+                                            profileId = loaded.id,
+                                            profileName = loaded.name,
+                                            driver = driver!!
+                                        )
                                         updateActiveConnection(loaded.id)
 
                                         onStatusTextChanged("Status: Connected (${loaded.name})")
@@ -258,27 +257,22 @@ fun ConnectionListScreen(
                                         updateStatus()
                                         dialogError = "Failed to connect: ${e.message}"
                                     } finally {
-                                        connectingProfileId = null
+                                        sessionViewModel.setConnecting(null)
                                     }
                                 }
                             },
                             onDisconnect = {
                                 if (connectingProfileId != null) return@ConnectionRow
                                 coroutineScope.launch {
-                                    connectingProfileId = profile.id
+                                    sessionViewModel.setConnecting(profile.id)
                                     try {
                                         onStatusTextChanged("Status: Disconnecting (${profile.name})")
-                                        activeDrivers.remove(profile.id)?.disconnect()
+                                        sessionViewModel.closeSession(profile.id)
                                     } catch (_: Exception) {
                                     } finally {
                                         DatabaseConnectionPool.closePool(profile.id)
-                                        connectedProfileIds = connectedProfileIds - profile.id
-                                        if (activeProfileId == profile.id) {
-                                            val next = activeDrivers.keys.firstOrNull()
-                                            updateActiveConnection(next)
-                                        }
                                         updateStatus()
-                                        connectingProfileId = null
+                                        sessionViewModel.setConnecting(null)
                                     }
                                 }
                             },
@@ -290,16 +284,10 @@ fun ConnectionListScreen(
                                 coroutineScope.launch {
                                     repository.delete(profile.id)
                                     try {
-                                        activeDrivers.remove(profile.id)?.disconnect()
+                                        sessionViewModel.closeSession(profile.id)
                                     } catch (_: Exception) {
                                     }
                                     DatabaseConnectionPool.closePool(profile.id)
-                                    connectedProfileIds = connectedProfileIds - profile.id
-
-                                    if (activeProfileId == profile.id) {
-                                        val next = activeDrivers.keys.firstOrNull()
-                                        updateActiveConnection(next)
-                                    }
 
                                     refreshProfiles()
                                 }

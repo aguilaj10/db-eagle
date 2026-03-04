@@ -23,6 +23,7 @@ dependencies {
     runtimeOnly(libs.slf4j.simple)
 
     testImplementation(libs.kotlin.test)
+    testRuntimeOnly(libs.slf4j.simple)
 }
 
 tasks.test {

@@ -1012,6 +1012,18 @@ Future database types can extend DatabaseType sealed class and add URL construct
 - Query Editor executes SQL via `QueryExecutor(driver).execute(sql)` and maps `QueryResult.Success.rows: List<Map<String, String>>` into `ResultGrid` rows by iterating `columnNames` and reading `rowMap[col] ?: ""`.
 - `SQLEditor` takes `isRunning` to disable Run, show a small spinner, and prevent double-run.
 
+## Task 30 - Multi-Connection Session Management
+
+- Use an app-level state-holder (plain Kotlin + StateFlow) for sessions keyed by connection profile id; Compose reads it via collectAsState().
+- Keep per-connection state isolated: SQL text, last executed SQL/result, and schema browser cache (schema tree + per-table columns cache).
+- Closing a connection tab must call driver.disconnect() and DatabaseConnectionPool.closePool(profileId) to avoid leaking pools.
+
+### Task 30 addendum - SessionViewModel details
+
+- `SessionViewModel` acts as the per-connection state holder keyed by `profileId`: SQL editor text, query results (columns/rows), and schema UI/cache are independent per session.
+- `closeSession(profileId)` removes the session driver, calls `driver.disconnect()`, then closes the pool for that `profileId` via injected `closePool` callback (now `suspend (String) -> Unit` for testability).
+- Active selection rule: closing the active session selects the first remaining `sessionOrder` entry as the new active session (or null if none remain).
+
 ## Task 24 - Inline grid edits persisted via UPDATE
 
 - QueryExecutor routes non-SELECT statements directly to DatabaseDriver.executeQuery(sql, params).
@@ -1505,3 +1517,10 @@ try {
 - Generated ER Diagram PNG evidence deterministically using Compose Desktop `ImageComposeScene`.
 - We can wrap the Compose view within a `Surface(color = Color.White)` to provide a proper background when rendering headless.
 - Skia's `Image.encodeToData(EncodedImageFormat.PNG)` effectively gets the bytes that we can write to disk directly without needing intermediate BufferedImage or AWT types.
+
+## Task 30 - Multi-Connection Session Management (additional notes)
+
+- Prefer a single app-level state-holder keyed by `profileId` over per-screen `remember { mutableStateOf(...) }` when state must survive navigation and be isolated per connection.
+- Make disconnect semantics testable by injecting a `closePool(profileId)` callback into the session manager; production wiring can delegate to `DatabaseConnectionPool.closePool(profileId)`.
+- Treat session close as `suspend` so it can safely call `driver.disconnect()` (also suspend) without blocking UI threads.
+- Track session ordering explicitly for stable connection tab rendering (don’t rely on Map iteration order).
