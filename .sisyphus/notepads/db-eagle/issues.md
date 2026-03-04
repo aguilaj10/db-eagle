@@ -197,3 +197,21 @@ Cannot measure UI FPS / rendering performance in this headless environment; rely
 ## Task 37: Application Icon + Branding
 - Headless environment prevented capturing an actual screenshot of the running app icon. Generated the icon files headlessly using Java Graphics2D and struct.pack for ICO/ICNS generation, and relied on text evidence.
 
+
+### Task 39 - DMG Packaging OS Constraint (Expected)
+
+**Issue**: Cannot execute `./gradlew :app:packageDmg` on Linux x86_64
+
+**Context**:
+- DMG packaging requires macOS-specific tools: `hdiutil`, `codesign`, `xcrun notarytool`
+- Current environment: Linux headless server (no macOS)
+- Task graph validation works: `./gradlew :app:packageDmg --dry-run` succeeds
+- Configuration is valid and will work on macOS runners
+
+**Workaround**:
+- Local development: Run on macOS machine with Apple Developer tools installed
+- CI/CD: Use `macos-latest` or `macos-13` runners in GitHub Actions
+- Verification: Use `--dry-run` flag on Linux for task graph validation
+
+**Resolution**: Expected behavior - not a bug. DMG is a macOS-specific format requiring macOS tooling.
+

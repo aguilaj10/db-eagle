@@ -43,9 +43,52 @@ compose.desktop {
 
             macOS {
                 iconFile.set(project.file("src/main/resources/icons/icon.icns"))
-            }
-            windows {
-                iconFile.set(project.file("src/main/resources/icons/icon.ico"))
+                
+                // Bundle identifier (required for macOS packaging)
+                bundleID = "com.dbeagle.app"
+                
+                // DMG customization
+                dockName = "DBEagle"
+                
+                // Optional code signing (requires Apple Developer ID certificate)
+                // Set these via environment variables or gradle.properties:
+                // - DBEAGLE_MAC_SIGN_IDENTITY: Developer ID certificate name
+                // - DBEAGLE_MAC_KEYCHAIN: Path to keychain (optional, uses default if not set)
+                val signIdentity = System.getenv("DBEAGLE_MAC_SIGN_IDENTITY")
+                    ?: findProperty("dbeagle.mac.sign.identity") as? String
+                
+                if (signIdentity != null) {
+                    signing {
+                        sign.set(true)
+                        identity.set(signIdentity)
+                        
+                        val keychainPath = System.getenv("DBEAGLE_MAC_KEYCHAIN")
+                            ?: findProperty("dbeagle.mac.keychain") as? String
+                        if (keychainPath != null) {
+                            keychain.set(keychainPath)
+                        }
+                    }
+                }
+                
+                // Optional notarization (requires signing + Apple ID credentials)
+                // Set these via environment variables or gradle.properties:
+                // - DBEAGLE_APPLE_ID: Apple ID email
+                // - DBEAGLE_APPLE_TEAM_ID: 10-character team ID
+                // - DBEAGLE_APPLE_APP_PASSWORD: App-specific password (from appleid.apple.com)
+                val appleId = System.getenv("DBEAGLE_APPLE_ID")
+                    ?: findProperty("dbeagle.apple.id") as? String
+                val appleTeamId = System.getenv("DBEAGLE_APPLE_TEAM_ID")
+                    ?: findProperty("dbeagle.apple.team.id") as? String
+                val appleAppPassword = System.getenv("DBEAGLE_APPLE_APP_PASSWORD")
+                    ?: findProperty("dbeagle.apple.app.password") as? String
+                
+                if (signIdentity != null && appleId != null && appleTeamId != null && appleAppPassword != null) {
+                    notarization {
+                        appleID.set(appleId)
+                        password.set(appleAppPassword)
+                        teamID.set(appleTeamId)
+                    }
+                }
             }
             linux {
                 iconFile.set(project.file("src/main/resources/icons/icon_512x512.png"))

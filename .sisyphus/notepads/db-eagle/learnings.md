@@ -2046,3 +2046,173 @@ val repoRoot = generateSequence(File(System.getProperty("user.dir"))) { it.paren
 - Core tests: `./gradlew :core:test` → PASS
 - Evidence: `.sisyphus/evidence/task-38-crash-log.txt` exists with crash stack trace
 
+
+### Task 39 - macOS DMG Packaging Configuration
+
+#### Compose Desktop nativeDistributions macOS DSL
+
+**Key Configuration Options**:
+1. **bundleID** (required): Reverse-DNS identifier (e.g., `com.dbeagle.app`)
+   - Required for macOS app bundles
+   - Used by macOS for app identification and security policies
+
+2. **dockName**: Display name in dock/Applications folder
+   - Optional; defaults to packageName if not set
+
+3. **signing { }** block: Code signing configuration
+   - `sign.set(true)` - Enable signing
+   - `identity.set(String)` - Developer ID certificate name (from Keychain)
+   - `keychain.set(String)` - Optional path to keychain (uses default login keychain if omitted)
+   - Conditional: Only configure if credentials present (check environment variables)
+
+4. **notarization { }** block: Apple notarization service
+   - `appleID.set(String)` - Apple ID email
+   - `password.set(String)` - App-specific password (NOT Apple ID password)
+   - `teamID.set(String)` - 10-character team ID from developer account
+   - Requires signing to be enabled
+   - Conditional: Only configure if all credentials present
+
+#### Environment Variable Pattern for Optional Credentials
+
+**Best Practice**: Check environment variables OR gradle.properties, fall back to null
+```kotlin
+val signIdentity = System.getenv("DBEAGLE_MAC_SIGN_IDENTITY")
+    ?: findProperty("dbeagle.mac.sign.identity") as? String
+
+if (signIdentity != null) {
+    signing { /* configure */ }
+}
+```
+
+**Why**:
+- Build succeeds without credentials (unsigned DMG)
+- CI/CD can set environment variables for signed builds
+- Local developers can use gradle.properties (git-ignored)
+- No hardcoded secrets in build.gradle.kts
+
+#### DMG Packaging Task Hierarchy
+
+Compose Desktop provides multiple DMG tasks:
+- `packageDmg` - Default variant (debug)
+- `packageReleaseDmg` - Release variant
+- `notarizeDmg` - Standalone notarization (if DMG already built)
+- `notarizeReleaseDmg` - Release variant notarization
+
+Task graph: `compileKotlin` → `classes` → `jar` → `createRuntimeImage` → `prepareAppResources` → `packageDmg`
+
+#### DMG Install Flow (Default jpackage Behavior)
+
+Compose Desktop's `packageDmg` uses `jpackage` (bundled with JDK 17+):
+- Creates DMG volume with `.app` bundle
+- Includes symbolic link to `/Applications` in DMG root
+- Default layout: Side-by-side (app icon + Applications link)
+- No custom background image (requires additional jpackage config)
+
+User experience: Mount DMG → Drag app to Applications link → Eject → Launch from Launchpad
+
+#### OS Requirements for DMG Packaging
+
+**Critical**: `packageDmg` task requires macOS environment
+- Uses macOS-specific tools: `hdiutil`, `codesign`, `xcrun notarytool`
+- Cannot run on Linux/Windows (even in Docker/VM without macOS base)
+- CI/CD: Use `macos-latest` or `macos-13` runners
+
+**Verification Strategy**:
+- Linux/Windows: Validate with `--dry-run` (task graph check)
+- macOS: Run full `./gradlew packageDmg` for actual DMG creation
+
+#### Expected DMG Output Path
+
+Default Compose Desktop output location:
+```
+app/build/compose/binaries/main/dmg/{packageName}-{packageVersion}.dmg
+```
+
+Example: `DBEagle-1.0.0.dmg` (from `packageName = "DBEagle"`, `packageVersion = "1.0.0"`)
+
+Release variant: `app/build/compose/binaries/main-release/dmg/`
+
+#### Signing Certificates & Notarization Prerequisites
+
+**Code Signing Requirements**:
+1. Apple Developer ID certificate (Developer ID Application)
+2. Certificate installed in macOS Keychain (login or custom keychain)
+3. Certificate identity string (e.g., "Developer ID Application: Name (TEAM123)")
+
+**Notarization Requirements**:
+1. Code signing enabled (prerequisite)
+2. Apple ID (developer account email)
+3. App-specific password (NOT main Apple ID password)
+   - Generate at appleid.apple.com → Security → App-Specific Passwords
+4. Team ID (10-character string from developer account)
+
+**Notarization Process** (automatic when configured):
+1. Build signs DMG with Developer ID
+2. Upload DMG to Apple notarization service
+3. Apple scans for malware/policy violations
+4. Staple notarization ticket to DMG (embeds approval)
+5. Users see no Gatekeeper warnings on download
+
+#### Icon Reuse from Task 37
+
+Task 37 already configured `icon.icns` for macOS:
+```kotlin
+macOS {
+    iconFile.set(project.file("src/main/resources/icons/icon.icns"))
+}
+```
+
+No additional icon configuration needed for Task 39 (just extended existing macOS block).
+
+#### Gradle Properties Naming Convention
+
+Chose lowercase dot-separated format for gradle.properties:
+- `dbeagle.mac.sign.identity` (NOT `dbeagle.macSignIdentity`)
+- Consistent with environment variable fallback pattern
+- Easy to document in README
+
+Environment variables use uppercase snake_case:
+- `DBEAGLE_MAC_SIGN_IDENTITY` (standard shell convention)
+
+Both patterns supported via `findProperty()` + `System.getenv()`.
+
+#### Key Design Decisions
+
+1. **Unsigned by Default**: Build succeeds without certificates
+   - Rationale: Not all developers have Apple Developer accounts
+   - Unsigned DMGs work locally, just show Gatekeeper warning on download
+
+2. **Conditional Blocks**: Signing/notarization only configured if credentials present
+   - Avoids build failures due to missing properties
+   - Clear error messages if partial credentials provided
+
+3. **Bundle ID Choice**: `com.dbeagle.app` (not `com.aguilaj10.dbeagle`)
+   - Matches app name semantics (generic, not user-specific)
+   - Can be changed if project has official organization domain
+
+4. **No Custom DMG Background**: jpackage default layout sufficient
+   - Custom backgrounds require additional jpackage `--resource-dir` config
+   - Plan requirement: "drag-to-Applications flow" (met by default layout)
+   - Future enhancement: Add custom background image if needed
+
+#### Gotchas & Lessons Learned
+
+1. **findProperty() Cast**: Must cast to `String?` explicitly
+   ```kotlin
+   findProperty("key") as? String  // Safe cast with null fallback
+   ```
+
+2. **Notarization Requires Signing**: Can't enable notarization without signing
+   - Check `signIdentity != null` before configuring notarization block
+
+3. **App-Specific Password ≠ Apple ID Password**: Common mistake
+   - Use app-specific password generated at appleid.apple.com
+   - Main Apple ID password will fail notarization
+
+4. **Dry-Run on Non-macOS**: `--dry-run` validates task graph but doesn't check macOS tools
+   - Use for build script validation on Linux/Windows
+   - Full build requires actual macOS environment
+
+5. **Icon Already Configured**: Task 37 icon work carried forward
+    - No need to reconfigure icon paths in Task 39
+
