@@ -1,6 +1,8 @@
 [versions]
 kotlin = "2.3.10"
-compose = "1.7.0"
+compose = "1.10.0"
+compose-material3 = "1.10.0-alpha05"
+compose-material = "1.7.3"
 koin = "3.5.3"
 exposed = "0.41.1"
 hikaricp = "5.1.0"
@@ -23,9 +25,10 @@ kodeview = { module = "dev.snipme:kodeview", version.ref = "kodeview" }
 # Compose
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose" }
 compose-ui-geometry = { module = "org.jetbrains.compose.ui:ui-geometry", version.ref = "compose" }
-compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose" }
+compose-material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-material" }
 
 # Serialization
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = "1.7.1" }
