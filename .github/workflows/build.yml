@@ -35,7 +35,7 @@ jobs:
         run: chmod +x gradlew
       
       - name: Build and Test
-        run: ./gradlew build --no-daemon --stacktrace
+        run: ./gradlew detekt spotlessCheck build --no-daemon --stacktrace
       
       - name: Package for macOS (DMG)
         if: runner.os == 'macOS'

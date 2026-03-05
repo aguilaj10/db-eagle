@@ -10,7 +10,12 @@ import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.settings.AppPreferences
 import com.dbeagle.settings.AppSettings
 import kotlinx.coroutines.runBlocking
-import kotlin.test.*
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class QueryExecutorTest {
     @BeforeTest

@@ -1,7 +1,10 @@
 package com.dbeagle.settings
 
 import java.util.prefs.Preferences
-import kotlin.test.*
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class AppPreferencesTest {
     private val prefsNode = Preferences.userRoot().node("com.dbeagle.settings")

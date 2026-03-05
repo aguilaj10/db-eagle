@@ -7,7 +7,10 @@ import com.dbeagle.settings.AppSettings
 import com.dbeagle.test.BaseTest
 import kotlinx.coroutines.runBlocking
 import java.io.File
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class QueryExecutorSettingsIntegrationTest : BaseTest() {
     private class FakeDriver : DatabaseDriver {

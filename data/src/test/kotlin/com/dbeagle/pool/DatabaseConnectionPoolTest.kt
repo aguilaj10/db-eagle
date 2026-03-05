@@ -4,7 +4,13 @@ import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.testcontainers.containers.PostgreSQLContainer
-import kotlin.test.*
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class DatabaseConnectionPoolTest {
     private var postgresContainer: PostgreSQLContainer<*>? = null
