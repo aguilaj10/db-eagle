@@ -25,6 +25,10 @@ dependencies {
     implementation(libs.logback.classic)
 
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.multiplatform.settings)
+    testImplementation(libs.multiplatform.settings.coroutines)
+    testImplementation(libs.multiplatform.settings.test)
 }
 
 tasks.test {

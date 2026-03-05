@@ -14,6 +14,7 @@ dependencies {
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.multiplatform.settings.test)
     testImplementation(libs.testcontainers)
     testImplementation(libs.testcontainers.postgres)
 }

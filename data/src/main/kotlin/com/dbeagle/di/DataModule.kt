@@ -9,6 +9,6 @@ import org.koin.dsl.module
  */
 val dataModule =
     module {
-        // Placeholder for data layer bindings (drivers, repositories, DAOs)
-        // Will be populated in future tasks with driver registry and persistence services
+        single<com.dbeagle.favorites.FavoritesRepository> { com.dbeagle.favorites.FileFavoritesRepository() }
+        single<com.dbeagle.history.QueryHistoryRepository> { com.dbeagle.history.FileQueryHistoryRepository() }
     }

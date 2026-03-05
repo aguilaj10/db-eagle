@@ -12,7 +12,7 @@ import org.koin.dsl.module
 
 val viewModelModule =
     module {
-        single { ThemeManager() }
+        single { ThemeManager(get()) }
         single { SessionViewModel() }
         factory { (masterPassword: String) ->
             ConnectionListViewModel(get { parametersOf(masterPassword) })
