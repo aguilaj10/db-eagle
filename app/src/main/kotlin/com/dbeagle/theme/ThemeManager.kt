@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Singleton manager for application theme state.
  * Owns dark mode preference and persistence.
- * 
+ *
  * darkModeOverride: null means "use system preference", non-null is user's explicit choice.
  */
 class ThemeManager {
