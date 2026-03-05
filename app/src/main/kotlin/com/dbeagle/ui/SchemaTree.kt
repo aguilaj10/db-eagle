@@ -2,6 +2,8 @@ package com.dbeagle.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.PointerMatcher
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,18 +15,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.onClick
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,7 +39,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 
 sealed class SchemaTreeNode(
@@ -47,11 +55,18 @@ sealed class SchemaTreeNode(
 
     class Table(id: String, label: String, override val children: List<SchemaTreeNode>) : SchemaTreeNode(id, label, Icons.Default.Menu)
 
-    class Column(id: String, label: String, val type: String) : SchemaTreeNode(id, label, Icons.Default.Info)
+    class Column(
+        id: String,
+        label: String,
+        val type: String,
+        val foreignKeyTarget: String? = null,
+    ) : SchemaTreeNode(id, label, Icons.Default.Info)
 
     class View(id: String, label: String) : SchemaTreeNode(id, label, Icons.Default.PlayArrow)
 
     class Index(id: String, label: String) : SchemaTreeNode(id, label, Icons.Default.Search)
+
+    class Sequence(id: String, label: String, val increment: Long) : SchemaTreeNode(id, label, Icons.Default.Numbers)
 }
 
 @Composable
@@ -173,6 +188,54 @@ private fun SchemaTreeNodeItem(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = node.type,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                
+                // Display FK indicator if this column is a foreign key
+                node.foreignKeyTarget?.let { target ->
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TooltipArea(
+                        tooltip = {
+                            Surface(
+                                modifier = Modifier.shadow(4.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(4.dp),
+                            ) {
+                                Text(
+                                    text = "Foreign key → $target",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(8.dp),
+                                )
+                            }
+                        },
+                        delayMillis = 300,
+                        tooltipPlacement = TooltipPlacement.CursorPoint(
+                            offset = DpOffset(0.dp, 16.dp),
+                        ),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Link,
+                                contentDescription = "Foreign Key",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.secondary,
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "→ $target",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (node is SchemaTreeNode.Sequence) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "(increment: ${node.increment})",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

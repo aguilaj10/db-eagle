@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.dbeagle.driver.DatabaseCapability
 import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.navigation.NavigationTab
@@ -62,6 +63,7 @@ fun SchemaBrowserScreen(
     val schemaNodes = schemaState.nodes
     val schemaDialogError = schemaState.dialogError
     val columnsCache = schemaState.columnsCache
+    val schemaMetadata = schemaState.schemaMetadata
 
     fun isExpired(loadedAt: Long?): Boolean {
         if (loadedAt == null) return true
@@ -99,7 +101,7 @@ fun SchemaBrowserScreen(
                 )
             }
 
-        return listOf(
+        val sections = mutableListOf(
             SchemaTreeNode.Section(
                 id = "section:tables",
                 label = "Tables",
@@ -116,6 +118,28 @@ fun SchemaBrowserScreen(
                 children = indexes,
             ),
         )
+
+        // Add Sequences section only if database supports it
+        if (activeDriver?.getCapabilities()?.contains(DatabaseCapability.Sequences) == true) {
+            val sequences = schema.sequences
+                .sortedBy { it.name }
+                .map { seq ->
+                    SchemaTreeNode.Sequence(
+                        id = "sequence:${seq.name}",
+                        label = seq.name,
+                        increment = seq.increment,
+                    )
+                }
+            sections.add(
+                SchemaTreeNode.Section(
+                    id = "section:sequences",
+                    label = "Sequences",
+                    children = sequences,
+                ),
+            )
+        }
+
+        return sections
     }
 
     fun updateTableChildren(
@@ -191,7 +215,7 @@ fun SchemaBrowserScreen(
                 val nodes = buildTree(schema)
                 val now = System.currentTimeMillis()
                 sessionViewModel.updateSchemaState(pid) {
-                    it.copy(nodes = nodes, loadedAtMs = now, isLoading = false)
+                    it.copy(nodes = nodes, loadedAtMs = now, isLoading = false, schemaMetadata = schema)
                 }
                 onStatusTextChanged("Status: Schema loaded ($name)")
             } catch (_: CancellationException) {
@@ -298,13 +322,21 @@ fun SchemaBrowserScreen(
                         val name = activeProfileName ?: "Connection"
                         onStatusTextChanged("Status: Loading columns ($name: $tableName)")
                         try {
+                            val fkMap = schemaMetadata?.foreignKeys
+                                ?.filter { it.fromTable == tableName }
+                                ?.associateBy { it.fromColumn }
+                                ?: emptyMap()
+                            
                             val cols = withContext(Dispatchers.IO) { driver.getColumns(tableName) }
                                 .sortedBy { it.name }
                                 .map { c ->
+                                    val fk = fkMap[c.name]
+                                    val fkTarget = fk?.let { "${it.toTable}.${it.toColumn}" }
                                     SchemaTreeNode.Column(
                                         id = "col:$tableKey.${c.name}",
                                         label = c.name,
                                         type = c.type,
+                                        foreignKeyTarget = fkTarget,
                                     )
                                 }
                             val now = System.currentTimeMillis()

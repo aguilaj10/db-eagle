@@ -2,6 +2,7 @@ package com.dbeagle.session
 
 import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.QueryResult
+import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.ui.SchemaTreeNode
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +25,7 @@ class SessionViewModel(
         val nodes: List<SchemaTreeNode> = emptyList(),
         val dialogError: String? = null,
         val columnsCache: Map<String, ColumnCacheEntry> = emptyMap(),
+        val schemaMetadata: SchemaMetadata? = null,
     )
 
     data class SessionUiState(

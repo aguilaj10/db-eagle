@@ -277,3 +277,247 @@
 - `./gradlew :core:compileKotlin` passes successfully
 - No compilation errors
 - Follows singleton object pattern like other DDL utilities
+
+## DDLPreviewDialog Implementation
+**Date:** 2026-03-05
+
+### Implementation Details
+- Created `app/src/main/kotlin/com/dbeagle/ui/dialogs/DDLPreviewDialog.kt`
+- Composable dialog for reviewing and executing DDL SQL statements
+- Follows AlertDialog pattern from ConnectionDialog and ExportDialog
+
+### Key Features
+1. **DDL Display**
+   - SelectionContainer allows text selection/copy
+   - FontFamily.Monospace for SQL formatting
+   - Background color (surfaceVariant) for visual distinction
+   - Scrollable text area via verticalScroll(rememberScrollState())
+
+2. **Warning Banner**
+   - Conditional display when isDestructive = true
+   - Red error container background with warning icon
+   - Message: "This operation is destructive and cannot be undone!"
+   - Uses MaterialTheme.colorScheme.errorContainer/onErrorContainer
+
+3. **Action Buttons**
+   - Execute: Calls onExecute() then onDismiss()
+   - Copy: Uses LocalClipboardManager.current.setText(AnnotatedString(ddlSql))
+   - Cancel: Calls onDismiss()
+
+### Dialog Signature
+```kotlin
+@Composable
+fun DDLPreviewDialog(
+    ddlSql: String,
+    isDestructive: Boolean,
+    onDismiss: () -> Unit,
+    onExecute: () -> Unit,
+)
+```
+
+### Design Decisions
+- Title changes based on isDestructive flag: "Confirm DDL Execution" vs "Review DDL"
+- Copy button in confirmButton section alongside Execute (row layout)
+- No inline destructive detection - caller determines isDestructive flag
+- SelectionContainer allows user to manually select/copy portions of SQL
+- Background color on SQL text improves readability
+
+### Verification
+- `./gradlew :app:compileKotlin` passes successfully
+- One deprecation warning: LocalClipboardManager (use LocalClipboard for suspend functions)
+- Warning non-blocking - dialog functional with current API
+
+### Integration Notes
+- Caller must detect destructive operations (e.g., check for DROP keyword)
+- onExecute callback should handle actual SQL execution
+- Dialog does not execute DDL directly - follows separation of concerns
+
+## Task 20: Add Sequences Section to SchemaTree
+
+### Implementation Details
+- Added new `SchemaTreeNode.Sequence(id, label, increment)` node type with `Icons.Default.Numbers` icon
+- Sequences display format: `sequence_name (increment: N)`
+- Added conditional rendering in `buildTree()` that checks `DatabaseCapability.Sequences`
+- Sequences section appears ONLY when driver supports them (PostgreSQL yes, SQLite no)
+- Section ordering: Tables → Views → Indexes → Sequences
+
+### Key Technical Points
+- Used `activeDriver?.getCapabilities()?.contains(DatabaseCapability.Sequences)` for capability check
+- SchemaMetadata already had `sequences: List<SequenceMetadata>` field ready to use
+- SequenceMetadata contains: name, schema, startValue, increment, minValue, maxValue, cycle, ownedByTable, ownedByColumn
+- Added import for `DatabaseCapability` in SchemaBrowserScreen
+- Sequences are sorted alphabetically by name
+
+### File Changes
+1. `SchemaTree.kt`:
+   - Added `Icons.Default.Numbers` import
+   - Added `SchemaTreeNode.Sequence` class with increment field
+   - Added rendering logic to display increment value alongside sequence name
+
+2. `SchemaBrowserScreen.kt`:
+   - Added `DatabaseCapability` import
+   - Modified `buildTree()` to conditionally add Sequences section based on capability check
+   - Used mutableListOf to dynamically build sections list
+
+### Verification
+- Compilation successful: `./gradlew :app:compileKotlin` passed
+- No new warnings introduced
+
+## TableEditorDialog Implementation
+**Date:** 2026-03-05
+
+### File Structure
+- Created `app/src/main/kotlin/com/dbeagle/ui/dialogs/TableEditorDialog.kt`
+- Three composable functions: TableEditorDialog (main), ColumnsTab, ColumnRow
+- Uses Material3 AlertDialog with fixed size: 800dp width, 600dp height
+
+### Tab Structure
+- TabRow with 3 tabs: Columns (implemented), Constraints (placeholder), Indexes (placeholder)
+- Uses `mutableIntStateOf(0)` for selected tab tracking
+- `when (selectedTab)` pattern for tab content rendering
+
+### State Management
+- Table name: `mutableStateOf(existingTable?.name ?: "")`
+- Columns: `mutableStateListOf<ColumnDefinition>()` for dynamic add/remove
+- Validation error: `mutableStateOf<String?>` for inline validation feedback
+- Edit mode detection: `existingTable != null`
+
+### Columns Tab Features
+- Table name field: read-only in edit mode, editable in create mode
+- LazyColumn for scrollable column list
+- Each column row has: name field, type dropdown, nullable checkbox, default value field, delete button
+- "Add Column" button adds empty ColumnDefinition with defaults (TEXT, nullable=true)
+- Validation error display in red below table name field
+
+### Column Row Implementation
+- Uses `remember { mutableStateOf(...) }` for each field to enable inline editing
+- ExposedDropdownMenuBox for ColumnType selection
+- `ColumnType.entries.forEach` to populate all enum values in dropdown
+- `notifyUpdate()` local function to propagate changes to parent on every field change
+- Row weight distribution: name (2f), type (1.5f), nullable (1f), default (1.5f), delete button
+
+### Validation Integration
+- Uses DDLValidator.validateTableDefinition on Save button click
+- ValidationResult.Invalid shows concatenated errors in UI
+- ValidationResult.Valid proceeds with onSave callback
+- Validation runs synchronously in onClick handler
+
+### Dialog Actions
+- Save button: validates then calls `onSave(TableDefinition)`
+- Cancel button: calls `onDismiss()`
+- No "Apply" button (single-shot save)
+
+### Type Safety
+- ColumnType enum exhaustive in dropdown (uses .entries)
+- SnapshotStateList for reactive column list
+- Nullable default value handling: `defaultValue.takeIf { it.isNotBlank() }`
+
+### Edit vs Create Mode
+- Edit mode: table name read-only, dialog title shows table name
+- Create mode: table name editable, dialog title "Create Table"
+- Both modes: columns fully editable (add/remove/reorder)
+
+### Verification
+- `:app:compileKotlin` passed successfully
+- No compilation errors
+- Deprecation warning on TabRow (acceptable - framework migration pending)
+
+### Design Patterns
+- Followed ConnectionDialog pattern: AlertDialog, ExposedDropdownMenuBox
+- State hoisting: parent manages columns list, children notify via callbacks
+- Immediate validation feedback via validationError state
+- No ViewModel - direct state management in composable (suitable for dialog scope)
+
+## Foreign Key Display in SchemaTree Implementation
+**Date:** 2026-03-05
+
+### Implementation Details
+- Extended `SchemaTreeNode.Column` with optional `foreignKeyTarget: String?` parameter
+- Format: "targetTable.targetColumn" (e.g., "users.id")
+- Added FK display with link icon (Icons.Default.Link) and "→ target" text
+- Used `TooltipArea` (Compose Desktop) for hover tooltip showing full FK info
+
+### UI Components
+- **Icon**: `Icons.Default.Link` in secondary color (14dp size)
+- **Text**: "→ targetTable.targetColumn" in secondary color
+- **Tooltip**: Surface with shadow showing "Foreign key → targetTable.targetColumn"
+- **Placement**: Appears after column type in tree row
+- **Delay**: 300ms hover delay before tooltip shows
+
+### Data Flow
+1. `SchemaMetadata.foreignKeys` stored in `SessionViewModel.SchemaUiState.schemaMetadata`
+2. When table expanded, FK lookup map built: `foreignKeys.filter { it.fromTable == tableName }.associateBy { it.fromColumn }`
+3. For each column, check if FK exists and populate `foreignKeyTarget` parameter
+4. SchemaTree renders FK indicator if `foreignKeyTarget != null`
+
+### Key Design Decisions
+- FK target format: "table.column" (not schema-qualified to reduce noise)
+- Used `TooltipArea` from `androidx.compose.foundation` (Compose Desktop specific)
+- FK data cached in `columnsCache` so re-expanding table doesn't lose FK info
+- Secondary color scheme used to visually distinguish FK from regular columns
+- Link icon + arrow text provides both icon and textual representation
+
+### Imports Added
+- `androidx.compose.foundation.TooltipArea`
+- `androidx.compose.foundation.TooltipPlacement`
+- `androidx.compose.foundation.shape.RoundedCornerShape`
+- `androidx.compose.material.icons.filled.Link`
+- `androidx.compose.material3.Surface`
+- `androidx.compose.ui.draw.shadow`
+- `androidx.compose.ui.unit.DpOffset`
+
+### SessionViewModel Changes
+- Added `schemaMetadata: SchemaMetadata?` field to `SchemaUiState`
+- Stored full schema on load to enable FK lookup during column expansion
+- No performance concerns: SchemaMetadata already loaded once, just retained
+
+### Verification
+- `:app:compileKotlin` passes successfully
+- All imports resolved correctly
+- No compilation errors or warnings related to FK changes
+- Compose Desktop `TooltipArea` available (not Material3 `TooltipBox`)
+
+### Notes
+- This implementation only displays FK info, not editing (Task 23)
+- FKs already loaded by drivers, no additional queries needed
+- Works for both PostgreSQL and SQLite (both populate foreignKeys)
+
+## SequenceEditorDialog Implementation (Task 26)
+
+### Key Design Patterns
+- **Dual-mode dialog**: Supports CREATE (null input) and EDIT (pre-filled) modes
+- **Read-only for owned sequences**: When `ownedByTable != null`, all fields disabled with explanatory text
+- **Real-time validation**: Uses `DDLValidator.validateIdentifier()` with immediate feedback
+- **Smart nullability**: `isOwnedSequence` check guarantees `existingSequence` is non-null in that branch
+
+### Form Fields Structure
+- Name: Required, validated with DDLValidator
+- Start Value: Default 1, enabled only for non-owned sequences
+- Increment: Default 1, enabled only for non-owned sequences
+- Min Value: Optional, nullable Long
+- Max Value: Optional, nullable Long
+- Cycle: Boolean checkbox, default false
+
+### Validation Approach
+```kotlin
+val nameValidation = if (name.isNotBlank()) {
+    DDLValidator.validateIdentifier(name)
+} else {
+    ValidationResult.Invalid(listOf("Name is required"))
+}
+val isNameValid = nameValidation is ValidationResult.Valid
+```
+
+### Smart Contracts
+- Dialog title dynamically reflects mode: "Create" / "Edit" / "View (Owned by table.column)"
+- Save button enabled only when name validation passes
+- onSave emits complete SequenceMetadata (dialog doesn't execute DDL)
+- Schema defaults to "public" for new sequences, preserved from existing for edits
+
+### Compose Best Practices
+- Use `remember { mutableStateOf() }` for form state
+- Row layout for related fields (Start/Increment, Min/Max)
+- `supportingText` for validation errors (first error shown)
+- `isError` visual feedback when validation fails
+- Conditional rendering: Hide Save button for owned sequences
+
