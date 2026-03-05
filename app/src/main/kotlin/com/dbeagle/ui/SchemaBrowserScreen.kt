@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +49,6 @@ import com.dbeagle.ui.dialogs.IndexEditorDialog
 import com.dbeagle.ui.dialogs.SequenceEditorDialog
 import com.dbeagle.ui.dialogs.TableEditorDialog
 import com.dbeagle.ui.dialogs.ViewEditorDialog
-import androidx.compose.runtime.collectAsState
 import com.dbeagle.viewmodel.DDLExecutionException
 import com.dbeagle.viewmodel.SchemaBrowserViewModel
 import com.dbeagle.viewmodel.SchemaEditorViewModel
@@ -71,7 +71,7 @@ fun SchemaBrowserScreen(
 ) {
     val schemaBrowserViewModel = remember { GlobalContext.get().get<SchemaBrowserViewModel>() }
     val browserUiState by schemaBrowserViewModel.uiState.collectAsState()
-    
+
     val coroutineScope = rememberCoroutineScope()
     var schemaJob by remember(activeProfileId) { mutableStateOf<Job?>(null) }
 
@@ -420,7 +420,7 @@ fun SchemaBrowserScreen(
                             schemaBrowserViewModel.showDDLPreview(
                                 ddl = ddl,
                                 isDestructive = true,
-                                execution = { SchemaEditorViewModel.executeTableDrop(driver, ddl) }
+                                execution = { SchemaEditorViewModel.executeTableDrop(driver, ddl) },
                             )
                         }.onFailure { error ->
                             schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
@@ -441,7 +441,7 @@ fun SchemaBrowserScreen(
                             schemaBrowserViewModel.showDDLPreview(
                                 ddl = ddl,
                                 isDestructive = true,
-                                execution = { SchemaEditorViewModel.executeSequenceDrop(driver, ddl) }
+                                execution = { SchemaEditorViewModel.executeSequenceDrop(driver, ddl) },
                             )
                         }.onFailure { error ->
                             schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
@@ -459,7 +459,7 @@ fun SchemaBrowserScreen(
                         schemaBrowserViewModel.showDDLPreview(
                             ddl = ddl,
                             isDestructive = true,
-                            execution = { executeDDL(driver, ddl) }
+                            execution = { executeDDL(driver, ddl) },
                         )
                     }
                 },
@@ -474,7 +474,7 @@ fun SchemaBrowserScreen(
                         schemaBrowserViewModel.showDDLPreview(
                             ddl = ddl,
                             isDestructive = true,
-                            execution = { executeDDL(driver, ddl) }
+                            execution = { executeDDL(driver, ddl) },
                         )
                     }
                 },
@@ -658,7 +658,7 @@ fun SchemaBrowserScreen(
                                         { SchemaEditorViewModel.executeTableCreate(driver, ddl) }
                                     } else {
                                         { SchemaEditorViewModel.executeTableAlter(driver, ddl) }
-                                    }
+                                    },
                                 )
                                 schemaBrowserViewModel.hideTableEditor()
                             }.onFailure { error ->
@@ -713,7 +713,7 @@ fun SchemaBrowserScreen(
                                         { SchemaEditorViewModel.executeSequenceCreate(driver, ddl) }
                                     } else {
                                         { SchemaEditorViewModel.executeSequenceAlter(driver, ddl) }
-                                    }
+                                    },
                                 )
                                 schemaBrowserViewModel.hideSequenceEditor()
                             }.onFailure { error ->
@@ -740,7 +740,7 @@ fun SchemaBrowserScreen(
                         schemaBrowserViewModel.showDDLPreview(
                             ddl = ddl,
                             isDestructive = false,
-                            execution = { executeDDL(driver, ddl) }
+                            execution = { executeDDL(driver, ddl) },
                         )
                         schemaBrowserViewModel.hideViewEditor()
                     },
@@ -769,7 +769,7 @@ fun SchemaBrowserScreen(
                         schemaBrowserViewModel.showDDLPreview(
                             ddl = ddl,
                             isDestructive = false,
-                            execution = { Result.success(Unit) }
+                            execution = { Result.success(Unit) },
                         )
                     },
                     onCreate = { ddl ->
@@ -801,7 +801,7 @@ fun SchemaBrowserScreen(
                             onStatusTextChanged("Status: DDL executed successfully ($name)")
                             forceRefresh()
                             ensureSchemaLoaded(force = true)
-                        }
+                        },
                     )
                 },
             )

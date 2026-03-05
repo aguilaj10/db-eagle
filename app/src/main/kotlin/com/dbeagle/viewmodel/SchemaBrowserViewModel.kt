@@ -9,7 +9,6 @@ import com.dbeagle.ddl.SQLiteDDLDialect
 import com.dbeagle.ddl.SequenceChanges
 import com.dbeagle.ddl.TableDefinition
 import com.dbeagle.driver.DatabaseDriver
-import com.dbeagle.model.ColumnMetadata
 import com.dbeagle.model.IndexMetadata
 import com.dbeagle.model.SequenceMetadata
 import com.dbeagle.model.TableMetadata
@@ -533,15 +532,13 @@ class SchemaBrowserViewModel : BaseViewModel() {
      */
     fun buildExistingIndexes(
         indexMetadataList: List<IndexMetadata>,
-    ): List<IndexDefinition> {
-        return indexMetadataList.map { index ->
-            IndexDefinition(
-                name = index.name,
-                tableName = index.tableName,
-                columns = index.columns,
-                unique = index.unique,
-            )
-        }
+    ): List<IndexDefinition> = indexMetadataList.map { index ->
+        IndexDefinition(
+            name = index.name,
+            tableName = index.tableName,
+            columns = index.columns,
+            unique = index.unique,
+        )
     }
 
     /**
@@ -607,14 +604,12 @@ class SchemaBrowserViewModel : BaseViewModel() {
     fun computeSequenceChanges(
         existing: SequenceMetadata,
         new: SequenceMetadata,
-    ): SequenceChanges {
-        return SequenceChanges(
-            increment = if (existing.increment != new.increment) new.increment else null,
-            minValue = if (existing.minValue != new.minValue) new.minValue else null,
-            maxValue = if (existing.maxValue != new.maxValue) new.maxValue else null,
-            restart = null, // Restart must be explicitly requested, not inferred from diff
-        )
-    }
+    ): SequenceChanges = SequenceChanges(
+        increment = if (existing.increment != new.increment) new.increment else null,
+        minValue = if (existing.minValue != new.minValue) new.minValue else null,
+        maxValue = if (existing.maxValue != new.maxValue) new.maxValue else null,
+        restart = null, // Restart must be explicitly requested, not inferred from diff
+    )
 
     /**
      * Executes arbitrary DDL statement directly.
