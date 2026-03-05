@@ -1,6 +1,0 @@
-Task 34 Evidence
-- Added withContext(Dispatchers.IO) to driver connection/schema loading logic in ConnectionManagerScreen.kt
-- Wrapped QueryExecutor execution in App.kt and InlineUpdate with Dispatchers.IO context
-- Explicitly caught CancellationException separately from generic Exception blocks to prevent unintended UI errors
-- Schema loading blocks explicitly wrapped using Dispatchers.IO in App.kt (ensureSchemaLoaded and table column load logic)
-- Connection teardown inside SessionViewModel explicitly moved to IO dispatchers
