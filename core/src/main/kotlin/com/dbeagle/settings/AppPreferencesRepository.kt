@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  * Wraps multiplatform-settings ObservableSettings with Flow API for reactive updates.
  */
 class AppPreferencesRepository(
-    private val settings: ObservableSettings
+    private val settings: ObservableSettings,
 ) {
     private companion object {
         const val KEY_RESULT_LIMIT = "resultLimit"
@@ -66,14 +66,14 @@ class AppPreferencesRepository(
         queryTimeoutFlow,
         connectionTimeoutFlow,
         maxConnectionsFlow,
-        darkModeFlow
+        darkModeFlow,
     ) { resultLimit, queryTimeout, connectionTimeout, maxConnections, darkMode ->
         AppSettings(
             resultLimit = resultLimit,
             queryTimeoutSeconds = queryTimeout,
             connectionTimeoutSeconds = connectionTimeout,
             maxConnections = maxConnections,
-            darkMode = darkMode
+            darkMode = darkMode,
         )
     }
 

@@ -77,7 +77,7 @@ class AppPreferencesRepositoryTest {
             queryTimeoutSeconds = 120,
             connectionTimeoutSeconds = 45,
             maxConnections = 20,
-            darkMode = true
+            darkMode = true,
         )
         repository.saveSettings(custom)
         val loaded = repository.settingsFlow.first()

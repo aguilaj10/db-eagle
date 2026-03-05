@@ -15,14 +15,14 @@ class FileFavoritesRepository(
     private val favoritesFile: File = File(System.getProperty("user.home"), ".dbeagle/favorites.json"),
 ) : FavoritesRepository {
     private val json = Json { prettyPrint = true }
-    private val _favoritesFlow = MutableStateFlow<List<FavoriteQuery>>(emptyList())
+    private val favoritesStateFlow = MutableStateFlow<List<FavoriteQuery>>(emptyList())
 
     init {
         favoritesFile.parentFile?.mkdirs()
         if (!favoritesFile.exists()) {
             favoritesFile.writeText("[]")
         }
-        _favoritesFlow.value = getAll()
+        favoritesStateFlow.value = getAll()
     }
 
     override fun save(favorite: FavoriteQuery) {
@@ -47,7 +47,7 @@ class FileFavoritesRepository(
             .sortedByDescending { it.lastModified }
     }
 
-    override fun getAllFlow(): Flow<List<FavoriteQuery>> = _favoritesFlow.asStateFlow()
+    override fun getAllFlow(): Flow<List<FavoriteQuery>> = favoritesStateFlow.asStateFlow()
 
     override fun getById(id: String): FavoriteQuery? = getAll().firstOrNull { it.id == id }
 
@@ -78,7 +78,7 @@ class FileFavoritesRepository(
             } catch (e: AtomicMoveNotSupportedException) {
                 Files.move(tempFile.toPath(), favoritesFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
-            _favoritesFlow.value = favorites.sortedByDescending { it.lastModified }
+            favoritesStateFlow.value = favorites.sortedByDescending { it.lastModified }
         } catch (e: Exception) {
             tempFile.delete()
             throw e

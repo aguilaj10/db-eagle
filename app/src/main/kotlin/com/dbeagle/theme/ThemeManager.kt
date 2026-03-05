@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
  * darkModeOverride: null means "use system preference", non-null is user's explicit choice.
  */
 class ThemeManager(
-    private val appPreferencesRepository: AppPreferencesRepository
+    private val appPreferencesRepository: AppPreferencesRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _darkModeOverride = MutableStateFlow<Boolean?>(null)

@@ -15,14 +15,14 @@ class FileQueryHistoryRepository(
     private val historyFile: File = File(System.getProperty("user.home"), ".dbeagle/history.json"),
 ) : QueryHistoryRepository {
     private val json = Json { prettyPrint = true }
-    private val _historyFlow = MutableStateFlow<List<QueryHistoryEntry>>(emptyList())
+    private val historyStateFlow = MutableStateFlow<List<QueryHistoryEntry>>(emptyList())
 
     init {
         historyFile.parentFile?.mkdirs()
         if (!historyFile.exists()) {
             historyFile.writeText("[]")
         }
-        _historyFlow.value = getAll()
+        historyStateFlow.value = getAll()
     }
 
     override fun add(entry: QueryHistoryEntry) {
@@ -38,7 +38,7 @@ class FileQueryHistoryRepository(
         return json.decodeFromString<List<QueryHistoryEntry>>(text)
     }
 
-    override fun getAllFlow(): Flow<List<QueryHistoryEntry>> = _historyFlow.asStateFlow()
+    override fun getAllFlow(): Flow<List<QueryHistoryEntry>> = historyStateFlow.asStateFlow()
 
     override fun clear() {
         save(emptyList())
@@ -58,7 +58,7 @@ class FileQueryHistoryRepository(
                 // Fallback: if atomic move is not supported (filesystem-specific), use non-atomic move
                 Files.move(tempFile.toPath(), historyFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
-            _historyFlow.value = entries
+            historyStateFlow.value = entries
         } catch (e: Exception) {
             tempFile.delete()
             throw e
