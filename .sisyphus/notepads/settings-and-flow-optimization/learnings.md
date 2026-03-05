@@ -158,3 +158,89 @@ Successfully migrated ConnectionProfileRepositoryTest from java.util.prefs.Prefe
 - No external dependencies needed (already in multiplatform-settings)
 - All encryption tests still pass - logic unchanged
 - profilesFlow requires concrete repository type, not interface
+
+## ViewDDLBuilder Implementation (2026-03-05)
+
+### Pattern Followed
+- Created `ViewDDLBuilder` object following `SequenceDDLBuilder` pattern
+- Used `DDLDialect` interface for database-agnostic identifier quoting
+- Implemented `buildCreateView()` and `buildDropView()` functions
+
+### Key Features
+- **Schema Support**: Qualified view names (`schema.view_name`)
+- **OR REPLACE**: `CREATE OR REPLACE VIEW` for PostgreSQL/Oracle
+- **IF EXISTS**: `DROP VIEW IF EXISTS` when `dialect.supportsIfExists()` is true
+- **CASCADE**: `DROP VIEW ... CASCADE` option for PostgreSQL
+
+### Database Coverage
+- PostgreSQL: Full support (OR REPLACE, IF EXISTS, CASCADE)
+- SQLite: CREATE VIEW, DROP VIEW IF EXISTS
+- Oracle: CREATE OR REPLACE VIEW, DROP VIEW (no IF EXISTS typically)
+
+### Implementation Notes
+- Used `buildString {}` builder pattern for clean SQL generation
+- Schema prefix handled via conditional qualified naming
+- Followed existing KDoc documentation style for consistency
+- No materialized view support (out of scope)
+
+## QueryLogService Implementation (Task 3 - Query Log Feature)
+
+### Pattern Learnings
+1. **NDJSON Format**: One JSON object per line enables efficient appending without parsing entire file
+2. **kotlinx.serialization**: Use `Json.encodeToString()` for serialization, `decodeFromString()` for parsing
+3. **Lazy File Initialization**: Use `by lazy` for file path construction (matches ErrorHandler pattern)
+4. **Silent Failure**: Logging services should fail silently (printStackTrace) to avoid crashing the app
+5. **Directory Creation**: Always call `mkdirs()` before file operations
+
+### File Structure
+- Location: `~/.dbeagle/query.log`
+- Format: NDJSON (newline-delimited JSON)
+- Directory: Same `.dbeagle` directory as crash.log, error.log
+
+### Data Model
+- **QueryStatus**: Simple enum (SUCCESS, ERROR)
+- **QueryLogEntry**: Captures timestamp, sql, duration, status, optional rowCount/errorMessage
+- **QueryLogService**: Singleton object with logQuery(), getLogs(), clearLogs()
+
+### Error Handling
+- Malformed JSON lines are skipped during parsing (mapNotNull pattern)
+- File I/O errors are caught and printed but don't crash the service
+- Empty/non-existent files return empty list (graceful degradation)
+
+### Compilation Note
+- Pre-existing error in PreferencesBackedConnectionProfileRepository.kt (exhaustive when for Oracle)
+- QueryLogService compiles cleanly (verified via Gradle compilation output)
+
+## Oracle Driver Implementation (2026-03-05)
+
+### Sequences Query Pattern
+- Oracle uses `user_sequences` system view for sequence metadata
+- Key columns: `sequence_name`, `min_value`, `max_value`, `increment_by`, `last_number`, `cycle_flag`
+- `cycle_flag` is 'Y' for cycling sequences, any other value means no cycle
+- `last_number` approximates start value (Oracle doesn't store original start value after use)
+- Schema determined via `SELECT USER FROM DUAL` query
+
+### Implementation Structure
+- Followed PostgreSQLDriver pattern closely for consistency
+- Oracle test connection uses `SELECT 1 FROM DUAL` (Oracle's dummy table)
+- JDBC URL format: `jdbc:oracle:thin:@{host}:{port}:{database}`
+- getCurrentSchema() helper returns current user as schema (Oracle's user-schema model)
+
+### Code Organization Issues
+- Private top-level classes with same name cause compilation conflicts across files in same package
+- Solution: Renamed Oracle-specific helpers with `Oracle` prefix:
+  - `OraclePoolBackedDataSource` instead of `PoolBackedDataSource`
+  - `oracleColumnNames()` and `oracleRowsAsStringMaps()` extension functions
+- Alternative would be extracting shared utilities to common file
+
+### DatabaseType Integration
+- Added `DatabaseType.Oracle` to sealed class in core module
+- Updated all exhaustive `when` expressions:
+  - `PreferencesBackedConnectionProfileRepository` (save/load type discriminators)
+  - `DatabaseConnectionPool.buildJdbcUrl()` (already done)
+- Registered in `DataDrivers.registerAll()`
+
+### Testing Approach
+- Compilation verified with `./gradlew :data:compileKotlin`
+- Build successful confirms all when expressions exhaustive
+- No runtime Oracle database needed for compilation verification

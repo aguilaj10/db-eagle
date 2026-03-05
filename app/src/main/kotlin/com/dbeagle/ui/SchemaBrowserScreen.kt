@@ -34,12 +34,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dbeagle.driver.DatabaseCapability
 import com.dbeagle.driver.DatabaseDriver
+import com.dbeagle.ddl.DDLDialect
+import com.dbeagle.ddl.DDLErrorMapper
+import com.dbeagle.ddl.IndexDDLBuilder
+import com.dbeagle.ddl.PostgreSQLDDLDialect
+import com.dbeagle.ddl.SQLiteDDLDialect
+import com.dbeagle.ddl.ViewDDLBuilder
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.navigation.NavigationTab
 import com.dbeagle.session.SessionViewModel
 import com.dbeagle.ui.dialogs.DDLPreviewDialog
+import com.dbeagle.ui.dialogs.IndexEditorDialog
 import com.dbeagle.ui.dialogs.SequenceEditorDialog
 import com.dbeagle.ui.dialogs.TableEditorDialog
+import com.dbeagle.ui.dialogs.ViewEditorDialog
 import com.dbeagle.viewmodel.DDLExecutionException
 import com.dbeagle.viewmodel.SchemaEditorViewModel
 import kotlinx.coroutines.CancellationException
@@ -63,6 +71,8 @@ fun SchemaBrowserScreen(
 
     var showTableEditor by remember { mutableStateOf(false) }
     var showSequenceEditor by remember { mutableStateOf(false) }
+    var showViewEditor by remember { mutableStateOf(false) }
+    var showIndexEditor by remember { mutableStateOf(false) }
     var editingTable by remember { mutableStateOf<String?>(null) }
     var editingSequence by remember { mutableStateOf<String?>(null) }
     var showDDLPreview by remember { mutableStateOf(false) }
@@ -84,6 +94,34 @@ fun SchemaBrowserScreen(
     fun isExpired(loadedAt: Long?): Boolean {
         if (loadedAt == null) return true
         return (System.currentTimeMillis() - loadedAt) > ttlMs
+    }
+
+    fun getDialectForDriver(driver: DatabaseDriver): DDLDialect = when (driver.getName()) {
+        "PostgreSQL" -> PostgreSQLDDLDialect
+        "SQLite" -> SQLiteDDLDialect
+        else -> throw IllegalArgumentException("Unsupported driver type: ${driver.getName()}")
+    }
+
+    suspend fun executeDDL(driver: DatabaseDriver, ddl: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val result = driver.executeQuery(ddl, emptyList())
+            when (result) {
+                is com.dbeagle.model.QueryResult.Success -> {
+                    Result.success(Unit)
+                }
+                is com.dbeagle.model.QueryResult.Error -> {
+                    val userError = DDLErrorMapper.mapError(null, result.message)
+                    Result.failure(DDLExecutionException(userError))
+                }
+            }
+        } catch (e: java.sql.SQLException) {
+            val sqlState = e.sqlState
+            val userError = DDLErrorMapper.mapError(sqlState, e.message ?: "Unknown SQL error")
+            Result.failure(DDLExecutionException(userError))
+        } catch (e: Exception) {
+            val userError = DDLErrorMapper.mapError(null, e.message ?: "Unknown error")
+            Result.failure(DDLExecutionException(userError))
+        }
     }
 
     fun buildTree(schema: SchemaMetadata): List<SchemaTreeNode> {
@@ -425,6 +463,38 @@ fun SchemaBrowserScreen(
                         }
                     }
                 },
+                onNewView = {
+                    showViewEditor = true
+                },
+                onDropView = { viewName ->
+                    val driver = activeDriver ?: return@SchemaTree
+                    coroutineScope.launch {
+                        val dialect = getDialectForDriver(driver)
+                        val ddl = ViewDDLBuilder.buildDropView(dialect, viewName, ifExists = true)
+                        previewDDL = ddl
+                        previewIsDestructive = true
+                        pendingDDLExecution = {
+                            executeDDL(driver, ddl)
+                        }
+                        showDDLPreview = true
+                    }
+                },
+                onNewIndex = {
+                    showIndexEditor = true
+                },
+                onDropIndex = { indexName ->
+                    val driver = activeDriver ?: return@SchemaTree
+                    coroutineScope.launch {
+                        val dialect = getDialectForDriver(driver)
+                        val ddl = IndexDDLBuilder.buildDropIndex(dialect, indexName, ifExists = true)
+                        previewDDL = ddl
+                        previewIsDestructive = true
+                        pendingDDLExecution = {
+                            executeDDL(driver, ddl)
+                        }
+                        showDDLPreview = true
+                    }
+                },
             )
         }
 
@@ -678,6 +748,61 @@ fun SchemaBrowserScreen(
                     }
                 },
             )
+        }
+
+        if (showViewEditor) {
+            val driver = activeDriver
+            if (driver != null) {
+                val dialect = getDialectForDriver(driver)
+                ViewEditorDialog(
+                    dialect = dialect,
+                    onDismiss = {
+                        showViewEditor = false
+                    },
+                    onSave = { ddl ->
+                        previewDDL = ddl
+                        previewIsDestructive = false
+                        pendingDDLExecution = {
+                            executeDDL(driver, ddl)
+                        }
+                        showDDLPreview = true
+                        showViewEditor = false
+                    },
+                )
+            }
+        }
+
+        if (showIndexEditor) {
+            val driver = activeDriver
+            if (driver != null) {
+                val dialect = getDialectForDriver(driver)
+                val allTables = schemaMetadata?.tables?.map { it.name } ?: emptyList()
+
+                IndexEditorDialog(
+                    dialect = dialect,
+                    tables = allTables,
+                    getColumnsForTable = { tableName ->
+                        withContext(Dispatchers.IO) {
+                            driver.getColumns(tableName).map { it.name }
+                        }
+                    },
+                    onDismiss = {
+                        showIndexEditor = false
+                    },
+                    onPreview = { ddl ->
+                        previewDDL = ddl
+                        previewIsDestructive = false
+                        showDDLPreview = true
+                    },
+                    onCreate = { ddl ->
+                        executeDDL(driver, ddl).also {
+                            if (it.isSuccess) {
+                                showIndexEditor = false
+                            }
+                        }
+                    },
+                )
+            }
         }
 
         if (showDDLPreview) {
