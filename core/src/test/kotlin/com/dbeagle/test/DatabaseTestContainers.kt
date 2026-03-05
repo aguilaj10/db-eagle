@@ -27,7 +27,7 @@ object DatabaseTestContainers {
                     .withUsername(DATABASE_USER)
                     .withPassword(DATABASE_PASSWORD)
                     .withStartupTimeoutSeconds(60)
-                    .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 1))
+                    .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 2))
 
             container!!.start()
         }
