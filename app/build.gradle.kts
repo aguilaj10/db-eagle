@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.kodeview)
 
     implementation(libs.koin.core)
+    implementation(libs.coroutines.swing)
 
     implementation(libs.slf4j.api)
     implementation(libs.logback.classic)

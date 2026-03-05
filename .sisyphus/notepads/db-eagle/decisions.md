@@ -417,3 +417,77 @@ fun `generate evidence for task N`() {
 - DefaultBranch is 'main' (verified via git branch --show-current)
 - Ready for future commit/tracking operations
 - Correction: The repo already had a .git directory. If a previous entry mentioned running git init, that was incorrect.
+
+### MVVM Architecture Refactor
+
+**Date:** 2026-03-05
+
+#### Decision 1: ViewModel Creation via Koin DI
+**Chosen**: Use Koin for dependency injection (KMP best practices)
+**Alternatives Considered**:
+- `remember { ViewModel() }` like current SessionViewModel
+- Manual constructor injection
+- Android Hilt (not KMP-compatible)
+
+**Rationale**:
+- Koin already exists in project (unused or minimal use)
+- KMP best practice for Compose Desktop
+- Enables proper testability (mock injection)
+- Centralized dependency graph
+- Follows librarian research recommendations
+
+#### Decision 2: Unidirectional Data Flow with StateFlow
+**Chosen**: StateFlow for all ViewModel state exposure
+**Rationale**:
+- Already used in SessionViewModel (proven pattern)
+- Compose integration via `collectAsState()`
+- Thread-safe state updates
+- Hot stream (always has current value)
+
+#### Decision 3: Repository Ownership in ViewModels
+**Chosen**: ViewModels create/own their repositories
+**Alternatives Considered**:
+- Screens create repositories, pass to ViewModels
+- Repositories as Koin singletons
+
+**Rationale**:
+- Clean separation of concerns
+- Screens become pure UI (no data layer knowledge)
+- ViewModels become single source of truth
+- Enables proper unit testing (mock repositories)
+
+#### Decision 4: Full App.kt Refactor Included
+**Chosen**: Refactor App.kt as part of MVVM migration
+**Alternatives Considered**:
+- Minimal changes to App.kt
+- Separate future task for App.kt
+
+**Rationale**:
+- App.kt currently has mixed concerns (state + navigation + ViewModel creation)
+- Moving to Koin requires App.kt changes anyway
+- Cleaner to refactor once, comprehensively
+- Reduces callback drilling through App.kt
+
+#### Decision 5: Unit Tests for New ViewModels
+**Chosen**: Add unit tests for each new ViewModel
+**Rationale**:
+- ViewModels contain business logic (must be tested)
+- Koin enables mock repository injection
+- Tests ensure refactoring doesn't break functionality
+- Establishes testing pattern for future ViewModels
+
+#### Workflow Decision: Task Verification Pipeline
+**Chosen**: Implement → Oracle review → Quality checks → Commit
+**Pattern**:
+1. Agent implements task changes
+2. Oracle agent reviews code changes for correctness
+3. If approved: Run quality checks (build, test, lint)
+4. If quality passes: Commit with descriptive message
+5. Trust subagent results - no redundant checks
+
+**Rationale**:
+- User explicitly requested this workflow
+- Prevents wasted cycles repeating checks
+- Oracle provides code-level review (catches logic issues)
+- Quality checks catch syntax/build issues
+- Commits create clean history with verified changes

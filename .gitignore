@@ -61,3 +61,7 @@ local.properties
 /.sisyphus/evidence/task-33-leak-detection.txt
 /.sisyphus/boulder.json
 /.sisyphus/plans/kotlin-gradle-upgrade.md
+/.sisyphus/notepads/mvvm-refactor/decisions.md
+/.sisyphus/notepads/mvvm-refactor/issues.md
+/.sisyphus/notepads/mvvm-refactor/learnings.md
+/.sisyphus/notepads/mvvm-refactor/problems.md
