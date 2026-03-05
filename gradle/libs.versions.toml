@@ -1,7 +1,7 @@
 [versions]
 kotlin = "2.3.10"
-compose = "1.10.0"
-compose-material3 = "1.10.0-alpha05"
+compose = "1.10.1"
+compose-material3 = "1.11.0-alpha03"
 compose-material = "1.7.3"
 koin = "3.5.3"
 exposed = "0.41.1"
