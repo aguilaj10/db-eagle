@@ -20,3 +20,25 @@ DatabaseMetaData constants (`tableIndexClustered`, `tableIndexHashed`, `tableInd
 
 ### Resolution Required
 Cast DatabaseMetaData constants to Int or convert `indexTypeValue.toInt()` to Short before comparison.
+
+## Constraint Name Limitation (2026-03-05)
+
+**Issue**: Dropping foreign keys and unique constraints requires constraint names, but current metadata doesn't always provide them.
+
+**Impact**: 
+- FKs without names cannot be dropped
+- Unique constraints use fallback naming convention which may not match actual names
+
+**Workaround**: 
+- Skip FK drops when name is null
+- Use convention-based names for unique constraints
+
+**Root Cause**: 
+`ForeignKeyRelationship` model lacks constraint name field, metadata extraction doesn't capture constraint names.
+
+**Proposed Solution**:
+1. Enhance `ForeignKeyRelationship` to include optional `constraintName: String?`
+2. Update metadata extraction queries to fetch constraint names from `information_schema`
+3. Update `IndexMetadata` similarly if needed for unique constraints
+
+**Severity**: Medium - affects edit operations with FK/unique constraint changes
