@@ -5,6 +5,8 @@ import com.dbeagle.model.QueryHistoryEntry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 class HistoryViewModel(
     private val repository: QueryHistoryRepository,
@@ -19,11 +21,17 @@ class HistoryViewModel(
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
     init {
-        refreshHistory()
+        viewModelScope.launch {
+            repository.getAllFlow()
+                .distinctUntilChanged()
+                .collect { entries ->
+                    updateStateFlow(_uiState) { it.copy(entries = entries) }
+                }
+        }
     }
 
     fun refreshHistory() {
-        updateStateFlow(_uiState) { it.copy(entries = repository.getAll()) }
+        // No-op: Flow handles updates automatically
     }
 
     fun showClearDialog() {

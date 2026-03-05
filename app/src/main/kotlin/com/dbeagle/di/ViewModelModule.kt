@@ -18,7 +18,7 @@ val viewModelModule =
             ConnectionListViewModel(get { parametersOf(masterPassword) })
         }
         factory { QueryEditorViewModel(get()) }
-        factory { SettingsViewModel(get()) }
+        factory { SettingsViewModel(get(), get()) }
         factory { HistoryViewModel(get()) }
         factory { FavoritesViewModel(get()) }
     }
