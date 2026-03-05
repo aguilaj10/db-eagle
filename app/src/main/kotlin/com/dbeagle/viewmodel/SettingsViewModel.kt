@@ -7,6 +7,7 @@ import com.dbeagle.theme.ThemeManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -43,17 +44,19 @@ class SettingsViewModel(
 
     init {
         viewModelScope.launch {
-            repository.settingsFlow.collect { settings ->
-                updateStateFlow(_uiState) { currentState ->
-                    currentState.copy(
-                        settings = settings,
-                        resultLimitInput = settings.resultLimit.toString(),
-                        queryTimeoutInput = settings.queryTimeoutSeconds.toString(),
-                        connectionTimeoutInput = settings.connectionTimeoutSeconds.toString(),
-                        maxConnectionsInput = settings.maxConnections.toString(),
-                    )
+            repository.settingsFlow
+                .distinctUntilChanged()
+                .collect { settings ->
+                    updateStateFlow(_uiState) { currentState ->
+                        currentState.copy(
+                            settings = settings,
+                            resultLimitInput = settings.resultLimit.toString(),
+                            queryTimeoutInput = settings.queryTimeoutSeconds.toString(),
+                            connectionTimeoutInput = settings.connectionTimeoutSeconds.toString(),
+                            maxConnectionsInput = settings.maxConnections.toString(),
+                        )
+                    }
                 }
-            }
         }
         refreshPoolStats()
     }

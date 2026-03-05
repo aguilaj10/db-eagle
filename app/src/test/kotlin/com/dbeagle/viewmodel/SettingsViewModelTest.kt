@@ -160,6 +160,9 @@ class SettingsViewModelTest {
     fun saveSettings_withNegativeValue_setsValidationError() = runBlocking {
         val viewModel = SettingsViewModel(appPreferencesRepository, themeManager)
 
+        // Wait for init block to load settings into input fields
+        viewModel.uiState.first { it.resultLimitInput.isNotEmpty() }
+
         viewModel.updateResultLimit("-100")
         viewModel.saveSettings()
 
@@ -172,6 +175,9 @@ class SettingsViewModelTest {
     @Test
     fun saveSettings_withZeroValue_setsValidationError() = runBlocking {
         val viewModel = SettingsViewModel(appPreferencesRepository, themeManager)
+
+        // Wait for init block to load settings into input fields
+        viewModel.uiState.first { it.maxConnectionsInput.isNotEmpty() }
 
         viewModel.updateMaxConnections("0")
         viewModel.saveSettings()
