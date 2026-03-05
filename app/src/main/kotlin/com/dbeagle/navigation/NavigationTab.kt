@@ -6,5 +6,6 @@ enum class NavigationTab(val title: String) {
     SchemaBrowser("Schema Browser"),
     Favorites("Favorites"),
     History("History"),
+    QueryLog("Query Log"),
     Settings("Settings"),
 }

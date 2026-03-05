@@ -59,6 +59,7 @@ import com.dbeagle.ui.AppBottomBar
 import com.dbeagle.ui.ConnectionManagerScreen
 import com.dbeagle.ui.FavoritesScreen
 import com.dbeagle.ui.HistoryScreen
+import com.dbeagle.ui.LogViewerScreen
 import com.dbeagle.ui.QueryEditorScreen
 import com.dbeagle.ui.SchemaBrowserScreen
 import com.dbeagle.ui.SettingsScreen
@@ -336,6 +337,9 @@ fun main() {
                                             },
                                             modifier = Modifier.fillMaxSize(),
                                         )
+                                    }
+                                    NavigationTab.QueryLog -> {
+                                        LogViewerScreen(modifier = Modifier.fillMaxSize())
                                     }
                                     NavigationTab.Settings -> {
                                         SettingsScreen(

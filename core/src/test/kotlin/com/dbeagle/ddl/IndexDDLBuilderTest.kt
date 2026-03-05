@@ -100,10 +100,17 @@ class IndexDDLBuilderTest {
     }
 
     @Test
-    fun `buildDropIndex without IF EXISTS when not supported`() {
+    fun `buildDropIndex without IF EXISTS when not supported by SQLite`() {
         val ddl = IndexDDLBuilder.buildDropIndex(MockSQLiteDialect, "idx_old", tableName = "users", ifExists = true)
 
         assertEquals("""DROP INDEX "idx_old"""", ddl)
+    }
+
+    @Test
+    fun `buildDropIndex SQLite respects supportsIfExists`() {
+        val ddl = IndexDDLBuilder.buildDropIndex(MockSQLiteDialect, "idx_test", tableName = null, ifExists = true)
+
+        assertEquals("""DROP INDEX "idx_test"""", ddl)
     }
 
     @Test

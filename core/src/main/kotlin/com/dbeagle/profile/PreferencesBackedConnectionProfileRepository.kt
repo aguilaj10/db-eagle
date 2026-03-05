@@ -48,6 +48,7 @@ class PreferencesBackedConnectionProfileRepository(
             when (profile.type) {
                 is DatabaseType.PostgreSQL -> "PostgreSQL"
                 is DatabaseType.SQLite -> "SQLite"
+                is DatabaseType.Oracle -> "Oracle"
             }
 
         val stored =
@@ -79,6 +80,7 @@ class PreferencesBackedConnectionProfileRepository(
             when (stored.typeDiscriminator) {
                 "PostgreSQL" -> DatabaseType.PostgreSQL
                 "SQLite" -> DatabaseType.SQLite
+                "Oracle" -> DatabaseType.Oracle
                 else -> throw IllegalArgumentException("Unknown database type: ${stored.typeDiscriminator}")
             }
 

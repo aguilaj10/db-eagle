@@ -82,6 +82,10 @@ fun SchemaTree(
     onNewSequence: () -> Unit = {},
     onEditSequence: (sequenceName: String) -> Unit = {},
     onDropSequence: (sequenceName: String) -> Unit = {},
+    onNewView: () -> Unit = {},
+    onDropView: (viewName: String) -> Unit = {},
+    onNewIndex: () -> Unit = {},
+    onDropIndex: (indexName: String) -> Unit = {},
 ) {
     var expandedIds by remember { mutableStateOf(setOf<String>()) }
 
@@ -125,6 +129,10 @@ fun SchemaTree(
                 onNewSequence = onNewSequence,
                 onEditSequence = onEditSequence,
                 onDropSequence = onDropSequence,
+                onNewView = onNewView,
+                onDropView = onDropView,
+                onNewIndex = onNewIndex,
+                onDropIndex = onDropIndex,
             )
         }
     }
@@ -146,6 +154,10 @@ private fun SchemaTreeNodeItem(
     onNewSequence: () -> Unit,
     onEditSequence: (sequenceName: String) -> Unit,
     onDropSequence: (sequenceName: String) -> Unit,
+    onNewView: () -> Unit,
+    onDropView: (viewName: String) -> Unit,
+    onNewIndex: () -> Unit,
+    onDropIndex: (indexName: String) -> Unit,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
 
@@ -164,9 +176,11 @@ private fun SchemaTreeNodeItem(
                     matcher = PointerMatcher.mouse(PointerButton.Secondary),
                     onClick = {
                         showContextMenu = when (node) {
-                            is SchemaTreeNode.Section -> node.id == "section:tables" || node.id == "section:sequences"
+                            is SchemaTreeNode.Section -> node.id == "section:tables" || node.id == "section:sequences" || node.id == "section:views" || node.id == "section:indexes"
                             is SchemaTreeNode.Table -> true
                             is SchemaTreeNode.Sequence -> true
+                            is SchemaTreeNode.View -> true
+                            is SchemaTreeNode.Index -> true
                             else -> false
                         }
                     },
@@ -288,6 +302,24 @@ private fun SchemaTreeNodeItem(
                                 },
                             )
                         }
+                        "section:views" -> {
+                            DropdownMenuItem(
+                                text = { Text("New View...") },
+                                onClick = {
+                                    onNewView()
+                                    showContextMenu = false
+                                },
+                            )
+                        }
+                        "section:indexes" -> {
+                            DropdownMenuItem(
+                                text = { Text("New Index...") },
+                                onClick = {
+                                    onNewIndex()
+                                    showContextMenu = false
+                                },
+                            )
+                        }
                     }
                 }
                 is SchemaTreeNode.Table -> {
@@ -332,6 +364,24 @@ private fun SchemaTreeNodeItem(
                         text = { Text("Drop Sequence...") },
                         onClick = {
                             onDropSequence(node.label)
+                            showContextMenu = false
+                        },
+                    )
+                }
+                is SchemaTreeNode.View -> {
+                    DropdownMenuItem(
+                        text = { Text("Drop View...") },
+                        onClick = {
+                            onDropView(node.label)
+                            showContextMenu = false
+                        },
+                    )
+                }
+                is SchemaTreeNode.Index -> {
+                    DropdownMenuItem(
+                        text = { Text("Drop Index...") },
+                        onClick = {
+                            onDropIndex(node.label)
                             showContextMenu = false
                         },
                     )
