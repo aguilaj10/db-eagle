@@ -110,6 +110,7 @@ class PostgreSQLDriver : DatabaseDriver {
                     name = table,
                     schema = "public",
                     columns = getColumns(table),
+                    primaryKey = getPrimaryKeyColumns(table),
                 )
             }
 
@@ -300,6 +301,24 @@ class PostgreSQLDriver : DatabaseDriver {
                 }
 
                 indexNames.sorted()
+            }
+        }
+    }
+
+    private suspend fun getPrimaryKeyColumns(table: String): List<String> {
+        val db = database ?: return emptyList()
+        val cfg = config!!
+
+        return withContext(Dispatchers.IO) {
+            transaction(db) {
+                val jdbc = connection.connection as Connection
+                jdbc.metaData.getPrimaryKeys(null, "public", table).use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(rs.getString("COLUMN_NAME"))
+                        }
+                    }.sorted()
+                }
             }
         }
     }

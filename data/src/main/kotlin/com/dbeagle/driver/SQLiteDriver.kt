@@ -136,6 +136,7 @@ class SQLiteDriver : DatabaseDriver {
                     name = table,
                     schema = "main",
                     columns = getColumns(table),
+                    primaryKey = getPrimaryKeyColumns(table),
                 )
             }
 
@@ -347,6 +348,31 @@ class SQLiteDriver : DatabaseDriver {
                             }
                         }
                     }
+            }
+        }
+    }
+
+    private suspend fun getPrimaryKeyColumns(table: String): List<String> {
+        val db = database ?: return emptyList()
+        val cfg = config!!
+        val escaped = escapeSqlitePragmaIdent(table)
+
+        return withContext(Dispatchers.IO) {
+            transaction(db) {
+                val jdbc = connection.connection as Connection
+                jdbc.createStatement().use { stmt ->
+                    stmt.queryTimeout = cfg.queryTimeoutSeconds
+                    stmt.executeQuery("PRAGMA table_info('$escaped')").use { rs ->
+                        buildList {
+                            while (rs.next()) {
+                                val pk = rs.getInt("pk")
+                                if (pk > 0) {
+                                    add(rs.getString("name"))
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
