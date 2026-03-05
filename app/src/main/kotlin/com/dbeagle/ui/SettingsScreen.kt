@@ -9,12 +9,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dbeagle.viewmodel.SettingsViewModel
@@ -27,6 +29,7 @@ fun SettingsScreen(
 ) {
     val viewModel = remember { GlobalContext.get().get<SettingsViewModel>() }
     val uiState by viewModel.uiState.collectAsState()
+    val darkMode by viewModel.darkMode.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.refreshPoolStats()
@@ -46,6 +49,21 @@ fun SettingsScreen(
                 text = uiState.errorMessage!!,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Dark Mode",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Switch(
+                checked = darkMode,
+                onCheckedChange = { viewModel.setDarkMode(it) },
             )
         }
 
