@@ -430,6 +430,21 @@ fun SchemaBrowserScreen(
 
         if (showTableEditor) {
             val allTables = schemaMetadata?.tables?.map { it.name } ?: emptyList()
+            
+            // Load existing indexes for the table being edited
+            val existingIndexes = editingTable?.let { tableName ->
+                schemaMetadata?.indexDetails
+                    ?.filter { it.tableName == tableName }
+                    ?.map { idxMeta ->
+                        com.dbeagle.ddl.IndexDefinition(
+                            name = idxMeta.name,
+                            tableName = idxMeta.tableName,
+                            columns = idxMeta.columns,
+                            unique = idxMeta.unique
+                        )
+                    } ?: emptyList()
+            } ?: emptyList()
+            
             val existingTableDef = editingTable?.let { tableName ->
                 schemaMetadata?.tables?.find { it.name == tableName }?.let { tableMetadata ->
                     val tableKey = "${tableMetadata.schema}.${tableMetadata.name}"
@@ -475,12 +490,13 @@ fun SchemaBrowserScreen(
             
             TableEditorDialog(
                 existingTable = existingTableDef,
+                existingIndexes = existingIndexes,
                 allTables = allTables,
                 onDismiss = { 
                     showTableEditor = false
                     editingTable = null
                 },
-                onSave = { tableDef ->
+                onSave = { tableDef, newIndexes ->
                     val driver = activeDriver
                     if (driver == null) {
                         showTableEditor = false
@@ -495,13 +511,89 @@ fun SchemaBrowserScreen(
                                 SchemaEditorViewModel.createTableDDL(driver, tableDef)
                             } else {
                                 val oldTableDef = existingTableDef ?: return@launch
+                                
+                                // Compute column changes
+                                val addedColumns = tableDef.columns.filter { newCol ->
+                                    oldTableDef.columns.none { it.name == newCol.name }
+                                }
+                                val droppedColumns = oldTableDef.columns.filter { oldCol ->
+                                    tableDef.columns.none { it.name == oldCol.name }
+                                }.map { it.name }
+                                
+                                // Compute constraint changes
+                                val addedConstraints = buildList<com.dbeagle.ddl.ConstraintDefinition> {
+                                    // PK changes: add if new PK exists and differs from old
+                                    if (tableDef.primaryKey != null && tableDef.primaryKey != oldTableDef.primaryKey) {
+                                        add(com.dbeagle.ddl.ConstraintDefinition.PrimaryKey(tableDef.primaryKey!!))
+                                    }
+                                    
+                                    // New FKs
+                                    tableDef.foreignKeys.forEach { newFk ->
+                                        val exists = oldTableDef.foreignKeys.any { oldFk ->
+                                            oldFk.columns == newFk.columns && 
+                                            oldFk.refTable == newFk.refTable && 
+                                            oldFk.refColumns == newFk.refColumns
+                                        }
+                                        if (!exists) {
+                                            add(com.dbeagle.ddl.ConstraintDefinition.ForeignKey(newFk))
+                                        }
+                                    }
+                                    
+                                    // New unique constraints
+                                    tableDef.uniqueConstraints.forEach { newUnique ->
+                                        val exists = oldTableDef.uniqueConstraints.any { it == newUnique }
+                                        if (!exists) {
+                                            add(com.dbeagle.ddl.ConstraintDefinition.Unique(null, newUnique))
+                                        }
+                                    }
+                                }
+                                
+                                val droppedConstraints = buildList<String> {
+                                    // PK drop: if old PK existed but new doesn't or differs
+                                    if (oldTableDef.primaryKey != null && 
+                                        (tableDef.primaryKey == null || tableDef.primaryKey != oldTableDef.primaryKey)) {
+                                        // Convention: {table}_pkey for PK constraint name
+                                        add("${editingTable}_pkey")
+                                    }
+                                    
+                                    // Dropped FKs - Note: requires constraint names which may not be available
+                                    // This is a limitation documented in the notepad
+                                    oldTableDef.foreignKeys.forEach { oldFk ->
+                                        val stillExists = tableDef.foreignKeys.any { newFk ->
+                                            newFk.columns == oldFk.columns && 
+                                            newFk.refTable == oldFk.refTable && 
+                                            newFk.refColumns == oldFk.refColumns
+                                        }
+                                        if (!stillExists && oldFk.name != null) {
+                                            add(oldFk.name!!)
+                                        }
+                                    }
+                                    
+                                    // Dropped unique constraints - similar limitation
+                                    oldTableDef.uniqueConstraints.forEachIndexed { idx, oldUnique ->
+                                        val stillExists = tableDef.uniqueConstraints.any { it == oldUnique }
+                                        if (!stillExists) {
+                                            // Convention fallback if name not available
+                                            add("${editingTable}_unique_$idx")
+                                        }
+                                    }
+                                }
+                                
+                                // Compute index changes
+                                val addedIndexes = newIndexes.filter { newIdx ->
+                                    existingIndexes.none { it.name == newIdx.name }
+                                }
+                                val droppedIndexes = existingIndexes.filter { oldIdx ->
+                                    newIndexes.none { it.name == oldIdx.name }
+                                }.map { it.name }
+                                
                                 val changes = com.dbeagle.viewmodel.TableChanges(
-                                    addedColumns = tableDef.columns.filter { newCol ->
-                                        oldTableDef.columns.none { it.name == newCol.name }
-                                    },
-                                    droppedColumns = oldTableDef.columns.filter { oldCol ->
-                                        tableDef.columns.none { it.name == oldCol.name }
-                                    }.map { it.name }
+                                    addedColumns = addedColumns,
+                                    droppedColumns = droppedColumns,
+                                    addedConstraints = addedConstraints,
+                                    droppedConstraints = droppedConstraints,
+                                    addedIndexes = addedIndexes,
+                                    droppedIndexes = droppedIndexes
                                 )
                                 SchemaEditorViewModel.alterTableDDL(driver, editingTable!!, changes)
                             }

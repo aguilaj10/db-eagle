@@ -53,9 +53,10 @@ import com.dbeagle.ddl.ValidationResult
 @Composable
 fun TableEditorDialog(
     existingTable: TableDefinition?,
+    existingIndexes: List<IndexDefinition> = emptyList(),
     allTables: List<String>,
     onDismiss: () -> Unit,
-    onSave: (TableDefinition) -> Unit,
+    onSave: (TableDefinition, List<IndexDefinition>) -> Unit,
 ) {
     var tableName by remember { mutableStateOf(existingTable?.name ?: "") }
     val columns = remember {
@@ -84,7 +85,11 @@ fun TableEditorDialog(
             }
         }
     }
-    val indexes = remember { mutableStateListOf<IndexDefinition>() }
+    val indexes = remember { 
+        mutableStateListOf<IndexDefinition>().apply {
+            addAll(existingIndexes)
+        }
+    }
     
     var selectedTab by remember { mutableIntStateOf(0) }
     var validationError by remember { mutableStateOf<String?>(null) }
@@ -160,7 +165,7 @@ fun TableEditorDialog(
                         }
                         ValidationResult.Valid -> {
                             validationError = null
-                            onSave(tableDefinition)
+                            onSave(tableDefinition, indexes.toList())
                         }
                     }
                 },
