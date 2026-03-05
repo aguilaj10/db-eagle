@@ -1,6 +1,5 @@
 package com.dbeagle
 
-import com.dbeagle.navigation.NavigationTab
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +23,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,7 +52,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.DpSize
@@ -66,15 +63,20 @@ import com.dbeagle.crash.CrashReporter
 import com.dbeagle.di.appModule
 import com.dbeagle.edit.InlineUpdate
 import com.dbeagle.error.ErrorHandler
+import com.dbeagle.export.CsvExporter
+import com.dbeagle.export.JsonExporter
+import com.dbeagle.export.SqlExporter
 import com.dbeagle.favorites.FileFavoritesRepository
 import com.dbeagle.history.FileQueryHistoryRepository
 import com.dbeagle.model.FavoriteQuery
 import com.dbeagle.model.QueryHistoryEntry
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
+import com.dbeagle.navigation.NavigationTab
 import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.query.QueryExecutor
 import com.dbeagle.session.SessionViewModel
+import com.dbeagle.ui.ExportFormat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -445,8 +447,7 @@ fun main() {
                                             com.dbeagle.ui.ExportDialog(
                                                 onDismiss = { showExportDialog = false },
                                                 onExportRequested = { format, path, onProgress ->
-                                                    val result = lastQueryResult
-                                                    if (result == null) {
+                                                    if (lastQueryResult == null) {
                                                         statusText = "Status: No query result to export"
                                                         return@ExportDialog
                                                     }
@@ -454,12 +455,15 @@ fun main() {
                                                     try {
                                                         val outputFile = java.io.File(path)
                                                         val exporter = when (format) {
-                                                            com.dbeagle.ui.ExportFormat.CSV -> com.dbeagle.export.CsvExporter()
-                                                            com.dbeagle.ui.ExportFormat.JSON -> com.dbeagle.export.JsonExporter()
-                                                            com.dbeagle.ui.ExportFormat.SQL -> com.dbeagle.export.SqlExporter()
+                                                            ExportFormat.CSV -> CsvExporter()
+                                                            ExportFormat.JSON -> JsonExporter()
+                                                            ExportFormat.SQL -> SqlExporter()
                                                         }
-
-                                                        exporter.export(outputFile, result, result.resultSet) { rowCount, isDone ->
+                                                        exporter.export(
+                                                            outputFile,
+                                                            lastQueryResult,
+                                                            lastQueryResult.resultSet,
+                                                        ) { rowCount, isDone ->
                                                             onProgress(rowCount, isDone)
                                                             if (isDone) {
                                                                 statusText = "Status: Exported $rowCount rows to $path"

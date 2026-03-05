@@ -6,6 +6,10 @@ import com.dbeagle.model.ForeignKeyRelationship
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.TableMetadata
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.transactions.transaction
 import java.io.PrintWriter
 import java.lang.reflect.Proxy
 import java.sql.Connection
@@ -15,10 +19,6 @@ import java.sql.SQLException
 import java.sql.SQLFeatureNotSupportedException
 import java.util.logging.Logger
 import javax.sql.DataSource
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.transactions.transaction
 
 class SQLiteDriver : DatabaseDriver {
     private var config: ConnectionConfig? = null
