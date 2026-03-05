@@ -9,27 +9,27 @@ package com.dbeagle.ddl
 enum class ColumnType {
     /** Variable-length text data */
     TEXT,
-    
+
     /** 32-bit integer */
     INTEGER,
-    
+
     /** 64-bit integer */
     BIGINT,
-    
+
     /** Fixed-point decimal number */
     DECIMAL,
-    
+
     /** Boolean (true/false) value */
     BOOLEAN,
-    
+
     /** Date without time */
     DATE,
-    
+
     /** Date and time with timezone */
     TIMESTAMP,
-    
+
     /** Binary large object */
-    BLOB
+    BLOB,
 }
 
 /**
@@ -45,7 +45,7 @@ enum class ColumnType {
  * - Type name mappings from generic ColumnType to native SQL types
  */
 interface DDLDialect {
-    
+
     /**
      * Quotes an identifier (table/column name) according to database rules.
      *
@@ -58,7 +58,7 @@ interface DDLDialect {
      * @return The properly quoted identifier for this database
      */
     fun quoteIdentifier(name: String): String
-    
+
     /**
      * Returns true if the database supports sequences.
      *
@@ -69,7 +69,7 @@ interface DDLDialect {
      * @return true if sequences are supported, false otherwise
      */
     fun supportsSequences(): Boolean
-    
+
     /**
      * Returns true if the database supports ALTER COLUMN operations.
      *
@@ -80,7 +80,7 @@ interface DDLDialect {
      * @return true if ALTER COLUMN is supported, false otherwise
      */
     fun supportsAlterColumn(): Boolean
-    
+
     /**
      * Returns true if the database supports DROP COLUMN operations.
      *
@@ -91,7 +91,7 @@ interface DDLDialect {
      * @return true if DROP COLUMN is supported, false otherwise
      */
     fun supportsDropColumn(): Boolean
-    
+
     /**
      * Returns true if the database supports IF EXISTS/IF NOT EXISTS clauses.
      *
@@ -103,7 +103,7 @@ interface DDLDialect {
      * @return true if IF EXISTS is supported, false otherwise
      */
     fun supportsIfExists(): Boolean
-    
+
     /**
      * Maps a generic ColumnType to the database-specific type name.
      *

@@ -12,8 +12,8 @@ class TableDDLBuilderTest {
         val table = TableDefinition(
             name = "users",
             columns = listOf(
-                ColumnDefinition("id", ColumnType.INTEGER, nullable = false)
-            )
+                ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
+            ),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -29,8 +29,8 @@ class TableDDLBuilderTest {
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
                 ColumnDefinition("name", ColumnType.TEXT, nullable = false),
                 ColumnDefinition("price", ColumnType.DECIMAL, nullable = true),
-                ColumnDefinition("created_at", ColumnType.TIMESTAMP, nullable = false)
-            )
+                ColumnDefinition("created_at", ColumnType.TIMESTAMP, nullable = false),
+            ),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -47,9 +47,9 @@ class TableDDLBuilderTest {
             name = "users",
             columns = listOf(
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
-                ColumnDefinition("email", ColumnType.TEXT, nullable = false)
+                ColumnDefinition("email", ColumnType.TEXT, nullable = false),
             ),
-            primaryKey = listOf("id")
+            primaryKey = listOf("id"),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -63,9 +63,9 @@ class TableDDLBuilderTest {
             name = "order_items",
             columns = listOf(
                 ColumnDefinition("order_id", ColumnType.INTEGER, nullable = false),
-                ColumnDefinition("product_id", ColumnType.INTEGER, nullable = false)
+                ColumnDefinition("product_id", ColumnType.INTEGER, nullable = false),
             ),
-            primaryKey = listOf("order_id", "product_id")
+            primaryKey = listOf("order_id", "product_id"),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -79,7 +79,7 @@ class TableDDLBuilderTest {
             name = "orders",
             columns = listOf(
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
-                ColumnDefinition("user_id", ColumnType.INTEGER, nullable = false)
+                ColumnDefinition("user_id", ColumnType.INTEGER, nullable = false),
             ),
             foreignKeys = listOf(
                 ForeignKeyDefinition(
@@ -88,9 +88,9 @@ class TableDDLBuilderTest {
                     refTable = "users",
                     refColumns = listOf("id"),
                     onDelete = "CASCADE",
-                    onUpdate = "RESTRICT"
-                )
-            )
+                    onUpdate = "RESTRICT",
+                ),
+            ),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -103,16 +103,16 @@ class TableDDLBuilderTest {
         val table = TableDefinition(
             name = "orders",
             columns = listOf(
-                ColumnDefinition("user_id", ColumnType.INTEGER, nullable = false)
+                ColumnDefinition("user_id", ColumnType.INTEGER, nullable = false),
             ),
             foreignKeys = listOf(
                 ForeignKeyDefinition(
                     name = null,
                     columns = listOf("user_id"),
                     refTable = "users",
-                    refColumns = listOf("id")
-                )
-            )
+                    refColumns = listOf("id"),
+                ),
+            ),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -127,9 +127,9 @@ class TableDDLBuilderTest {
             name = "users",
             columns = listOf(
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
-                ColumnDefinition("email", ColumnType.TEXT, nullable = false)
+                ColumnDefinition("email", ColumnType.TEXT, nullable = false),
             ),
-            uniqueConstraints = listOf(listOf("email"))
+            uniqueConstraints = listOf(listOf("email")),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -144,9 +144,9 @@ class TableDDLBuilderTest {
             columns = listOf(
                 ColumnDefinition("first_name", ColumnType.TEXT, nullable = false),
                 ColumnDefinition("last_name", ColumnType.TEXT, nullable = false),
-                ColumnDefinition("email", ColumnType.TEXT, nullable = false)
+                ColumnDefinition("email", ColumnType.TEXT, nullable = false),
             ),
-            uniqueConstraints = listOf(listOf("first_name", "last_name"))
+            uniqueConstraints = listOf(listOf("first_name", "last_name")),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -161,8 +161,8 @@ class TableDDLBuilderTest {
             columns = listOf(
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
                 ColumnDefinition("status", ColumnType.TEXT, nullable = false, defaultValue = "'active'"),
-                ColumnDefinition("quantity", ColumnType.INTEGER, nullable = false, defaultValue = "0")
-            )
+                ColumnDefinition("quantity", ColumnType.INTEGER, nullable = false, defaultValue = "0"),
+            ),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -176,8 +176,8 @@ class TableDDLBuilderTest {
         val table = TableDefinition(
             name = "my\"table",
             columns = listOf(
-                ColumnDefinition("col\"name", ColumnType.TEXT, nullable = false)
-            )
+                ColumnDefinition("col\"name", ColumnType.TEXT, nullable = false),
+            ),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -252,7 +252,7 @@ class TableDDLBuilderTest {
             columns = listOf("user_id"),
             refTable = "users",
             refColumns = listOf("id"),
-            onDelete = "CASCADE"
+            onDelete = "CASCADE",
         )
         val constraint = ConstraintDefinition.ForeignKey(fkDef)
 
@@ -260,7 +260,7 @@ class TableDDLBuilderTest {
 
         assertEquals(
             """ALTER TABLE "orders" ADD CONSTRAINT "fk_user" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE""",
-            ddl
+            ddl,
         )
     }
 
@@ -270,7 +270,7 @@ class TableDDLBuilderTest {
             name = null,
             columns = listOf("user_id"),
             refTable = "users",
-            refColumns = listOf("id")
+            refColumns = listOf("id"),
         )
         val constraint = ConstraintDefinition.ForeignKey(fkDef)
 
@@ -278,7 +278,7 @@ class TableDDLBuilderTest {
 
         assertEquals(
             """ALTER TABLE "orders" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id")""",
-            ddl
+            ddl,
         )
     }
 
@@ -336,7 +336,7 @@ class TableDDLBuilderTest {
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
                 ColumnDefinition("user_id", ColumnType.INTEGER, nullable = false),
                 ColumnDefinition("status", ColumnType.TEXT, nullable = false, defaultValue = "'pending'"),
-                ColumnDefinition("created_at", ColumnType.TIMESTAMP, nullable = false)
+                ColumnDefinition("created_at", ColumnType.TIMESTAMP, nullable = false),
             ),
             primaryKey = listOf("id"),
             foreignKeys = listOf(
@@ -345,10 +345,10 @@ class TableDDLBuilderTest {
                     columns = listOf("user_id"),
                     refTable = "users",
                     refColumns = listOf("id"),
-                    onDelete = "CASCADE"
-                )
+                    onDelete = "CASCADE",
+                ),
             ),
-            uniqueConstraints = listOf(listOf("user_id", "created_at"))
+            uniqueConstraints = listOf(listOf("user_id", "created_at")),
         )
 
         val ddl = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)
@@ -367,8 +367,8 @@ class TableDDLBuilderTest {
             columns = listOf(
                 ColumnDefinition("col_text", ColumnType.TEXT, nullable = false),
                 ColumnDefinition("col_int", ColumnType.INTEGER, nullable = false),
-                ColumnDefinition("col_bigint", ColumnType.BIGINT, nullable = false)
-            )
+                ColumnDefinition("col_bigint", ColumnType.BIGINT, nullable = false),
+            ),
         )
 
         val ddlPg = TableDDLBuilder.buildCreateTable(MockPostgreSQLDialect, table)

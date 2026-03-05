@@ -11,7 +11,7 @@ data class IndexDefinition(
 )
 
 object IndexDDLBuilder {
-    
+
     fun buildCreateIndex(dialect: DDLDialect, index: IndexDefinition): String = buildString {
         append("CREATE ")
         if (index.unique) {
@@ -25,12 +25,12 @@ object IndexDDLBuilder {
         append(index.columns.joinToString(", ") { dialect.quoteIdentifier(it) })
         append(")")
     }
-    
+
     fun buildDropIndex(
         dialect: DDLDialect,
         indexName: String,
         tableName: String? = null,
-        ifExists: Boolean = true
+        ifExists: Boolean = true,
     ): String = buildString {
         append("DROP INDEX ")
         if (ifExists && dialect.supportsIfExists()) {

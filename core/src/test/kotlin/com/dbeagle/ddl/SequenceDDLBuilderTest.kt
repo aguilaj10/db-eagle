@@ -3,7 +3,6 @@ package com.dbeagle.ddl
 import com.dbeagle.model.SequenceMetadata
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class SequenceDDLBuilderTest {
@@ -19,14 +18,14 @@ class SequenceDDLBuilderTest {
             maxValue = 9223372036854775807,
             cycle = false,
             ownedByTable = null,
-            ownedByColumn = null
+            ownedByColumn = null,
         )
 
         val ddl = SequenceDDLBuilder.buildCreateSequence(MockPostgreSQLDialect, sequence)
 
         assertEquals(
             """CREATE SEQUENCE "order_id_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 NO CYCLE""",
-            ddl
+            ddl,
         )
     }
 
@@ -41,7 +40,7 @@ class SequenceDDLBuilderTest {
             maxValue = 100,
             cycle = true,
             ownedByTable = null,
-            ownedByColumn = null
+            ownedByColumn = null,
         )
 
         val ddl = SequenceDDLBuilder.buildCreateSequence(MockPostgreSQLDialect, sequence)
@@ -60,7 +59,7 @@ class SequenceDDLBuilderTest {
             maxValue = 9223372036854775807,
             cycle = false,
             ownedByTable = null,
-            ownedByColumn = null
+            ownedByColumn = null,
         )
 
         val ddl = SequenceDDLBuilder.buildCreateSequence(MockPostgreSQLDialect, sequence)
@@ -74,14 +73,14 @@ class SequenceDDLBuilderTest {
             increment = 2,
             minValue = 10,
             maxValue = 1000,
-            restart = 50
+            restart = 50,
         )
 
         val ddl = SequenceDDLBuilder.buildAlterSequence(MockPostgreSQLDialect, "my_seq", changes)
 
         assertEquals(
             """ALTER SEQUENCE "my_seq" INCREMENT BY 2 MINVALUE 10 MAXVALUE 1000 RESTART WITH 50""",
-            ddl
+            ddl,
         )
     }
 
@@ -89,14 +88,14 @@ class SequenceDDLBuilderTest {
     fun `buildAlterSequence with partial changes`() {
         val changes = SequenceChanges(
             increment = 5,
-            restart = 100
+            restart = 100,
         )
 
         val ddl = SequenceDDLBuilder.buildAlterSequence(MockPostgreSQLDialect, "my_seq", changes)
 
         assertEquals(
             """ALTER SEQUENCE "my_seq" INCREMENT BY 5 RESTART WITH 100""",
-            ddl
+            ddl,
         )
     }
 
@@ -108,7 +107,7 @@ class SequenceDDLBuilderTest {
 
         assertEquals(
             """ALTER SEQUENCE "my_seq" MINVALUE 0""",
-            ddl
+            ddl,
         )
     }
 
@@ -144,7 +143,7 @@ class SequenceDDLBuilderTest {
             maxValue = 10000,
             cycle = false,
             ownedByTable = null,
-            ownedByColumn = null
+            ownedByColumn = null,
         )
 
         val ddl = SequenceDDLBuilder.buildCreateSequence(MockPostgreSQLDialect, sequence)
@@ -164,7 +163,7 @@ class SequenceDDLBuilderTest {
             maxValue = 9223372036854775807,
             cycle = false,
             ownedByTable = null,
-            ownedByColumn = null
+            ownedByColumn = null,
         )
 
         val ddl = SequenceDDLBuilder.buildCreateSequence(MockSQLiteDialect, sequence)

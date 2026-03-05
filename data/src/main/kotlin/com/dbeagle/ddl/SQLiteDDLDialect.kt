@@ -13,7 +13,7 @@ package com.dbeagle.ddl
  * - Uses double quotes for identifier quoting (SQL-standard)
  */
 object SQLiteDDLDialect : DDLDialect {
-    
+
     /**
      * Quotes identifiers using double quotes (SQL-standard).
      *
@@ -24,30 +24,30 @@ object SQLiteDDLDialect : DDLDialect {
         val escaped = name.replace("\"", "\"\"")
         return "\"$escaped\""
     }
-    
+
     /**
      * SQLite does not support CREATE SEQUENCE.
      * Uses AUTOINCREMENT on INTEGER PRIMARY KEY instead.
      */
     override fun supportsSequences(): Boolean = false
-    
+
     /**
      * SQLite has limited ALTER COLUMN support.
      * Modifying column definitions requires recreating the table.
      */
     override fun supportsAlterColumn(): Boolean = false
-    
+
     /**
      * SQLite has limited DROP COLUMN support.
      * Dropping columns requires recreating the table (before SQLite 3.35.0).
      */
     override fun supportsDropColumn(): Boolean = false
-    
+
     /**
      * SQLite supports IF EXISTS and IF NOT EXISTS clauses.
      */
     override fun supportsIfExists(): Boolean = true
-    
+
     /**
      * Maps generic ColumnType to SQLite type affinity names.
      *
@@ -62,11 +62,11 @@ object SQLiteDDLDialect : DDLDialect {
     override fun getTypeName(genericType: ColumnType): String = when (genericType) {
         ColumnType.TEXT -> "TEXT"
         ColumnType.INTEGER -> "INTEGER"
-        ColumnType.BIGINT -> "INTEGER"  // SQLite stores all integers as INTEGER
+        ColumnType.BIGINT -> "INTEGER" // SQLite stores all integers as INTEGER
         ColumnType.DECIMAL -> "REAL"
-        ColumnType.BOOLEAN -> "INTEGER"  // SQLite has no native boolean (uses 0/1)
-        ColumnType.DATE -> "TEXT"  // Stored as ISO8601 string: YYYY-MM-DD
-        ColumnType.TIMESTAMP -> "TEXT"  // Stored as ISO8601 string: YYYY-MM-DD HH:MM:SS.SSS
+        ColumnType.BOOLEAN -> "INTEGER" // SQLite has no native boolean (uses 0/1)
+        ColumnType.DATE -> "TEXT" // Stored as ISO8601 string: YYYY-MM-DD
+        ColumnType.TIMESTAMP -> "TEXT" // Stored as ISO8601 string: YYYY-MM-DD HH:MM:SS.SSS
         ColumnType.BLOB -> "BLOB"
     }
 }

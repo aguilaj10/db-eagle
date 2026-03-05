@@ -59,7 +59,7 @@ fun SequenceEditorDialog(
                     isOwnedSequence -> "View Sequence (Owned by ${existingSequence.ownedByTable}.${existingSequence.ownedByColumn})"
                     isCreateMode -> "Create Sequence"
                     else -> "Edit Sequence"
-                }
+                },
             )
         },
         text = {

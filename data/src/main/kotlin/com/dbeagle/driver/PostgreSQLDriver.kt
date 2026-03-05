@@ -260,11 +260,13 @@ class PostgreSQLDriver : DatabaseDriver {
 
                 // First, get basic sequence info from information_schema
                 val sequences = jdbc.createStatement().use { stmt ->
-                    stmt.executeQuery("""
+                    stmt.executeQuery(
+                        """
                         SELECT sequence_name, start_value, increment, minimum_value, maximum_value, cycle_option
                         FROM information_schema.sequences
                         WHERE sequence_schema = 'public'
-                    """.trimIndent()).use { rs ->
+                        """.trimIndent(),
+                    ).use { rs ->
                         buildList {
                             while (rs.next()) {
                                 val name = rs.getString("sequence_name")
@@ -286,8 +288,8 @@ class PostgreSQLDriver : DatabaseDriver {
                                             maxValue = maxValue,
                                             cycle = cycle,
                                         ),
-                                        mutableMapOf<String, Pair<String, String>>()
-                                    )
+                                        mutableMapOf<String, Pair<String, String>>(),
+                                    ),
                                 )
                             }
                         }
@@ -297,7 +299,8 @@ class PostgreSQLDriver : DatabaseDriver {
                 // Now, get ownership info from pg_depend
                 val ownershipMap = mutableMapOf<String, Pair<String, String>>()
                 jdbc.createStatement().use { stmt ->
-                    stmt.executeQuery("""
+                    stmt.executeQuery(
+                        """
                         SELECT s.relname AS sequence_name,
                                t.relname AS table_name,
                                a.attname AS column_name
@@ -308,7 +311,8 @@ class PostgreSQLDriver : DatabaseDriver {
                         WHERE s.relkind = 'S'
                           AND d.deptype = 'a'
                           AND s.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
-                    """.trimIndent()).use { rs ->
+                        """.trimIndent(),
+                    ).use { rs ->
                         while (rs.next()) {
                             val seqName = rs.getString("sequence_name")
                             val tableName = rs.getString("table_name")
@@ -323,7 +327,7 @@ class PostgreSQLDriver : DatabaseDriver {
                     val ownership = ownershipMap[name]
                     metadata.copy(
                         ownedByTable = ownership?.first,
-                        ownedByColumn = ownership?.second
+                        ownedByColumn = ownership?.second,
                     )
                 }.sortedBy { it.name }
             }
@@ -375,7 +379,7 @@ class PostgreSQLDriver : DatabaseDriver {
                             tableName = tableName,
                             columns = columns.sortedBy { it.first }.map { it.second },
                             unique = indexUnique[name] ?: false,
-                            type = indexType[name]
+                            type = indexType[name],
                         )
                     }.sortedBy { it.name }
                 }

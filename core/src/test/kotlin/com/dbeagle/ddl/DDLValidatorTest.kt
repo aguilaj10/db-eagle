@@ -1,7 +1,6 @@
 package com.dbeagle.ddl
 
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DDLValidatorTest {
@@ -193,8 +192,8 @@ class DDLValidatorTest {
             name = "users",
             columns = listOf(
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
-                ColumnDefinition("email", ColumnType.TEXT, nullable = false)
-            )
+                ColumnDefinition("email", ColumnType.TEXT, nullable = false),
+            ),
         )
 
         val result = DDLValidator.validateTableDefinition(table)
@@ -206,7 +205,7 @@ class DDLValidatorTest {
     fun `validateTableDefinition rejects table with no columns`() {
         val table = TableDefinition(
             name = "users",
-            columns = emptyList()
+            columns = emptyList(),
         )
 
         val result = DDLValidator.validateTableDefinition(table)
@@ -221,8 +220,8 @@ class DDLValidatorTest {
         val table = TableDefinition(
             name = "users;DROP",
             columns = listOf(
-                ColumnDefinition("id", ColumnType.INTEGER, nullable = false)
-            )
+                ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
+            ),
         )
 
         val result = DDLValidator.validateTableDefinition(table)
@@ -238,8 +237,8 @@ class DDLValidatorTest {
             name = "users",
             columns = listOf(
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
-                ColumnDefinition("id", ColumnType.TEXT, nullable = false)
-            )
+                ColumnDefinition("id", ColumnType.TEXT, nullable = false),
+            ),
         )
 
         val result = DDLValidator.validateTableDefinition(table)
@@ -255,8 +254,8 @@ class DDLValidatorTest {
             name = "users",
             columns = listOf(
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
-                ColumnDefinition("email;DROP", ColumnType.TEXT, nullable = false)
-            )
+                ColumnDefinition("email;DROP", ColumnType.TEXT, nullable = false),
+            ),
         )
 
         val result = DDLValidator.validateTableDefinition(table)
@@ -273,8 +272,8 @@ class DDLValidatorTest {
             columns = listOf(
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
                 ColumnDefinition("id", ColumnType.TEXT, nullable = false),
-                ColumnDefinition("email--", ColumnType.TEXT, nullable = false)
-            )
+                ColumnDefinition("email--", ColumnType.TEXT, nullable = false),
+            ),
         )
 
         val result = DDLValidator.validateTableDefinition(table)
@@ -324,7 +323,7 @@ class DDLValidatorTest {
                 ColumnDefinition("id", ColumnType.INTEGER, nullable = false),
                 ColumnDefinition("user_id", ColumnType.INTEGER, nullable = false),
                 ColumnDefinition("status", ColumnType.TEXT, nullable = false, defaultValue = "'pending'"),
-                ColumnDefinition("created_at", ColumnType.TIMESTAMP, nullable = false)
+                ColumnDefinition("created_at", ColumnType.TIMESTAMP, nullable = false),
             ),
             primaryKey = listOf("id"),
             foreignKeys = listOf(
@@ -332,10 +331,10 @@ class DDLValidatorTest {
                     name = "fk_user",
                     columns = listOf("user_id"),
                     refTable = "users",
-                    refColumns = listOf("id")
-                )
+                    refColumns = listOf("id"),
+                ),
             ),
-            uniqueConstraints = listOf(listOf("user_id", "created_at"))
+            uniqueConstraints = listOf(listOf("user_id", "created_at")),
         )
 
         val result = DDLValidator.validateTableDefinition(table)
@@ -357,8 +356,8 @@ class DDLValidatorTest {
         val table = TableDefinition(
             name = "valid_table",
             columns = listOf(
-                ColumnDefinition("123invalid", ColumnType.INTEGER, nullable = false)
-            )
+                ColumnDefinition("123invalid", ColumnType.INTEGER, nullable = false),
+            ),
         )
 
         val result = DDLValidator.validateTableDefinition(table)

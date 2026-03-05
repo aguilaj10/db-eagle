@@ -13,14 +13,14 @@ import kotlin.test.assertTrue
  * These tests focus on the business logic, not UI rendering.
  */
 class SequenceEditorDialogTest {
-    
+
     @Test
     fun testSequenceNameValidation_valid() {
         val validName = "my_sequence"
         val result = DDLValidator.validateIdentifier(validName)
         assertIs<ValidationResult.Valid>(result)
     }
-    
+
     @Test
     fun testSequenceNameValidation_empty() {
         val emptyName = ""
@@ -28,7 +28,7 @@ class SequenceEditorDialogTest {
         assertIs<ValidationResult.Invalid>(result)
         assertTrue(result.errors.isNotEmpty())
     }
-    
+
     @Test
     fun testSequenceNameValidation_invalidChars() {
         val invalidName = "my-sequence"
@@ -36,7 +36,7 @@ class SequenceEditorDialogTest {
         assertIs<ValidationResult.Invalid>(result)
         assertTrue(result.errors.any { it.contains("invalid characters") })
     }
-    
+
     @Test
     fun testSequenceNameValidation_sqlInjection() {
         val maliciousName = "DROP TABLE"
@@ -44,7 +44,7 @@ class SequenceEditorDialogTest {
         assertIs<ValidationResult.Invalid>(result)
         assertTrue(result.errors.any { it.contains("reserved keyword") || it.contains("invalid") })
     }
-    
+
     @Test
     fun testSequenceMetadataCreation_defaults() {
         val sequence = SequenceMetadata(
@@ -58,14 +58,14 @@ class SequenceEditorDialogTest {
             ownedByTable = null,
             ownedByColumn = null,
         )
-        
+
         assertEquals("test_seq", sequence.name)
         assertEquals("public", sequence.schema)
         assertEquals(1L, sequence.startValue)
         assertEquals(1L, sequence.increment)
         assertEquals(false, sequence.cycle)
     }
-    
+
     @Test
     fun testSequenceMetadataCreation_customValues() {
         val sequence = SequenceMetadata(
@@ -79,13 +79,13 @@ class SequenceEditorDialogTest {
             ownedByTable = null,
             ownedByColumn = null,
         )
-        
+
         assertEquals(100L, sequence.startValue)
         assertEquals(5L, sequence.increment)
         assertEquals(1000L, sequence.maxValue)
         assertEquals(true, sequence.cycle)
     }
-    
+
     @Test
     fun testSequenceMetadataCreation_ownedSequence() {
         val sequence = SequenceMetadata(
@@ -99,11 +99,11 @@ class SequenceEditorDialogTest {
             ownedByTable = "users",
             ownedByColumn = "id",
         )
-        
+
         assertEquals("users", sequence.ownedByTable)
         assertEquals("id", sequence.ownedByColumn)
     }
-    
+
     @Test
     fun testSequenceMetadataCallback_createMode() {
         // Simulate dialog create flow
@@ -113,11 +113,11 @@ class SequenceEditorDialogTest {
         val minValue = ""
         val maxValue = ""
         val cycle = false
-        
+
         // Validate name
         val nameValidation = DDLValidator.validateIdentifier(name)
         assertIs<ValidationResult.Valid>(nameValidation)
-        
+
         // Create sequence (simulating onSave callback)
         val sequence = SequenceMetadata(
             name = name,
@@ -130,7 +130,7 @@ class SequenceEditorDialogTest {
             ownedByTable = null,
             ownedByColumn = null,
         )
-        
+
         assertEquals("new_sequence", sequence.name)
         assertEquals(10L, sequence.startValue)
         assertEquals(2L, sequence.increment)
@@ -138,7 +138,7 @@ class SequenceEditorDialogTest {
         assertEquals(Long.MAX_VALUE, sequence.maxValue)
         assertEquals(false, sequence.cycle)
     }
-    
+
     @Test
     fun testSequenceMetadataCallback_editMode() {
         // Simulate existing sequence
@@ -153,11 +153,11 @@ class SequenceEditorDialogTest {
             ownedByTable = null,
             ownedByColumn = null,
         )
-        
+
         // Simulate edit: change increment and add max value
         val updatedIncrement = "5"
         val updatedMaxValue = "10000"
-        
+
         val updatedSequence = SequenceMetadata(
             name = existingSequence.name,
             schema = existingSequence.schema,
@@ -169,34 +169,34 @@ class SequenceEditorDialogTest {
             ownedByTable = existingSequence.ownedByTable,
             ownedByColumn = existingSequence.ownedByColumn,
         )
-        
+
         assertEquals("existing_seq", updatedSequence.name)
         assertEquals(5L, updatedSequence.increment)
         assertEquals(10000L, updatedSequence.maxValue)
     }
-    
+
     @Test
     fun testNumericValueParsing_invalidInput() {
         // Test that invalid numeric inputs default to fallback values
         val invalidStart = "not_a_number"
         val invalidIncrement = "abc"
-        
+
         val startValue = invalidStart.toLongOrNull() ?: 1L
         val increment = invalidIncrement.toLongOrNull() ?: 1L
-        
+
         assertEquals(1L, startValue)
         assertEquals(1L, increment)
     }
-    
+
     @Test
     fun testNumericValueParsing_negativeValues() {
         // Test that negative values are handled correctly
         val negativeStart = "-100"
         val negativeIncrement = "-5"
-        
+
         val startValue = negativeStart.toLongOrNull() ?: 1L
         val increment = negativeIncrement.toLongOrNull() ?: 1L
-        
+
         assertEquals(-100L, startValue)
         assertEquals(-5L, increment)
     }

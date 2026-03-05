@@ -16,14 +16,14 @@ import kotlin.test.assertTrue
  * These tests focus on the business logic, not UI rendering.
  */
 class TableEditorDialogTest {
-    
+
     @Test
     fun testTableNameValidation_valid() {
         val validName = "users"
         val result = DDLValidator.validateIdentifier(validName)
         assertIs<ValidationResult.Valid>(result)
     }
-    
+
     @Test
     fun testTableNameValidation_empty() {
         val emptyName = ""
@@ -31,7 +31,7 @@ class TableEditorDialogTest {
         assertIs<ValidationResult.Invalid>(result)
         assertTrue(result.errors.isNotEmpty())
     }
-    
+
     @Test
     fun testTableNameValidation_sqlInjection() {
         val maliciousName = "users; DROP TABLE"
@@ -39,7 +39,7 @@ class TableEditorDialogTest {
         assertIs<ValidationResult.Invalid>(result)
         assertTrue(result.errors.any { it.contains("invalid") || it.contains("reserved keyword") })
     }
-    
+
     @Test
     fun testTableDefinitionValidation_noColumns() {
         val tableDef = TableDefinition(
@@ -49,12 +49,12 @@ class TableEditorDialogTest {
             foreignKeys = emptyList(),
             uniqueConstraints = emptyList(),
         )
-        
+
         val result = DDLValidator.validateTableDefinition(tableDef)
         assertIs<ValidationResult.Invalid>(result)
         assertTrue(result.errors.any { it.contains("at least one column") })
     }
-    
+
     @Test
     fun testTableDefinitionValidation_duplicateColumns() {
         val tableDef = TableDefinition(
@@ -68,12 +68,12 @@ class TableEditorDialogTest {
             foreignKeys = emptyList(),
             uniqueConstraints = emptyList(),
         )
-        
+
         val result = DDLValidator.validateTableDefinition(tableDef)
         assertIs<ValidationResult.Invalid>(result)
         assertTrue(result.errors.any { it.contains("Duplicate column name") })
     }
-    
+
     @Test
     fun testTableDefinitionCreation_simpleTable() {
         val columns = listOf(
@@ -81,7 +81,7 @@ class TableEditorDialogTest {
             ColumnDefinition("name", ColumnType.TEXT, false, null),
             ColumnDefinition("email", ColumnType.TEXT, true, null),
         )
-        
+
         val tableDef = TableDefinition(
             name = "users",
             columns = columns,
@@ -89,13 +89,13 @@ class TableEditorDialogTest {
             foreignKeys = emptyList(),
             uniqueConstraints = emptyList(),
         )
-        
+
         assertEquals("users", tableDef.name)
         assertEquals(3, tableDef.columns.size)
         assertEquals(listOf("id"), tableDef.primaryKey)
         assertTrue(tableDef.foreignKeys.isEmpty())
     }
-    
+
     @Test
     fun testTableDefinitionCreation_withForeignKey() {
         val fk = ForeignKeyDefinition(
@@ -106,7 +106,7 @@ class TableEditorDialogTest {
             onDelete = "CASCADE",
             onUpdate = null,
         )
-        
+
         val tableDef = TableDefinition(
             name = "orders",
             columns = listOf(
@@ -117,14 +117,14 @@ class TableEditorDialogTest {
             foreignKeys = listOf(fk),
             uniqueConstraints = emptyList(),
         )
-        
+
         assertEquals(1, tableDef.foreignKeys.size)
         assertEquals("fk_order_user", tableDef.foreignKeys[0].name)
         assertEquals("users", tableDef.foreignKeys[0].refTable)
         assertEquals(listOf("id"), tableDef.foreignKeys[0].refColumns)
         assertEquals("CASCADE", tableDef.foreignKeys[0].onDelete)
     }
-    
+
     @Test
     fun testTableDefinitionCreation_withUniqueConstraint() {
         val tableDef = TableDefinition(
@@ -141,12 +141,12 @@ class TableEditorDialogTest {
                 listOf("username"),
             ),
         )
-        
+
         assertEquals(2, tableDef.uniqueConstraints.size)
         assertEquals(listOf("email"), tableDef.uniqueConstraints[0])
         assertEquals(listOf("username"), tableDef.uniqueConstraints[1])
     }
-    
+
     @Test
     fun testTableDefinitionCreation_compositePrimaryKey() {
         val tableDef = TableDefinition(
@@ -159,10 +159,10 @@ class TableEditorDialogTest {
             foreignKeys = emptyList(),
             uniqueConstraints = emptyList(),
         )
-        
+
         assertEquals(listOf("user_id", "role_id"), tableDef.primaryKey)
     }
-    
+
     @Test
     fun testTableDefinitionCallback_createMode() {
         val tableName = "products"
@@ -171,7 +171,7 @@ class TableEditorDialogTest {
             ColumnDefinition("name", ColumnType.TEXT, false, null),
             ColumnDefinition("price", ColumnType.DECIMAL, true, "0.00"),
         )
-        
+
         val tableDef = TableDefinition(
             name = tableName,
             columns = columns,
@@ -179,15 +179,15 @@ class TableEditorDialogTest {
             foreignKeys = emptyList(),
             uniqueConstraints = emptyList(),
         )
-        
+
         val result = DDLValidator.validateTableDefinition(tableDef)
         assertIs<ValidationResult.Valid>(result)
-        
+
         assertEquals("products", tableDef.name)
         assertEquals(3, tableDef.columns.size)
         assertEquals("0.00", tableDef.columns[2].defaultValue)
     }
-    
+
     @Test
     fun testColumnDefinition_nullableWithDefault() {
         val column = ColumnDefinition(
@@ -196,13 +196,13 @@ class TableEditorDialogTest {
             nullable = true,
             defaultValue = "active",
         )
-        
+
         assertEquals("status", column.name)
         assertEquals(ColumnType.TEXT, column.type)
         assertEquals(true, column.nullable)
         assertEquals("active", column.defaultValue)
     }
-    
+
     @Test
     fun testColumnDefinition_notNullNoDefault() {
         val column = ColumnDefinition(
@@ -211,12 +211,12 @@ class TableEditorDialogTest {
             nullable = false,
             defaultValue = null,
         )
-        
+
         assertEquals("email", column.name)
         assertEquals(false, column.nullable)
         assertEquals(null, column.defaultValue)
     }
-    
+
     @Test
     fun testForeignKeyDefinition_withReferentialActions() {
         val fk = ForeignKeyDefinition(
@@ -227,7 +227,7 @@ class TableEditorDialogTest {
             onDelete = "CASCADE",
             onUpdate = "RESTRICT",
         )
-        
+
         assertEquals("fk_comment_post", fk.name)
         assertEquals(listOf("post_id"), fk.columns)
         assertEquals("posts", fk.refTable)
@@ -235,7 +235,7 @@ class TableEditorDialogTest {
         assertEquals("CASCADE", fk.onDelete)
         assertEquals("RESTRICT", fk.onUpdate)
     }
-    
+
     @Test
     fun testForeignKeyDefinition_compositeKey() {
         val fk = ForeignKeyDefinition(
@@ -246,12 +246,12 @@ class TableEditorDialogTest {
             onDelete = null,
             onUpdate = null,
         )
-        
+
         assertEquals(null, fk.name)
         assertEquals(2, fk.columns.size)
         assertEquals(2, fk.refColumns.size)
     }
-    
+
     @Test
     fun testTableValidation_invalidColumnName() {
         val tableDef = TableDefinition(
@@ -264,12 +264,12 @@ class TableEditorDialogTest {
             foreignKeys = emptyList(),
             uniqueConstraints = emptyList(),
         )
-        
+
         val result = DDLValidator.validateTableDefinition(tableDef)
         assertIs<ValidationResult.Invalid>(result)
         assertTrue(result.errors.any { it.contains("user-name") || it.contains("invalid") })
     }
-    
+
     @Test
     fun testTableDefinition_primaryKeyNull_whenEmpty() {
         val tableName = "temp_table"
@@ -277,7 +277,7 @@ class TableEditorDialogTest {
             ColumnDefinition("data", ColumnType.TEXT, true, null),
         )
         val primaryKeyColumns = emptyList<String>()
-        
+
         val tableDef = TableDefinition(
             name = tableName,
             columns = columns,
@@ -285,10 +285,10 @@ class TableEditorDialogTest {
             foreignKeys = emptyList(),
             uniqueConstraints = emptyList(),
         )
-        
+
         assertEquals(null, tableDef.primaryKey)
     }
-    
+
     @Test
     fun testTableDefinition_allColumnTypes() {
         val columns = listOf(
@@ -301,7 +301,7 @@ class TableEditorDialogTest {
             ColumnDefinition("col_timestamp", ColumnType.TIMESTAMP, true, null),
             ColumnDefinition("col_blob", ColumnType.BLOB, true, null),
         )
-        
+
         val tableDef = TableDefinition(
             name = "type_test",
             columns = columns,
@@ -309,7 +309,7 @@ class TableEditorDialogTest {
             foreignKeys = emptyList(),
             uniqueConstraints = emptyList(),
         )
-        
+
         assertEquals(8, tableDef.columns.size)
         assertEquals(ColumnType.TEXT, tableDef.columns[0].type)
         assertEquals(ColumnType.INTEGER, tableDef.columns[1].type)

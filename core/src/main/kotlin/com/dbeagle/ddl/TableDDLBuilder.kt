@@ -10,7 +10,7 @@ data class ColumnDefinition(
     val name: String,
     val type: ColumnType,
     val nullable: Boolean = true,
-    val defaultValue: String? = null
+    val defaultValue: String? = null,
 )
 
 /**
@@ -23,7 +23,7 @@ data class ForeignKeyDefinition(
     val refTable: String,
     val refColumns: List<String>,
     val onDelete: String? = null,
-    val onUpdate: String? = null
+    val onUpdate: String? = null,
 )
 
 /**
@@ -33,10 +33,10 @@ data class ForeignKeyDefinition(
 sealed class ConstraintDefinition {
     @Serializable
     data class PrimaryKey(val columns: List<String>) : ConstraintDefinition()
-    
+
     @Serializable
     data class ForeignKey(val def: ForeignKeyDefinition) : ConstraintDefinition()
-    
+
     @Serializable
     data class Unique(val name: String?, val columns: List<String>) : ConstraintDefinition()
 }
@@ -50,7 +50,7 @@ data class TableDefinition(
     val columns: List<ColumnDefinition>,
     val primaryKey: List<String>? = null,
     val foreignKeys: List<ForeignKeyDefinition> = emptyList(),
-    val uniqueConstraints: List<List<String>> = emptyList()
+    val uniqueConstraints: List<List<String>> = emptyList(),
 )
 
 /**
@@ -60,7 +60,7 @@ data class TableDefinition(
  * database-specific DDLDialect implementations for proper syntax.
  */
 object TableDDLBuilder {
-    
+
     /**
      * Builds a CREATE TABLE statement.
      *
@@ -70,7 +70,7 @@ object TableDDLBuilder {
      */
     fun buildCreateTable(dialect: DDLDialect, table: TableDefinition): String = buildString {
         append("CREATE TABLE ${dialect.quoteIdentifier(table.name)} (")
-        
+
         // Add column definitions
         val columnDefs = table.columns.map { col ->
             buildString {
@@ -86,14 +86,14 @@ object TableDDLBuilder {
             }
         }
         append(columnDefs.joinToString(", "))
-        
+
         // Add primary key constraint
         table.primaryKey?.takeIf { it.isNotEmpty() }?.let { pk ->
             append(", PRIMARY KEY (")
             append(pk.joinToString(", ") { dialect.quoteIdentifier(it) })
             append(")")
         }
-        
+
         // Add unique constraints
         table.uniqueConstraints.forEach { uniqueCols ->
             if (uniqueCols.isNotEmpty()) {
@@ -102,7 +102,7 @@ object TableDDLBuilder {
                 append(")")
             }
         }
-        
+
         // Add foreign key constraints
         table.foreignKeys.forEach { fk ->
             append(", ")
@@ -117,10 +117,10 @@ object TableDDLBuilder {
             fk.onDelete?.let { append(" ON DELETE $it") }
             fk.onUpdate?.let { append(" ON UPDATE $it") }
         }
-        
+
         append(")")
     }
-    
+
     /**
      * Builds an ALTER TABLE ADD COLUMN statement.
      *
@@ -132,7 +132,7 @@ object TableDDLBuilder {
     fun buildAlterTableAddColumn(
         dialect: DDLDialect,
         table: String,
-        column: ColumnDefinition
+        column: ColumnDefinition,
     ): String = buildString {
         append("ALTER TABLE ${dialect.quoteIdentifier(table)} ADD COLUMN ")
         append(dialect.quoteIdentifier(column.name))
@@ -145,7 +145,7 @@ object TableDDLBuilder {
             append(" DEFAULT $default")
         }
     }
-    
+
     /**
      * Builds an ALTER TABLE DROP COLUMN statement.
      *
@@ -158,17 +158,17 @@ object TableDDLBuilder {
     fun buildAlterTableDropColumn(
         dialect: DDLDialect,
         table: String,
-        column: String
+        column: String,
     ): String {
         if (!dialect.supportsDropColumn()) {
             throw UnsupportedOperationException(
                 "DROP COLUMN is not supported by this database dialect. " +
-                "Table recreation may be required."
+                    "Table recreation may be required.",
             )
         }
         return "ALTER TABLE ${dialect.quoteIdentifier(table)} DROP COLUMN ${dialect.quoteIdentifier(column)}"
     }
-    
+
     /**
      * Builds an ALTER TABLE ADD CONSTRAINT statement.
      *
@@ -180,10 +180,10 @@ object TableDDLBuilder {
     fun buildAlterTableAddConstraint(
         dialect: DDLDialect,
         table: String,
-        constraint: ConstraintDefinition
+        constraint: ConstraintDefinition,
     ): String = buildString {
         append("ALTER TABLE ${dialect.quoteIdentifier(table)} ADD ")
-        
+
         when (constraint) {
             is ConstraintDefinition.PrimaryKey -> {
                 append("PRIMARY KEY (")
@@ -213,7 +213,7 @@ object TableDDLBuilder {
             }
         }
     }
-    
+
     /**
      * Builds an ALTER TABLE DROP CONSTRAINT statement.
      *
@@ -225,11 +225,9 @@ object TableDDLBuilder {
     fun buildAlterTableDropConstraint(
         dialect: DDLDialect,
         table: String,
-        constraintName: String
-    ): String {
-        return "ALTER TABLE ${dialect.quoteIdentifier(table)} DROP CONSTRAINT ${dialect.quoteIdentifier(constraintName)}"
-    }
-    
+        constraintName: String,
+    ): String = "ALTER TABLE ${dialect.quoteIdentifier(table)} DROP CONSTRAINT ${dialect.quoteIdentifier(constraintName)}"
+
     /**
      * Builds a DROP TABLE statement.
      *
@@ -241,7 +239,7 @@ object TableDDLBuilder {
     fun buildDropTable(
         dialect: DDLDialect,
         table: String,
-        cascade: Boolean = false
+        cascade: Boolean = false,
     ): String = buildString {
         append("DROP TABLE ")
         if (dialect.supportsIfExists()) {

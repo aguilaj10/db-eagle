@@ -5,12 +5,11 @@ import com.dbeagle.ddl.ConstraintDefinition
 import com.dbeagle.ddl.DDLDialect
 import com.dbeagle.ddl.DDLErrorMapper
 import com.dbeagle.ddl.DDLValidator
-import com.dbeagle.ddl.IndexDDLBuilder
 import com.dbeagle.ddl.IndexDefinition
 import com.dbeagle.ddl.PostgreSQLDDLDialect
+import com.dbeagle.ddl.SQLiteDDLDialect
 import com.dbeagle.ddl.SequenceChanges
 import com.dbeagle.ddl.SequenceDDLBuilder
-import com.dbeagle.ddl.SQLiteDDLDialect
 import com.dbeagle.ddl.TableDDLBuilder
 import com.dbeagle.ddl.TableDefinition
 import com.dbeagle.ddl.UserFriendlyError
@@ -47,7 +46,7 @@ data class TableChanges(
  * 5. Map errors to user-friendly messages
  */
 object SchemaEditorViewModel {
-    
+
     /**
      * Generates CREATE SEQUENCE DDL for preview.
      *
@@ -66,20 +65,20 @@ object SchemaEditorViewModel {
             val nameValidation = DDLValidator.validateIdentifier(definition.name)
             if (nameValidation is ValidationResult.Invalid) {
                 return@withContext Result.failure(
-                    IllegalArgumentException(nameValidation.errors.joinToString("; "))
+                    IllegalArgumentException(nameValidation.errors.joinToString("; ")),
                 )
             }
-            
+
             // Get dialect based on driver
             val dialect = getDialectForDriver(driver)
-            
+
             // Generate DDL
             val ddl = SequenceDDLBuilder.buildCreateSequence(dialect, definition)
-            
+
             Result.success(ddl)
         }
     }
-    
+
     /**
      * Executes CREATE SEQUENCE DDL.
      *
@@ -92,10 +91,8 @@ object SchemaEditorViewModel {
     suspend fun executeSequenceCreate(
         driver: DatabaseDriver,
         ddl: String,
-    ): Result<Unit> {
-        return executeDDL(driver, ddl)
-    }
-    
+    ): Result<Unit> = executeDDL(driver, ddl)
+
     /**
      * Generates ALTER SEQUENCE DDL for preview.
      *
@@ -116,20 +113,20 @@ object SchemaEditorViewModel {
             val nameValidation = DDLValidator.validateIdentifier(name)
             if (nameValidation is ValidationResult.Invalid) {
                 return@withContext Result.failure(
-                    IllegalArgumentException(nameValidation.errors.joinToString("; "))
+                    IllegalArgumentException(nameValidation.errors.joinToString("; ")),
                 )
             }
-            
+
             // Get dialect
             val dialect = getDialectForDriver(driver)
-            
+
             // Generate DDL
             val ddl = SequenceDDLBuilder.buildAlterSequence(dialect, name, changes)
-            
+
             Result.success(ddl)
         }
     }
-    
+
     /**
      * Executes ALTER SEQUENCE DDL.
      *
@@ -140,10 +137,8 @@ object SchemaEditorViewModel {
     suspend fun executeSequenceAlter(
         driver: DatabaseDriver,
         ddl: String,
-    ): Result<Unit> {
-        return executeDDL(driver, ddl)
-    }
-    
+    ): Result<Unit> = executeDDL(driver, ddl)
+
     /**
      * Generates DROP SEQUENCE DDL for preview.
      *
@@ -164,20 +159,20 @@ object SchemaEditorViewModel {
             val nameValidation = DDLValidator.validateIdentifier(name)
             if (nameValidation is ValidationResult.Invalid) {
                 return@withContext Result.failure(
-                    IllegalArgumentException(nameValidation.errors.joinToString("; "))
+                    IllegalArgumentException(nameValidation.errors.joinToString("; ")),
                 )
             }
-            
+
             // Get dialect
             val dialect = getDialectForDriver(driver)
-            
+
             // Generate DDL
             val ddl = SequenceDDLBuilder.buildDropSequence(dialect, name, ifExists)
-            
+
             Result.success(ddl)
         }
     }
-    
+
     /**
      * Executes DROP SEQUENCE DDL.
      *
@@ -188,10 +183,8 @@ object SchemaEditorViewModel {
     suspend fun executeSequenceDrop(
         driver: DatabaseDriver,
         ddl: String,
-    ): Result<Unit> {
-        return executeDDL(driver, ddl)
-    }
-    
+    ): Result<Unit> = executeDDL(driver, ddl)
+
     /**
      * Generates CREATE TABLE DDL for preview.
      *
@@ -210,20 +203,20 @@ object SchemaEditorViewModel {
             val validation = DDLValidator.validateTableDefinition(definition)
             if (validation is ValidationResult.Invalid) {
                 return@withContext Result.failure(
-                    IllegalArgumentException(validation.errors.joinToString("; "))
+                    IllegalArgumentException(validation.errors.joinToString("; ")),
                 )
             }
-            
+
             // Get dialect based on driver
             val dialect = getDialectForDriver(driver)
-            
+
             // Generate DDL
             val ddl = TableDDLBuilder.buildCreateTable(dialect, definition)
-            
+
             Result.success(ddl)
         }
     }
-    
+
     /**
      * Executes CREATE TABLE DDL.
      *
@@ -236,10 +229,8 @@ object SchemaEditorViewModel {
     suspend fun executeTableCreate(
         driver: DatabaseDriver,
         ddl: String,
-    ): Result<Unit> {
-        return executeDDL(driver, ddl)
-    }
-    
+    ): Result<Unit> = executeDDL(driver, ddl)
+
     /**
      * Generates ALTER TABLE DDL for preview.
      *
@@ -261,59 +252,59 @@ object SchemaEditorViewModel {
             val nameValidation = DDLValidator.validateIdentifier(tableName)
             if (nameValidation is ValidationResult.Invalid) {
                 return@withContext Result.failure(
-                    IllegalArgumentException(nameValidation.errors.joinToString("; "))
+                    IllegalArgumentException(nameValidation.errors.joinToString("; ")),
                 )
             }
-            
+
             // Get dialect
             val dialect = getDialectForDriver(driver)
-            
+
             // Check SQLite limitations
             if (changes.droppedColumns.isNotEmpty() && !dialect.supportsDropColumn()) {
                 return@withContext Result.failure(
                     UnsupportedOperationException(
                         "ALTER TABLE DROP COLUMN is not supported by SQLite. " +
-                        "To remove columns, you must recreate the table with the desired schema."
-                    )
+                            "To remove columns, you must recreate the table with the desired schema.",
+                    ),
                 )
             }
-            
+
             // Generate DDL statements
             val statements = buildList<String> {
                 // Add columns
                 changes.addedColumns.forEach { col ->
                     add(TableDDLBuilder.buildAlterTableAddColumn(dialect, tableName, col))
                 }
-                
+
                 // Drop columns
                 changes.droppedColumns.forEach { col ->
                     add(TableDDLBuilder.buildAlterTableDropColumn(dialect, tableName, col))
                 }
-                
+
                 // Add constraints
                 changes.addedConstraints.forEach { constraint ->
                     add(TableDDLBuilder.buildAlterTableAddConstraint(dialect, tableName, constraint))
                 }
-                
+
                 // Drop constraints
                 changes.droppedConstraints.forEach { constraintName ->
                     add(TableDDLBuilder.buildAlterTableDropConstraint(dialect, tableName, constraintName))
                 }
             }
-            
+
             if (statements.isEmpty()) {
                 return@withContext Result.failure(
-                    IllegalArgumentException("No changes specified for ALTER TABLE operation")
+                    IllegalArgumentException("No changes specified for ALTER TABLE operation"),
                 )
             }
-            
+
             // Join multiple statements with semicolons
             val ddl = statements.joinToString(";\n") + ";"
-            
+
             Result.success(ddl)
         }
     }
-    
+
     /**
      * Executes ALTER TABLE DDL.
      *
@@ -324,10 +315,8 @@ object SchemaEditorViewModel {
     suspend fun executeTableAlter(
         driver: DatabaseDriver,
         ddl: String,
-    ): Result<Unit> {
-        return executeDDL(driver, ddl)
-    }
-    
+    ): Result<Unit> = executeDDL(driver, ddl)
+
     /**
      * Generates DROP TABLE DDL for preview.
      *
@@ -348,20 +337,20 @@ object SchemaEditorViewModel {
             val nameValidation = DDLValidator.validateIdentifier(tableName)
             if (nameValidation is ValidationResult.Invalid) {
                 return@withContext Result.failure(
-                    IllegalArgumentException(nameValidation.errors.joinToString("; "))
+                    IllegalArgumentException(nameValidation.errors.joinToString("; ")),
                 )
             }
-            
+
             // Get dialect
             val dialect = getDialectForDriver(driver)
-            
+
             // Generate DDL
             val ddl = TableDDLBuilder.buildDropTable(dialect, tableName, cascade)
-            
+
             Result.success(ddl)
         }
     }
-    
+
     /**
      * Executes DROP TABLE DDL.
      *
@@ -372,10 +361,8 @@ object SchemaEditorViewModel {
     suspend fun executeTableDrop(
         driver: DatabaseDriver,
         ddl: String,
-    ): Result<Unit> {
-        return executeDDL(driver, ddl)
-    }
-    
+    ): Result<Unit> = executeDDL(driver, ddl)
+
     /**
      * Executes arbitrary DDL statement.
      *
@@ -388,47 +375,43 @@ object SchemaEditorViewModel {
     private suspend fun executeDDL(
         driver: DatabaseDriver,
         ddl: String,
-    ): Result<Unit> {
-        return withContext(Dispatchers.IO) {
-            try {
-                // Execute DDL via driver
-                val result = driver.executeQuery(ddl, emptyList())
-                
-                when (result) {
-                    is com.dbeagle.model.QueryResult.Success -> {
-                        Result.success(Unit)
-                    }
-                    is com.dbeagle.model.QueryResult.Error -> {
-                        // Map error to user-friendly message
-                        val userError = DDLErrorMapper.mapError(null, result.message)
-                        Result.failure(DDLExecutionException(userError))
-                    }
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            // Execute DDL via driver
+            val result = driver.executeQuery(ddl, emptyList())
+
+            when (result) {
+                is com.dbeagle.model.QueryResult.Success -> {
+                    Result.success(Unit)
                 }
-            } catch (e: SQLException) {
-                // Extract SQLSTATE and map to user-friendly error
-                val sqlState = e.sqlState
-                val userError = DDLErrorMapper.mapError(sqlState, e.message ?: "Unknown SQL error")
-                Result.failure(DDLExecutionException(userError))
-            } catch (e: Exception) {
-                // Generic error
-                val userError = DDLErrorMapper.mapError(null, e.message ?: "Unknown error")
-                Result.failure(DDLExecutionException(userError))
+                is com.dbeagle.model.QueryResult.Error -> {
+                    // Map error to user-friendly message
+                    val userError = DDLErrorMapper.mapError(null, result.message)
+                    Result.failure(DDLExecutionException(userError))
+                }
             }
+        } catch (e: SQLException) {
+            // Extract SQLSTATE and map to user-friendly error
+            val sqlState = e.sqlState
+            val userError = DDLErrorMapper.mapError(sqlState, e.message ?: "Unknown SQL error")
+            Result.failure(DDLExecutionException(userError))
+        } catch (e: Exception) {
+            // Generic error
+            val userError = DDLErrorMapper.mapError(null, e.message ?: "Unknown error")
+            Result.failure(DDLExecutionException(userError))
         }
     }
-    
+
     /**
      * Determines the DDL dialect based on the driver type.
      *
      * @param driver The database driver
      * @return The appropriate DDLDialect implementation
      */
-    private fun getDialectForDriver(driver: DatabaseDriver): DDLDialect {
-        return when (driver.getName()) {
-            "PostgreSQL" -> PostgreSQLDDLDialect
-            "SQLite" -> SQLiteDDLDialect
-            else -> throw IllegalArgumentException("Unsupported driver type: ${driver.getName()}")
-        }
+    private fun getDialectForDriver(driver: DatabaseDriver): DDLDialect = when (driver.getName()) {
+        "PostgreSQL" -> PostgreSQLDDLDialect
+        "SQLite" -> SQLiteDDLDialect
+        else -> throw IllegalArgumentException("Unsupported driver type: ${driver.getName()}")
     }
 }
 

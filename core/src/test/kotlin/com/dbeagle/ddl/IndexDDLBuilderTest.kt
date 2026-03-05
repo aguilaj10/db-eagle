@@ -12,7 +12,7 @@ class IndexDDLBuilderTest {
             name = "idx_users_email",
             tableName = "users",
             columns = listOf("email"),
-            unique = false
+            unique = false,
         )
 
         val ddl = IndexDDLBuilder.buildCreateIndex(MockPostgreSQLDialect, index)
@@ -26,7 +26,7 @@ class IndexDDLBuilderTest {
             name = "idx_orders_user_date",
             tableName = "orders",
             columns = listOf("user_id", "created_at"),
-            unique = false
+            unique = false,
         )
 
         val ddl = IndexDDLBuilder.buildCreateIndex(MockPostgreSQLDialect, index)
@@ -40,7 +40,7 @@ class IndexDDLBuilderTest {
             name = "idx_unique_email",
             tableName = "users",
             columns = listOf("email"),
-            unique = true
+            unique = true,
         )
 
         val ddl = IndexDDLBuilder.buildCreateIndex(MockPostgreSQLDialect, index)
@@ -54,7 +54,7 @@ class IndexDDLBuilderTest {
             name = "idx\"special",
             tableName = "my\"table",
             columns = listOf("col\"name"),
-            unique = false
+            unique = false,
         )
 
         val ddl = IndexDDLBuilder.buildCreateIndex(MockPostgreSQLDialect, index)
@@ -70,7 +70,7 @@ class IndexDDLBuilderTest {
             name = "idx_composite",
             tableName = "orders",
             columns = listOf("user_id", "status", "created_at"),
-            unique = false
+            unique = false,
         )
 
         val ddl = IndexDDLBuilder.buildCreateIndex(MockPostgreSQLDialect, index)
@@ -84,7 +84,7 @@ class IndexDDLBuilderTest {
             name = "idx_test",
             tableName = "test_table",
             columns = listOf("test_col"),
-            unique = false
+            unique = false,
         )
 
         val ddl = IndexDDLBuilder.buildCreateIndex(MockSQLiteDialect, index)
@@ -133,7 +133,7 @@ class IndexDDLBuilderTest {
             name = "idx_unique_first_last",
             tableName = "users",
             columns = listOf("first_name", "last_name"),
-            unique = true
+            unique = true,
         )
 
         val ddl = IndexDDLBuilder.buildCreateIndex(MockPostgreSQLDialect, index)
@@ -147,7 +147,7 @@ class IndexDDLBuilderTest {
             name = "idx_test",
             tableName = "test_table",
             columns = listOf("col1", "col2"),
-            unique = false
+            unique = false,
         )
 
         val ddlPg = IndexDDLBuilder.buildCreateIndex(MockPostgreSQLDialect, index)
@@ -162,13 +162,13 @@ class IndexDDLBuilderTest {
             MockPostgreSQLDialect,
             "idx_test",
             tableName = "users",
-            ifExists = true
+            ifExists = true,
         )
         val ddlWithoutTable = IndexDDLBuilder.buildDropIndex(
             MockPostgreSQLDialect,
             "idx_test",
             tableName = null,
-            ifExists = true
+            ifExists = true,
         )
 
         assertEquals(ddlWithTable, ddlWithoutTable)
@@ -180,7 +180,7 @@ class IndexDDLBuilderTest {
             name = "idx_user_email_active",
             tableName = "user_accounts",
             columns = listOf("email_address", "is_active"),
-            unique = false
+            unique = false,
         )
 
         val ddl = IndexDDLBuilder.buildCreateIndex(MockPostgreSQLDialect, index)

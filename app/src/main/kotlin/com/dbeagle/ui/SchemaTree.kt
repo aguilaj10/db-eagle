@@ -212,7 +212,7 @@ private fun SchemaTreeNodeItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                
+
                 // Display FK indicator if this column is a foreign key
                 node.foreignKeyTarget?.let { target ->
                     Spacer(modifier = Modifier.width(8.dp))

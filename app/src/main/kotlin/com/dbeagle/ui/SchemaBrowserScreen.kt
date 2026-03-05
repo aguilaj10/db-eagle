@@ -342,7 +342,7 @@ fun SchemaBrowserScreen(
                                 ?.filter { it.fromTable == tableName }
                                 ?.associateBy { it.fromColumn }
                                 ?: emptyMap()
-                            
+
                             val cols = withContext(Dispatchers.IO) { driver.getColumns(tableName) }
                                 .sortedBy { it.name }
                                 .map { c ->
@@ -430,7 +430,7 @@ fun SchemaBrowserScreen(
 
         if (showTableEditor) {
             val allTables = schemaMetadata?.tables?.map { it.name } ?: emptyList()
-            
+
             // Load existing indexes for the table being edited
             val existingIndexes = editingTable?.let { tableName ->
                 schemaMetadata?.indexDetails
@@ -440,16 +440,16 @@ fun SchemaBrowserScreen(
                             name = idxMeta.name,
                             tableName = idxMeta.tableName,
                             columns = idxMeta.columns,
-                            unique = idxMeta.unique
+                            unique = idxMeta.unique,
                         )
                     } ?: emptyList()
             } ?: emptyList()
-            
+
             val existingTableDef = editingTable?.let { tableName ->
                 schemaMetadata?.tables?.find { it.name == tableName }?.let { tableMetadata ->
                     val tableKey = "${tableMetadata.schema}.${tableMetadata.name}"
                     val cachedColumns = columnsCache[tableKey]?.columns ?: emptyList()
-                    
+
                     val columnDefs = cachedColumns.map { col ->
                         val colType = try {
                             com.dbeagle.ddl.ColumnType.valueOf(col.type.uppercase())
@@ -461,10 +461,10 @@ fun SchemaBrowserScreen(
                             name = col.label,
                             type = colType,
                             nullable = true, // SchemaTreeNode.Column lacks nullable field
-                            defaultValue = null
+                            defaultValue = null,
                         )
                     }
-                    
+
                     val foreignKeyDefs = schemaMetadata?.foreignKeys
                         ?.filter { it.fromTable == tableName }
                         ?.map { fk ->
@@ -474,25 +474,25 @@ fun SchemaBrowserScreen(
                                 refTable = fk.toTable,
                                 refColumns = listOf(fk.toColumn),
                                 onDelete = null,
-                                onUpdate = null
+                                onUpdate = null,
                             )
                         } ?: emptyList()
-                    
+
                     com.dbeagle.ddl.TableDefinition(
                         name = tableMetadata.name,
                         columns = columnDefs,
                         primaryKey = tableMetadata.primaryKey.takeIf { it.isNotEmpty() },
                         foreignKeys = foreignKeyDefs,
-                        uniqueConstraints = emptyList() // Metadata doesn't include unique constraints
+                        uniqueConstraints = emptyList(), // Metadata doesn't include unique constraints
                     )
                 }
             }
-            
+
             TableEditorDialog(
                 existingTable = existingTableDef,
                 existingIndexes = existingIndexes,
                 allTables = allTables,
-                onDismiss = { 
+                onDismiss = {
                     showTableEditor = false
                     editingTable = null
                 },
@@ -503,7 +503,7 @@ fun SchemaBrowserScreen(
                         editingTable = null
                         return@TableEditorDialog
                     }
-                    
+
                     coroutineScope.launch {
                         try {
                             val isCreateMode = editingTable == null
@@ -511,7 +511,7 @@ fun SchemaBrowserScreen(
                                 SchemaEditorViewModel.createTableDDL(driver, tableDef)
                             } else {
                                 val oldTableDef = existingTableDef ?: return@launch
-                                
+
                                 // Compute column changes
                                 val addedColumns = tableDef.columns.filter { newCol ->
                                     oldTableDef.columns.none { it.name == newCol.name }
@@ -519,26 +519,26 @@ fun SchemaBrowserScreen(
                                 val droppedColumns = oldTableDef.columns.filter { oldCol ->
                                     tableDef.columns.none { it.name == oldCol.name }
                                 }.map { it.name }
-                                
+
                                 // Compute constraint changes
                                 val addedConstraints = buildList<com.dbeagle.ddl.ConstraintDefinition> {
                                     // PK changes: add if new PK exists and differs from old
                                     if (tableDef.primaryKey != null && tableDef.primaryKey != oldTableDef.primaryKey) {
                                         add(com.dbeagle.ddl.ConstraintDefinition.PrimaryKey(tableDef.primaryKey!!))
                                     }
-                                    
+
                                     // New FKs
                                     tableDef.foreignKeys.forEach { newFk ->
                                         val exists = oldTableDef.foreignKeys.any { oldFk ->
-                                            oldFk.columns == newFk.columns && 
-                                            oldFk.refTable == newFk.refTable && 
-                                            oldFk.refColumns == newFk.refColumns
+                                            oldFk.columns == newFk.columns &&
+                                                oldFk.refTable == newFk.refTable &&
+                                                oldFk.refColumns == newFk.refColumns
                                         }
                                         if (!exists) {
                                             add(com.dbeagle.ddl.ConstraintDefinition.ForeignKey(newFk))
                                         }
                                     }
-                                    
+
                                     // New unique constraints
                                     tableDef.uniqueConstraints.forEach { newUnique ->
                                         val exists = oldTableDef.uniqueConstraints.any { it == newUnique }
@@ -547,28 +547,29 @@ fun SchemaBrowserScreen(
                                         }
                                     }
                                 }
-                                
+
                                 val droppedConstraints = buildList<String> {
                                     // PK drop: if old PK existed but new doesn't or differs
-                                    if (oldTableDef.primaryKey != null && 
-                                        (tableDef.primaryKey == null || tableDef.primaryKey != oldTableDef.primaryKey)) {
+                                    if (oldTableDef.primaryKey != null &&
+                                        (tableDef.primaryKey == null || tableDef.primaryKey != oldTableDef.primaryKey)
+                                    ) {
                                         // Convention: {table}_pkey for PK constraint name
                                         add("${editingTable}_pkey")
                                     }
-                                    
+
                                     // Dropped FKs - Note: requires constraint names which may not be available
                                     // This is a limitation documented in the notepad
                                     oldTableDef.foreignKeys.forEach { oldFk ->
                                         val stillExists = tableDef.foreignKeys.any { newFk ->
-                                            newFk.columns == oldFk.columns && 
-                                            newFk.refTable == oldFk.refTable && 
-                                            newFk.refColumns == oldFk.refColumns
+                                            newFk.columns == oldFk.columns &&
+                                                newFk.refTable == oldFk.refTable &&
+                                                newFk.refColumns == oldFk.refColumns
                                         }
                                         if (!stillExists && oldFk.name != null) {
                                             add(oldFk.name!!)
                                         }
                                     }
-                                    
+
                                     // Dropped unique constraints - similar limitation
                                     oldTableDef.uniqueConstraints.forEachIndexed { idx, oldUnique ->
                                         val stillExists = tableDef.uniqueConstraints.any { it == oldUnique }
@@ -578,7 +579,7 @@ fun SchemaBrowserScreen(
                                         }
                                     }
                                 }
-                                
+
                                 // Compute index changes
                                 val addedIndexes = newIndexes.filter { newIdx ->
                                     existingIndexes.none { it.name == newIdx.name }
@@ -586,18 +587,18 @@ fun SchemaBrowserScreen(
                                 val droppedIndexes = existingIndexes.filter { oldIdx ->
                                     newIndexes.none { it.name == oldIdx.name }
                                 }.map { it.name }
-                                
+
                                 val changes = com.dbeagle.viewmodel.TableChanges(
                                     addedColumns = addedColumns,
                                     droppedColumns = droppedColumns,
                                     addedConstraints = addedConstraints,
                                     droppedConstraints = droppedConstraints,
                                     addedIndexes = addedIndexes,
-                                    droppedIndexes = droppedIndexes
+                                    droppedIndexes = droppedIndexes,
                                 )
                                 SchemaEditorViewModel.alterTableDDL(driver, editingTable!!, changes)
                             }
-                            
+
                             ddlResult.onSuccess { ddl ->
                                 previewDDL = ddl
                                 previewIsDestructive = false
@@ -625,7 +626,7 @@ fun SchemaBrowserScreen(
             val existingSeq = editingSequence?.let { seqName ->
                 schemaMetadata?.sequences?.find { it.name == seqName }
             }
-            
+
             SequenceEditorDialog(
                 existingSequence = existingSeq,
                 onDismiss = {
@@ -639,7 +640,7 @@ fun SchemaBrowserScreen(
                         editingSequence = null
                         return@SequenceEditorDialog
                     }
-                    
+
                     coroutineScope.launch {
                         try {
                             val isCreateMode = editingSequence == null
@@ -651,11 +652,11 @@ fun SchemaBrowserScreen(
                                     increment = if (seqMetadata.increment != oldSeq.increment) seqMetadata.increment else null,
                                     minValue = if (seqMetadata.minValue != oldSeq.minValue) seqMetadata.minValue else null,
                                     maxValue = if (seqMetadata.maxValue != oldSeq.maxValue) seqMetadata.maxValue else null,
-                                    restart = null
+                                    restart = null,
                                 )
                                 SchemaEditorViewModel.alterSequenceDDL(driver, editingSequence!!, changes)
                             }
-                            
+
                             ddlResult.onSuccess { ddl ->
                                 previewDDL = ddl
                                 previewIsDestructive = false
@@ -719,7 +720,7 @@ fun SchemaBrowserScreen(
                 },
             )
         }
-        
+
         if (showDDLError) {
             AlertDialog(
                 onDismissRequest = {

@@ -331,7 +331,7 @@ class SQLiteDriver : DatabaseDriver {
                         tableName = tableName,
                         columns = columns,
                         unique = unique,
-                        type = null
+                        type = null,
                     )
                 }.sortedBy { it.name }
             }

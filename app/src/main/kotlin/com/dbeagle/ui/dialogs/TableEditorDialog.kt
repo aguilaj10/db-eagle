@@ -85,12 +85,12 @@ fun TableEditorDialog(
             }
         }
     }
-    val indexes = remember { 
+    val indexes = remember {
         mutableStateListOf<IndexDefinition>().apply {
             addAll(existingIndexes)
         }
     }
-    
+
     var selectedTab by remember { mutableIntStateOf(0) }
     var validationError by remember { mutableStateOf<String?>(null) }
 
@@ -512,7 +512,7 @@ private fun ForeignKeyRow(
     var refColumns by remember { mutableStateOf(fk.refColumns.joinToString(", ")) }
     var onDeleteAction by remember { mutableStateOf(fk.onDelete ?: "") }
     var onUpdateAction by remember { mutableStateOf(fk.onUpdate ?: "") }
-    
+
     var refTableExpanded by remember { mutableStateOf(false) }
     var onDeleteExpanded by remember { mutableStateOf(false) }
     var onUpdateExpanded by remember { mutableStateOf(false) }
