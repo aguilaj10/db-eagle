@@ -306,7 +306,6 @@ fun main() {
                                         ConnectionManagerScreen(
                                             sessionViewModel = sessionViewModel,
                                             onStatusTextChanged = { statusText = it },
-                                            coroutineScope = appCoroutineScope,
                                             triggerNewConnection = triggerNewConnection,
                                             onNewConnectionTriggered = { triggerNewConnection = false },
                                         )
@@ -326,7 +325,6 @@ fun main() {
                                             onShowSaveFavoriteDialog = { showSaveFavoriteDialog = it },
                                             onFavoriteQueryDraftChange = { favoriteQueryDraft = it },
                                             favoritesRepository = favoritesRepository,
-                                            historyRepository = historyRepository,
                                             snackbarHostState = snackbarHostState,
                                             sessionStates = sessionStates,
                                         )

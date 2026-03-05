@@ -17,13 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.dbeagle.session.SessionViewModel
-import kotlinx.coroutines.CoroutineScope
 
 @Composable
 fun ConnectionManagerScreen(
     sessionViewModel: SessionViewModel,
     onStatusTextChanged: (String) -> Unit = {},
-    coroutineScope: CoroutineScope,
     triggerNewConnection: Boolean = false,
     onNewConnectionTriggered: () -> Unit = {},
 ) {
@@ -38,7 +36,6 @@ fun ConnectionManagerScreen(
             masterPassword = masterPassword!!,
             sessionViewModel = sessionViewModel,
             onStatusTextChanged = onStatusTextChanged,
-            coroutineScope = coroutineScope,
             triggerNewConnection = triggerNewConnection,
             onNewConnectionTriggered = onNewConnectionTriggered,
         )

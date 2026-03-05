@@ -20,89 +20,49 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dbeagle.driver.DataDrivers
-import com.dbeagle.driver.DatabaseDriver
-import com.dbeagle.driver.DatabaseDriverRegistry
-import com.dbeagle.error.ErrorHandler
-import com.dbeagle.model.ConnectionConfig
-import com.dbeagle.model.ConnectionProfile
-import com.dbeagle.pool.DatabaseConnectionPool
-import com.dbeagle.profile.PreferencesBackedConnectionProfileRepository
 import com.dbeagle.session.SessionViewModel
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.dbeagle.viewmodel.ConnectionListViewModel
+import org.koin.core.context.GlobalContext
+import org.koin.core.parameter.parametersOf
 
 @Composable
 fun ConnectionListScreen(
     masterPassword: String,
     sessionViewModel: SessionViewModel,
     onStatusTextChanged: (String) -> Unit,
-    coroutineScope: CoroutineScope,
     triggerNewConnection: Boolean = false,
     onNewConnectionTriggered: () -> Unit = {},
 ) {
-    val repository = remember(masterPassword) {
-        PreferencesBackedConnectionProfileRepository(
-            masterPasswordProvider = { masterPassword },
-        )
+    val viewModel: ConnectionListViewModel = remember(masterPassword) {
+        GlobalContext.get().get { parametersOf(masterPassword) }
     }
 
-    var profiles by remember { mutableStateOf<List<ConnectionProfile>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-
+    val uiState by viewModel.uiState.collectAsState()
     val connectedProfileIds by sessionViewModel.connectedProfileIds.collectAsState()
     val connectingProfileId by sessionViewModel.connectingProfileId.collectAsState()
 
-    var connectionErrorMessage by remember { mutableStateOf<String?>(null) }
-    var retryConnection by remember { mutableStateOf<ConnectionProfile?>(null) }
-
-    var showDialog by remember { mutableStateOf(false) }
-    var editingProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
-    var connectingJob by remember { mutableStateOf<Job?>(null) }
-
     LaunchedEffect(triggerNewConnection) {
         if (triggerNewConnection) {
-            editingProfile = null
-            showDialog = true
+            viewModel.showDialog(editingProfile = null)
             onNewConnectionTriggered()
-        }
-    }
-
-    fun refreshProfiles() {
-        coroutineScope.launch {
-            try {
-                isLoading = true
-                error = null
-                profiles = repository.loadAll().map { it.copy(encryptedPassword = "") }
-            } catch (e: Exception) {
-                error = "Failed to load profiles: ${e.message}"
-            } finally {
-                isLoading = false
-            }
         }
     }
 
     LaunchedEffect(Unit) {
         DataDrivers.registerAll()
-        refreshProfiles()
+        viewModel.refreshProfiles()
     }
 
     fun updateStatus() {
         val status = if (connectedProfileIds.isEmpty()) {
             "Status: Disconnected"
         } else {
-            val connectedNames = profiles
+            val connectedNames = uiState.profiles
                 .filter { connectedProfileIds.contains(it.id) }
                 .map { it.name }
             if (connectedNames.isNotEmpty()) {
@@ -114,7 +74,7 @@ fun ConnectionListScreen(
         onStatusTextChanged(status)
     }
 
-    LaunchedEffect(connectedProfileIds, profiles) {
+    LaunchedEffect(connectedProfileIds, uiState.profiles) {
         updateStatus()
     }
 
@@ -122,95 +82,10 @@ fun ConnectionListScreen(
         sessionViewModel.setActiveProfile(profileId)
     }
 
-    suspend fun connectToProfile(
-        profile: ConnectionProfile,
-        repository: PreferencesBackedConnectionProfileRepository,
-        sessionViewModel: SessionViewModel,
-        onStatusTextChanged: (String) -> Unit,
-        updateActiveConnection: (String?) -> Unit,
-        updateStatus: () -> Unit,
-        onError: (String, ConnectionProfile) -> Unit,
-    ) {
-        var driver: DatabaseDriver? = null
-        try {
-            val loaded = repository.load(profile.id)
-                ?: throw IllegalStateException("Profile not found")
-
-            val prototype = DatabaseDriverRegistry.getDriver(loaded.type)
-                ?: throw IllegalStateException(
-                    "No driver registered for type: ${loaded.type}",
-                )
-
-            driver = try {
-                prototype::class.java.getDeclaredConstructor().newInstance()
-            } catch (e: Exception) {
-                throw IllegalStateException(
-                    "Driver for type ${loaded.type} must have a no-arg constructor",
-                    e,
-                )
-            }
-
-            val password = loaded.encryptedPassword
-            val configProfile = loaded.copy(
-                options = loaded.options + ("password" to password),
-            )
-
-            onStatusTextChanged("Status: Connecting (${loaded.name})")
-
-            withContext(Dispatchers.IO) {
-                DatabaseConnectionPool.getConnection(loaded, password).use { _ -> }
-
-                driver!!.connect(ConnectionConfig(profile = configProfile))
-
-                try {
-                    driver.getSchema()
-                } catch (schemaError: Exception) {
-                    try {
-                        driver.disconnect()
-                    } catch (_: Exception) {
-                    } finally {
-                        DatabaseConnectionPool.closePool(loaded.id)
-                    }
-                    throw schemaError
-                }
-            }
-
-            sessionViewModel.openSession(
-                profileId = loaded.id,
-                profileName = loaded.name,
-                driver = driver!!,
-            )
-            updateActiveConnection(loaded.id)
-
-            onStatusTextChanged("Status: Connected (${loaded.name})")
-        } catch (_: CancellationException) {
-            try {
-                driver?.disconnect()
-            } catch (_: Exception) {}
-            DatabaseConnectionPool.closePool(profile.id)
-            updateStatus()
-        } catch (e: Exception) {
-            try {
-                driver?.disconnect()
-            } catch (_: Exception) {
-            }
-            DatabaseConnectionPool.closePool(profile.id)
-            updateStatus()
-            onError(
-                ErrorHandler.getConnectionErrorMessage(
-                    "Failed to connect: ${e.message}",
-                    e,
-                ),
-                profile,
-            )
-        }
-    }
-
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                editingProfile = null
-                showDialog = true
+                viewModel.showDialog(editingProfile = null)
             }) {
                 Icon(
                     Icons.Default.Add,
@@ -229,81 +104,69 @@ fun ConnectionListScreen(
             )
 
             Box(modifier = Modifier.fillMaxSize()) {
-                if (isLoading) {
+                if (uiState.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                } else if (error != null) {
+                } else if (uiState.error != null) {
                     Text(
-                        text = error ?: "",
+                        text = uiState.error ?: "",
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.align(Alignment.Center),
                     )
-                } else if (profiles.isEmpty()) {
+                } else if (uiState.profiles.isEmpty()) {
                     Text(
                         text = "No connections found. Click + to add one.",
                         modifier = Modifier.align(Alignment.Center),
                     )
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(profiles) { profile ->
+                        items(uiState.profiles) { profile ->
                             ConnectionRow(
                                 profile = profile,
                                 isConnected = connectedProfileIds.contains(profile.id),
                                 isConnecting = connectingProfileId == profile.id,
                                 isBusy = connectingProfileId != null,
                                 onCancelConnect = {
-                                    connectingJob?.cancel()
+                                    viewModel.cancelConnect()
                                 },
                                 onConnect = {
                                     if (connectingProfileId != null) return@ConnectionRow
-                                    connectingJob = coroutineScope.launch {
-                                        sessionViewModel.setConnecting(profile.id)
-                                        connectToProfile(
-                                            profile = profile,
-                                            repository = repository,
-                                            sessionViewModel = sessionViewModel,
-                                            onStatusTextChanged = onStatusTextChanged,
-                                            updateActiveConnection = ::updateActiveConnection,
-                                            updateStatus = ::updateStatus,
-                                        ) { msg, p ->
-                                            connectionErrorMessage = msg
-                                            retryConnection = p
-                                        }
-                                        sessionViewModel.setConnecting(null)
-                                        if (connectingJob?.isActive != true) {
-                                            connectingJob = null
-                                        }
-                                    }
+                                    viewModel.connect(
+                                        profile = profile,
+                                        onStatusTextChanged = onStatusTextChanged,
+                                        onSessionOpen = { profileId, profileName, driver ->
+                                            sessionViewModel.openSession(profileId, profileName, driver)
+                                            updateActiveConnection(profileId)
+                                        },
+                                        onSetConnecting = { profileId ->
+                                            sessionViewModel.setConnecting(profileId)
+                                        },
+                                    )
                                 },
                                 onDisconnect = {
                                     if (connectingProfileId != null) return@ConnectionRow
-                                    coroutineScope.launch {
-                                        sessionViewModel.setConnecting(profile.id)
-                                        try {
-                                            onStatusTextChanged("Status: Disconnecting (${profile.name})")
-                                            sessionViewModel.closeSession(profile.id)
-                                        } catch (_: Exception) {
-                                        } finally {
-                                            DatabaseConnectionPool.closePool(profile.id)
-                                            updateStatus()
-                                            sessionViewModel.setConnecting(null)
-                                        }
-                                    }
+                                    viewModel.disconnect(
+                                        profileId = profile.id,
+                                        profileName = profile.name,
+                                        onStatusTextChanged = onStatusTextChanged,
+                                        onSessionClose = { profileId ->
+                                            sessionViewModel.closeSession(profileId)
+                                        },
+                                        onSetConnecting = { profileId ->
+                                            sessionViewModel.setConnecting(profileId)
+                                        },
+                                        onUpdateStatus = ::updateStatus,
+                                    )
                                 },
                                 onEdit = {
-                                    editingProfile = profile
-                                    showDialog = true
+                                    viewModel.showDialog(editingProfile = profile)
                                 },
                                 onDelete = {
-                                    coroutineScope.launch {
-                                        repository.delete(profile.id)
-                                        try {
-                                            sessionViewModel.closeSession(profile.id)
-                                        } catch (_: Exception) {
-                                        }
-                                        DatabaseConnectionPool.closePool(profile.id)
-
-                                        refreshProfiles()
-                                    }
+                                    viewModel.deleteProfile(
+                                        profileId = profile.id,
+                                        onSessionClose = { profileId ->
+                                            sessionViewModel.closeSession(profileId)
+                                        },
+                                    )
                                 },
                             )
                         }
@@ -313,60 +176,36 @@ fun ConnectionListScreen(
         }
     }
 
-    if (showDialog) {
+    if (uiState.showDialog) {
         ConnectionDialog(
-            initialProfile = editingProfile,
-            onDismiss = { showDialog = false },
+            initialProfile = uiState.editingProfile,
+            onDismiss = { viewModel.hideDialog() },
             onSave = { updatedProfile, plaintextPassword ->
-                coroutineScope.launch {
-                    try {
-                        repository.save(updatedProfile, plaintextPassword)
-                        showDialog = false
-                        refreshProfiles()
-                    } catch (e: Exception) {
-                        connectionErrorMessage = ErrorHandler.getConnectionErrorMessage(
-                            "Failed to save profile: ${e.message}",
-                            e,
-                        )
-                        retryConnection = null
-                        showDialog = false
-                    }
-                }
+                viewModel.saveProfile(updatedProfile, plaintextPassword)
             },
         )
     }
 
-    if (connectionErrorMessage != null) {
+    if (uiState.connectionError != null) {
         AlertDialog(
             onDismissRequest = {
-                connectionErrorMessage = null
-                retryConnection = null
+                viewModel.clearConnectionError()
             },
             title = { Text("Connection Error") },
-            text = { Text(connectionErrorMessage ?: "") },
+            text = { Text(uiState.connectionError ?: "") },
             confirmButton = {
-                if (retryConnection != null) {
+                if (uiState.connectionErrorProfile != null) {
                     TextButton(onClick = {
-                        val profile = retryConnection
-                        connectionErrorMessage = null
-                        retryConnection = null
-                        if (profile != null) {
-                            connectingJob = coroutineScope.launch {
-                                sessionViewModel.setConnecting(profile.id)
-                                connectToProfile(
-                                    profile = profile,
-                                    repository = repository,
-                                    sessionViewModel = sessionViewModel,
-                                    onStatusTextChanged = onStatusTextChanged,
-                                    updateActiveConnection = ::updateActiveConnection,
-                                    updateStatus = ::updateStatus,
-                                ) { msg, p ->
-                                    connectionErrorMessage = msg
-                                    retryConnection = p
-                                }
-                                sessionViewModel.setConnecting(null)
-                            }
-                        }
+                        viewModel.retryConnection(
+                            onStatusTextChanged = onStatusTextChanged,
+                            onSessionOpen = { profileId, profileName, driver ->
+                                sessionViewModel.openSession(profileId, profileName, driver)
+                                updateActiveConnection(profileId)
+                            },
+                            onSetConnecting = { profileId ->
+                                sessionViewModel.setConnecting(profileId)
+                            },
+                        )
                     }) {
                         Text("Retry")
                     }
@@ -374,8 +213,7 @@ fun ConnectionListScreen(
             },
             dismissButton = {
                 TextButton(onClick = {
-                    connectionErrorMessage = null
-                    retryConnection = null
+                    viewModel.clearConnectionError()
                 }) {
                     Text("Cancel")
                 }

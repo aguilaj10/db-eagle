@@ -18,6 +18,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,23 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.dbeagle.driver.DatabaseDriver
-import com.dbeagle.edit.InlineUpdate
 import com.dbeagle.error.ErrorHandler
-import com.dbeagle.export.CsvExporter
-import com.dbeagle.export.JsonExporter
-import com.dbeagle.export.SqlExporter
 import com.dbeagle.favorites.FileFavoritesRepository
-import com.dbeagle.history.FileQueryHistoryRepository
-import com.dbeagle.model.QueryHistoryEntry
-import com.dbeagle.model.QueryResult
-import com.dbeagle.query.QueryExecutor
 import com.dbeagle.session.SessionViewModel
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import com.dbeagle.viewmodel.QueryEditorViewModel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
+import org.koin.core.context.GlobalContext
 
 @Composable
 fun QueryEditorScreen(
@@ -60,15 +50,12 @@ fun QueryEditorScreen(
     onShowSaveFavoriteDialog: (Boolean) -> Unit,
     onFavoriteQueryDraftChange: (String) -> Unit,
     favoritesRepository: FileFavoritesRepository,
-    historyRepository: FileQueryHistoryRepository,
     snackbarHostState: SnackbarHostState,
     sessionStates: Map<String, SessionViewModel.SessionUiState>,
 ) {
+    val viewModel: QueryEditorViewModel = remember { GlobalContext.get().get() }
     val coroutineScope = rememberCoroutineScope()
-    var isRunning by remember(activeProfileId) { mutableStateOf(false) }
-    var queryJob by remember(activeProfileId) { mutableStateOf<Job?>(null) }
-    var editError by remember(activeProfileId) { mutableStateOf<String?>(null) }
-    var showExportDialog by remember(activeProfileId) { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsState()
 
     val sqlText = activeSession?.queryEditorSql ?: scratchSql
     val lastExecutedSql = activeSession?.lastExecutedSql
@@ -76,47 +63,31 @@ fun QueryEditorScreen(
     val columns = activeSession?.resultColumns ?: emptyList()
     val rows = activeSession?.resultRows ?: emptyList()
 
-    if (showExportDialog) {
+    if (uiState.showExportDialog) {
         ExportDialog(
-            onDismiss = { showExportDialog = false },
+            onDismiss = { viewModel.hideExportDialog() },
             onExportRequested = { format, path, onProgress ->
-                if (lastQueryResult == null) {
-                    onStatusTextChanged("Status: No query result to export")
-                    return@ExportDialog
-                }
-
-                try {
-                    val outputFile = File(path)
-                    val exporter = when (format) {
-                        ExportFormat.CSV -> CsvExporter()
-                        ExportFormat.JSON -> JsonExporter()
-                        ExportFormat.SQL -> SqlExporter()
-                    }
-                    exporter.export(
-                        outputFile,
-                        lastQueryResult,
-                        lastQueryResult.resultSet,
-                    ) { rowCount, isDone ->
-                        onProgress(rowCount, isDone)
-                        if (isDone) {
-                            onStatusTextChanged("Status: Exported $rowCount rows to $path")
-                        }
-                    }
-                } catch (e: Exception) {
-                    onStatusTextChanged("Status: Export failed: ${e.message}")
+                coroutineScope.launch {
+                    viewModel.exportResults(
+                        format = format,
+                        path = path,
+                        lastQueryResult = lastQueryResult,
+                        onStatusChanged = onStatusTextChanged,
+                        onProgress = onProgress,
+                    )
                 }
             },
         )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        if (editError != null) {
+        if (uiState.editError != null) {
             AlertDialog(
-                onDismissRequest = { editError = null },
+                onDismissRequest = { viewModel.clearEditError() },
                 title = { Text("Edit Error") },
-                text = { Text(editError ?: "") },
+                text = { Text(uiState.editError ?: "") },
                 confirmButton = {
-                    TextButton(onClick = { editError = null }) {
+                    TextButton(onClick = { viewModel.clearEditError() }) {
                         Text("OK")
                     }
                 },
@@ -134,85 +105,45 @@ fun QueryEditorScreen(
                 }
             },
             onCancel = {
-                queryJob?.cancel()
-                isRunning = false
-                onStatusTextChanged("Status: Query canceled")
+                viewModel.cancelQuery(onStatusTextChanged)
             },
             onRun = {
-                if (isRunning) return@SQLEditor
+                if (uiState.isRunning) return@SQLEditor
                 if (activeDriver == null) {
                     onStatusTextChanged("Status: No active connection")
                     return@SQLEditor
                 }
 
-                queryJob = coroutineScope.launch {
-                    isRunning = true
-                    val name = activeProfileName ?: "Connection"
-                    onStatusTextChanged("Status: Running query ($name)")
+                val pid = activeProfileId
+                if (pid == null) {
+                    onStatusTextChanged("Status: No active connection")
+                    return@SQLEditor
+                }
 
-                    val pid = activeProfileId
-                    if (pid == null) {
-                        onStatusTextChanged("Status: No active connection")
-                        isRunning = false
-                        return@launch
-                    }
+                sessionViewModel.clearQueryResult(pid)
 
-                    sessionViewModel.clearQueryResult(pid)
+                val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
 
-                    val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
-
-                    val startNs = System.nanoTime()
-                    try {
-                        val r = withContext(Dispatchers.IO) { QueryExecutor(activeDriver).execute(sqlToRun) }
-                        when (r) {
-                            is QueryResult.Success -> {
-                                sessionViewModel.recordQueryResult(pid, sqlToRun, r)
-                                val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                onStatusTextChanged("Status: ${r.rows.size} row(s) in ${durationMs}ms")
-
-                                historyRepository.add(
-                                    QueryHistoryEntry(
-                                        query = sqlToRun,
-                                        durationMs = durationMs,
-                                        connectionProfileId = pid,
-                                    ),
-                                )
-                            }
-                            is QueryResult.Error -> {
-                                val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                                onStatusTextChanged("Status: Error in ${durationMs}ms: ${r.message}")
-                                ErrorHandler.showQueryError(
-                                    snackbarHostState,
-                                    coroutineScope,
-                                    "Query error: ${r.message}",
-                                )
-
-                                historyRepository.add(
-                                    QueryHistoryEntry(
-                                        query = sqlToRun,
-                                        durationMs = durationMs,
-                                        connectionProfileId = pid,
-                                    ),
-                                )
-                            }
-                        }
-                    } catch (_: CancellationException) {
-                        onStatusTextChanged("Status: Query canceled")
-                    } catch (e: Exception) {
-                        val durationMs = (System.nanoTime() - startNs) / 1_000_000
-                        onStatusTextChanged("Status: Error in ${durationMs}ms: ${e.message ?: "Error"}")
+                viewModel.executeQuery(
+                    sqlToRun = sqlToRun,
+                    driver = activeDriver,
+                    profileId = pid,
+                    profileName = activeProfileName ?: "Connection",
+                    onStatusChanged = onStatusTextChanged,
+                    onQuerySuccess = { result, _ ->
+                        sessionViewModel.recordQueryResult(pid, sqlToRun, result)
+                    },
+                    onQueryError = { message, exception ->
                         ErrorHandler.showQueryError(
                             snackbarHostState,
                             coroutineScope,
-                            "Query error: ${e.message ?: "Unknown error"}",
-                            e,
+                            "Query error: $message",
+                            exception,
                         )
-                    } finally {
-                        isRunning = false
-                    }
-                }
+                    },
+                )
             },
-            isRunning = isRunning,
+            isRunning = uiState.isRunning,
             onClear = {
                 val pid = activeProfileId
                 if (pid == null) onScratchSqlChange("") else sessionViewModel.updateQueryEditorSql(pid, "")
@@ -231,7 +162,7 @@ fun QueryEditorScreen(
             horizontalArrangement = Arrangement.End,
         ) {
             Button(
-                onClick = { showExportDialog = true },
+                onClick = { viewModel.showExportDialog() },
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp),
             ) {
@@ -251,58 +182,15 @@ fun QueryEditorScreen(
                     return@ResultGrid Result.failure(IllegalStateException("No active connection"))
                 }
 
-                val lastSql = lastExecutedSql
-                val table = lastSql?.let { InlineUpdate.inferTableNameFromSelectAll(it) }
-                if (table.isNullOrBlank()) {
-                    val msg = "Inline edit requires last query like: SELECT * FROM <table>"
-                    editError = msg
-                    return@ResultGrid Result.failure(IllegalStateException(msg))
-                }
-
-                val idIndex = columns.indexOfFirst { it.equals("id", ignoreCase = true) }
-                if (idIndex < 0) {
-                    val msg = "Inline edit requires an 'id' column in result set"
-                    editError = msg
-                    return@ResultGrid Result.failure(IllegalStateException(msg))
-                }
-
-                val idValue = rowSnapshot.getOrNull(idIndex)
-                if (idValue.isNullOrBlank()) {
-                    val msg = "Inline edit requires a non-empty id value"
-                    editError = msg
-                    return@ResultGrid Result.failure(IllegalStateException(msg))
-                }
-
-                val stmt = InlineUpdate.buildUpdateById(
-                    table = table,
-                    column = columnName,
-                    value = newValue,
-                    id = idValue,
+                viewModel.executeInlineEdit(
+                    driver = driver,
+                    lastExecutedSql = lastExecutedSql,
+                    columns = columns,
+                    columnName = columnName,
+                    newValue = newValue,
+                    rowSnapshot = rowSnapshot,
+                    onStatusChanged = onStatusTextChanged,
                 )
-
-                val r = try {
-                    withContext(Dispatchers.IO) { QueryExecutor(driver).execute(stmt.sql, stmt.params) }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    val msg = e.message ?: "Unknown error"
-                    editError = msg
-                    onStatusTextChanged("Status: Update failed: $msg")
-                    return@ResultGrid Result.failure(IllegalStateException(msg))
-                }
-
-                when (r) {
-                    is QueryResult.Success -> {
-                        onStatusTextChanged("Status: Updated $table.$columnName for id=$idValue")
-                        Result.success(Unit)
-                    }
-                    is QueryResult.Error -> {
-                        val msg = r.message
-                        editError = msg
-                        onStatusTextChanged("Status: Update failed: $msg")
-                        Result.failure(IllegalStateException(msg))
-                    }
-                }
             },
         )
     }

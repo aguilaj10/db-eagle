@@ -1,14 +1,14 @@
 package com.dbeagle.di
 
+import com.dbeagle.viewmodel.ConnectionListViewModel
+import com.dbeagle.viewmodel.QueryEditorViewModel
+import org.koin.core.parameter.parametersOf
 import org.koin.dsl.module
 
-/**
- * ViewModel module for Koin dependency injection.
- * Provides bindings for ViewModels.
- *
- * ViewModels will be added in later tasks.
- */
 val viewModelModule =
     module {
-        // ViewModel definitions will be added here
+        factory { (masterPassword: String) ->
+            ConnectionListViewModel(get { parametersOf(masterPassword) })
+        }
+        factory { QueryEditorViewModel(get()) }
     }
