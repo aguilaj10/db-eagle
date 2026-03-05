@@ -13,8 +13,8 @@ import com.dbeagle.model.TableMetadata
 import com.dbeagle.pool.DatabaseConnectionPool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.io.PrintWriter
 import java.sql.Connection
 import java.sql.DatabaseMetaData
@@ -130,7 +130,6 @@ class PostgreSQLDriver : DatabaseDriver {
 
     override suspend fun getTables(): List<String> {
         val db = database ?: return emptyList()
-        val cfg = config!!
         return withContext(Dispatchers.IO) {
             transaction(db) {
                 val jdbc = connection.connection as Connection
@@ -147,7 +146,6 @@ class PostgreSQLDriver : DatabaseDriver {
 
     override suspend fun getColumns(table: String): List<ColumnMetadata> {
         val db = database ?: return emptyList()
-        val cfg = config!!
 
         return withContext(Dispatchers.IO) {
             transaction(db) {
@@ -176,7 +174,6 @@ class PostgreSQLDriver : DatabaseDriver {
 
     override suspend fun getForeignKeys(): List<ForeignKeyRelationship> {
         val db = database ?: return emptyList()
-        val cfg = config!!
 
         return withContext(Dispatchers.IO) {
             transaction(db) {
@@ -252,7 +249,6 @@ class PostgreSQLDriver : DatabaseDriver {
 
     override suspend fun getSequences(): List<SequenceMetadata> {
         val db = database ?: return emptyList()
-        val cfg = config!!
 
         return withContext(Dispatchers.IO) {
             transaction(db) {
@@ -336,7 +332,6 @@ class PostgreSQLDriver : DatabaseDriver {
 
     override suspend fun getIndexDetails(tableName: String): List<IndexMetadata> {
         val db = database ?: return emptyList()
-        val cfg = config!!
 
         return withContext(Dispatchers.IO) {
             transaction(db) {
@@ -401,7 +396,6 @@ class PostgreSQLDriver : DatabaseDriver {
 
     private suspend fun getViews(): List<String> {
         val db = database ?: return emptyList()
-        val cfg = config!!
         return withContext(Dispatchers.IO) {
             transaction(db) {
                 val jdbc = connection.connection as Connection
@@ -418,7 +412,6 @@ class PostgreSQLDriver : DatabaseDriver {
 
     private suspend fun getIndexes(): List<String> {
         val db = database ?: return emptyList()
-        val cfg = config!!
 
         return withContext(Dispatchers.IO) {
             transaction(db) {
@@ -447,7 +440,6 @@ class PostgreSQLDriver : DatabaseDriver {
 
     private suspend fun getPrimaryKeyColumns(table: String): List<String> {
         val db = database ?: return emptyList()
-        val cfg = config!!
 
         return withContext(Dispatchers.IO) {
             transaction(db) {
@@ -488,7 +480,7 @@ private class PoolBackedDataSource(
     override fun getParentLogger(): Logger = Logger
         .getGlobal()
 
-    override fun <T : Any?> unwrap(iface: Class<T>?): T = throw SQLFeatureNotSupportedException()
+    override fun <T> unwrap(iface: Class<T>?): T = throw SQLFeatureNotSupportedException()
 
     override fun isWrapperFor(iface: Class<*>?): Boolean = false
 }

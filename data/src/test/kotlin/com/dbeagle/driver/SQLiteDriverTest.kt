@@ -159,11 +159,9 @@ class SQLiteDriverTest {
         val emailIndex = usersIndexes.find { it.name == "idx_users_email" }
         assertTrue(emailIndex != null, "Expected idx_users_email index")
 
-        if (emailIndex != null) {
-            assertEquals("users", emailIndex.tableName)
-            assertEquals(listOf("email"), emailIndex.columns)
-            assertEquals(false, emailIndex.unique)
-        }
+        assertEquals("users", emailIndex.tableName)
+        assertEquals(listOf("email"), emailIndex.columns)
+        assertEquals(false, emailIndex.unique)
     }
 
     @Test
@@ -172,18 +170,14 @@ class SQLiteDriverTest {
         val usersTable = schema.tables.find { it.name == "users" }
         assertTrue(usersTable != null, "Expected users table in schema")
 
-        if (usersTable != null) {
-            assertTrue(usersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
-            assertEquals(listOf("id"), usersTable.primaryKey)
-        }
+        assertTrue(usersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+        assertEquals(listOf("id"), usersTable.primaryKey)
 
         val ordersTable = schema.tables.find { it.name == "orders" }
         assertTrue(ordersTable != null, "Expected orders table in schema")
 
-        if (ordersTable != null) {
-            assertTrue(ordersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
-            assertEquals(listOf("id"), ordersTable.primaryKey)
-        }
+        assertTrue(ordersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+        assertEquals(listOf("id"), ordersTable.primaryKey)
     }
 }
 
