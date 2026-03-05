@@ -1050,19 +1050,19 @@ Max Concurrent: 7 (Wave 1)
 
 ## Final Verification Wave
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   Read the plan end-to-end. For each "Must Have": verify implementation exists. For each "Must NOT Have": search codebase for forbidden patterns. Check evidence files exist in `.sisyphus/evidence/`. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   Run `./gradlew build test detekt spotlessCheck`. Review all changed files for: wildcard imports remaining, inline package refs, files >400 lines. Check for AI slop patterns.
   Output: `Build [PASS/FAIL] | Detekt [PASS/FAIL] | Spotless [PASS/FAIL] | Files [N clean/N issues] | VERDICT`
 
-- [ ] F3. **Full Application QA** — `unspecified-high`
+- [x] F3. **Full Application QA** — `unspecified-high`
   Start the application with `./gradlew run`. Verify all tabs work (Connections, Query Editor, Schema Browser, Favorites, History, Settings). Test connecting to a database, running queries, and viewing results.
   Output: `App Launch [PASS/FAIL] | Tabs [N/N working] | Core Features [N/N] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read "What to do", read actual git diff. Verify 1:1 correspondence. Check "Must NOT do" compliance. Detect scope creep. Flag unaccounted changes.
   Output: `Tasks [N/N compliant] | Scope Creep [CLEAN/N issues] | VERDICT`
 
