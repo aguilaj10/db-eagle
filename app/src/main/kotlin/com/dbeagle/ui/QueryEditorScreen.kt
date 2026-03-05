@@ -29,8 +29,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.error.ErrorHandler
-import com.dbeagle.favorites.FileFavoritesRepository
+import com.dbeagle.model.FavoriteQuery
 import com.dbeagle.session.SessionViewModel
+import com.dbeagle.viewmodel.FavoritesViewModel
 import com.dbeagle.viewmodel.QueryEditorViewModel
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
@@ -45,23 +46,39 @@ fun QueryEditorScreen(
     scratchSql: String,
     onScratchSqlChange: (String) -> Unit,
     onStatusTextChanged: (String) -> Unit,
-    favoriteQueryDraft: String,
-    showSaveFavoriteDialog: Boolean,
-    onShowSaveFavoriteDialog: (Boolean) -> Unit,
-    onFavoriteQueryDraftChange: (String) -> Unit,
-    favoritesRepository: FileFavoritesRepository,
     snackbarHostState: SnackbarHostState,
     sessionStates: Map<String, SessionViewModel.SessionUiState>,
 ) {
     val viewModel: QueryEditorViewModel = remember { GlobalContext.get().get() }
+    val favoritesViewModel: FavoritesViewModel = remember { GlobalContext.get().get() }
     val coroutineScope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
+
+    var showSaveFavoriteDialog by remember { mutableStateOf(false) }
+    var favoriteQueryDraft by remember { mutableStateOf("") }
 
     val sqlText = activeSession?.queryEditorSql ?: scratchSql
     val lastExecutedSql = activeSession?.lastExecutedSql
     val lastQueryResult = activeSession?.lastQueryResult
     val columns = activeSession?.resultColumns ?: emptyList()
     val rows = activeSession?.resultRows ?: emptyList()
+
+    if (showSaveFavoriteDialog) {
+        SaveFavoriteDialog(
+            initialQuery = favoriteQueryDraft,
+            onDismiss = { showSaveFavoriteDialog = false },
+            onSave = { name, tags ->
+                val favorite = FavoriteQuery(
+                    name = name,
+                    query = favoriteQueryDraft,
+                    tags = tags,
+                )
+                favoritesViewModel.saveFavorite(favorite)
+                onStatusTextChanged("Status: Saved to favorites")
+                showSaveFavoriteDialog = false
+            },
+        )
+    }
 
     if (uiState.showExportDialog) {
         ExportDialog(
@@ -149,8 +166,8 @@ fun QueryEditorScreen(
                 if (pid == null) onScratchSqlChange("") else sessionViewModel.updateQueryEditorSql(pid, "")
             },
             onSaveToFavorites = {
-                onFavoriteQueryDraftChange(sqlText)
-                onShowSaveFavoriteDialog(true)
+                favoriteQueryDraft = sqlText
+                showSaveFavoriteDialog = true
             },
             modifier = Modifier.weight(0.4f),
         )

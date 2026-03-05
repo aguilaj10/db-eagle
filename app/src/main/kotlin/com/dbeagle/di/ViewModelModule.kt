@@ -1,5 +1,6 @@
 package com.dbeagle.di
 
+import com.dbeagle.session.SessionViewModel
 import com.dbeagle.viewmodel.ConnectionListViewModel
 import com.dbeagle.viewmodel.FavoritesViewModel
 import com.dbeagle.viewmodel.HistoryViewModel
@@ -10,6 +11,7 @@ import org.koin.dsl.module
 
 val viewModelModule =
     module {
+        single { SessionViewModel() }
         factory { (masterPassword: String) ->
             ConnectionListViewModel(get { parametersOf(masterPassword) })
         }

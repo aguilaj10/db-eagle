@@ -50,9 +50,6 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.dbeagle.crash.CrashReporter
 import com.dbeagle.di.appModule
-import com.dbeagle.favorites.FileFavoritesRepository
-import com.dbeagle.history.FileQueryHistoryRepository
-import com.dbeagle.model.FavoriteQuery
 import com.dbeagle.navigation.NavigationTab
 import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.session.SessionViewModel
@@ -61,12 +58,12 @@ import com.dbeagle.ui.ConnectionManagerScreen
 import com.dbeagle.ui.FavoritesScreen
 import com.dbeagle.ui.HistoryScreen
 import com.dbeagle.ui.QueryEditorScreen
-import com.dbeagle.ui.SaveFavoriteDialog
 import com.dbeagle.ui.SchemaBrowserScreen
 import com.dbeagle.ui.SettingsScreen
 import com.dbeagle.ui.readMemoryStats
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 import org.slf4j.LoggerFactory
 
@@ -84,7 +81,7 @@ fun main() {
         var selectedTab by remember { mutableStateOf(NavigationTab.Connections) }
         var statusText by remember { mutableStateOf("Status: Disconnected") }
 
-        val sessionViewModel = remember { SessionViewModel() }
+        val sessionViewModel: SessionViewModel = GlobalContext.get().get()
         val sessionOrder by sessionViewModel.sessionOrder.collectAsState()
         val sessionStates by sessionViewModel.sessionStates.collectAsState()
         val activeProfileId by sessionViewModel.activeProfileId.collectAsState()
@@ -105,32 +102,11 @@ fun main() {
         }
 
         var scratchSql by remember { mutableStateOf(SessionViewModel.DEFAULT_SQL) }
-        var favoriteQueryDraft by remember { mutableStateOf("") }
 
         val appCoroutineScope = rememberCoroutineScope()
         val snackbarHostState = remember { SnackbarHostState() }
 
-        val historyRepository = remember { FileQueryHistoryRepository() }
-        val favoritesRepository = remember { FileFavoritesRepository() }
-        var showSaveFavoriteDialog by remember { mutableStateOf(false) }
         var triggerNewConnection by remember { mutableStateOf(false) }
-
-        if (showSaveFavoriteDialog) {
-            SaveFavoriteDialog(
-                initialQuery = favoriteQueryDraft,
-                onDismiss = { showSaveFavoriteDialog = false },
-                onSave = { name, tags ->
-                    val favorite = FavoriteQuery(
-                        name = name,
-                        query = favoriteQueryDraft,
-                        tags = tags,
-                    )
-                    favoritesRepository.save(favorite)
-                    statusText = "Status: Saved to favorites"
-                    showSaveFavoriteDialog = false
-                },
-            )
-        }
 
         Window(
             onCloseRequest = ::exitApplication,
@@ -320,11 +296,6 @@ fun main() {
                                             scratchSql = scratchSql,
                                             onScratchSqlChange = { scratchSql = it },
                                             onStatusTextChanged = { statusText = it },
-                                            favoriteQueryDraft = favoriteQueryDraft,
-                                            showSaveFavoriteDialog = showSaveFavoriteDialog,
-                                            onShowSaveFavoriteDialog = { showSaveFavoriteDialog = it },
-                                            onFavoriteQueryDraftChange = { favoriteQueryDraft = it },
-                                            favoritesRepository = favoritesRepository,
                                             snackbarHostState = snackbarHostState,
                                             sessionStates = sessionStates,
                                         )
