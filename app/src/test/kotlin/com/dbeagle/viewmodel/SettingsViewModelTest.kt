@@ -2,6 +2,7 @@ package com.dbeagle.viewmodel
 
 import com.dbeagle.settings.AppPreferences
 import com.dbeagle.settings.AppSettings
+import com.dbeagle.theme.ThemeManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
@@ -13,8 +14,11 @@ import kotlin.test.assertNull
 
 class SettingsViewModelTest {
 
+    private lateinit var themeManager: ThemeManager
+
     @BeforeTest
     fun setup() {
+        themeManager = ThemeManager()
         AppPreferences.save(AppSettings())
     }
 
@@ -33,7 +37,7 @@ class SettingsViewModelTest {
         )
         AppPreferences.save(customSettings)
 
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
         val state = viewModel.uiState.value
 
         assertEquals(500, state.settings.resultLimit, "Should load custom resultLimit")
@@ -49,7 +53,7 @@ class SettingsViewModelTest {
 
     @Test
     fun updateResultLimit_updatesInputState() {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateResultLimit("2000")
 
@@ -59,7 +63,7 @@ class SettingsViewModelTest {
 
     @Test
     fun updateQueryTimeout_updatesInputState() {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateQueryTimeout("120")
 
@@ -69,7 +73,7 @@ class SettingsViewModelTest {
 
     @Test
     fun updateConnectionTimeout_updatesInputState() {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateConnectionTimeout("60")
 
@@ -79,7 +83,7 @@ class SettingsViewModelTest {
 
     @Test
     fun updateMaxConnections_updatesInputState() {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateMaxConnections("20")
 
@@ -89,7 +93,7 @@ class SettingsViewModelTest {
 
     @Test
     fun saveSettings_withValidInput_savesSuccessfully() = runBlocking {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateResultLimit("750")
         viewModel.updateQueryTimeout("75")
@@ -116,7 +120,7 @@ class SettingsViewModelTest {
 
     @Test
     fun saveSettings_withNonNumericInput_setsErrorMessage() = runBlocking {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateResultLimit("not-a-number")
         viewModel.saveSettings()
@@ -134,7 +138,7 @@ class SettingsViewModelTest {
 
     @Test
     fun saveSettings_withEmptyInput_setsErrorMessage() = runBlocking {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateQueryTimeout("")
         viewModel.saveSettings()
@@ -147,7 +151,7 @@ class SettingsViewModelTest {
 
     @Test
     fun saveSettings_withNegativeValue_setsValidationError() = runBlocking {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateResultLimit("-100")
         viewModel.saveSettings()
@@ -165,7 +169,7 @@ class SettingsViewModelTest {
 
     @Test
     fun saveSettings_withZeroValue_setsValidationError() = runBlocking {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateMaxConnections("0")
         viewModel.saveSettings()
@@ -183,7 +187,7 @@ class SettingsViewModelTest {
 
     @Test
     fun resetToDefaults_resetsAllFieldsToDefaults() = runBlocking {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateResultLimit("9999")
         viewModel.updateQueryTimeout("999")
@@ -259,7 +263,7 @@ class SettingsViewModelTest {
 
     @Test
     fun resetToDefaults_clearsPreviousErrorMessage() = runBlocking {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.updateResultLimit("invalid")
         viewModel.saveSettings()
@@ -275,7 +279,7 @@ class SettingsViewModelTest {
 
     @Test
     fun refreshPoolStats_updatesPoolCountAndStats() = runBlocking {
-        val viewModel = SettingsViewModel()
+        val viewModel = SettingsViewModel(themeManager)
 
         viewModel.refreshPoolStats()
         delay(100)

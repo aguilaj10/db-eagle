@@ -3,6 +3,7 @@ package com.dbeagle.viewmodel
 import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.settings.AppPreferences
 import com.dbeagle.settings.AppSettings
+import com.dbeagle.theme.ThemeManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,7 +13,9 @@ import kotlinx.coroutines.launch
  * ViewModel for managing application settings and pool statistics.
  * Handles settings persistence, validation, and debug pool info display.
  */
-class SettingsViewModel : BaseViewModel() {
+class SettingsViewModel(
+    private val themeManager: ThemeManager
+) : BaseViewModel() {
 
     /**
      * UI state for the settings screen.
@@ -30,6 +33,12 @@ class SettingsViewModel : BaseViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    val darkMode: StateFlow<Boolean> = themeManager.darkMode
+
+    fun setDarkMode(enabled: Boolean) {
+        themeManager.setDarkMode(enabled)
+    }
 
     init {
         refreshPoolStats()
