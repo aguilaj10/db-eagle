@@ -3,27 +3,20 @@ build:
 
 complexity:
   LongMethod:
-    threshold: 80
+    threshold: 30
   LongParameterList:
-    functionThreshold: 12
-    constructorThreshold: 12
+    functionThreshold: 6
+    constructorThreshold: 6
   TooManyFunctions:
-    thresholdInFiles: 30
-    thresholdInClasses: 30
+    thresholdInFiles: 10
+    thresholdInClasses: 10
 
 style:
   MaxLineLength:
     maxLineLength: 120
   WildcardImport:
     active: true
-  MagicNumber:
-    ignoreNumbers:
-      - '-1'
-      - '0'
-      - '1'
-      - '2'
-      - '100'
 
 naming:
   FunctionNaming:
-    functionPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    functionPattern: "[a-zA-Z][a-zA-Z0-9]*"
