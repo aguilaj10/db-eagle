@@ -40,6 +40,8 @@ import com.dbeagle.session.SessionViewModel
 import com.dbeagle.ui.dialogs.DDLPreviewDialog
 import com.dbeagle.ui.dialogs.SequenceEditorDialog
 import com.dbeagle.ui.dialogs.TableEditorDialog
+import com.dbeagle.viewmodel.DDLExecutionException
+import com.dbeagle.viewmodel.SchemaEditorViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -66,6 +68,9 @@ fun SchemaBrowserScreen(
     var showDDLPreview by remember { mutableStateOf(false) }
     var previewDDL by remember { mutableStateOf("") }
     var previewIsDestructive by remember { mutableStateOf(false) }
+    var pendingDDLExecution by remember { mutableStateOf<suspend () -> Result<Unit>>({ Result.success(Unit) }) }
+    var showDDLError by remember { mutableStateOf(false) }
+    var ddlErrorMessage by remember { mutableStateOf("") }
 
     val ttlMs = 5 * 60 * 1000L
     val pid = activeProfileId
@@ -392,9 +397,21 @@ fun SchemaBrowserScreen(
                     showSequenceEditor = true
                 },
                 onDropSequence = { sequenceName ->
-                    previewDDL = "DROP SEQUENCE \"$sequenceName\";"
-                    previewIsDestructive = true
-                    showDDLPreview = true
+                    val driver = activeDriver ?: return@SchemaTree
+                    coroutineScope.launch {
+                        val ddlResult = SchemaEditorViewModel.dropSequenceDDL(driver, sequenceName, ifExists = true)
+                        ddlResult.onSuccess { ddl ->
+                            previewDDL = ddl
+                            previewIsDestructive = true
+                            pendingDDLExecution = {
+                                SchemaEditorViewModel.executeSequenceDrop(driver, ddl)
+                            }
+                            showDDLPreview = true
+                        }.onFailure { error ->
+                            ddlErrorMessage = error.message ?: "Failed to generate DROP DDL"
+                            showDDLError = true
+                        }
+                    }
                 },
             )
         }
@@ -438,10 +455,39 @@ fun SchemaBrowserScreen(
                     editingSequence = null
                 },
                 onSave = { seqMetadata ->
-                    // TODO: Generate DDL and show preview (Task 28)
-                    showSequenceEditor = false
-                    editingSequence = null
-                    println("App: Save sequence -> ${seqMetadata.name}")
+                    val driver = activeDriver
+                    if (driver == null) {
+                        showSequenceEditor = false
+                        editingSequence = null
+                        return@SequenceEditorDialog
+                    }
+                    
+                    coroutineScope.launch {
+                        try {
+                            val isCreateMode = editingSequence == null
+                            val ddlResult = if (isCreateMode) {
+                                SchemaEditorViewModel.createSequenceDDL(driver, seqMetadata)
+                            } else {
+                                SchemaEditorViewModel.createSequenceDDL(driver, seqMetadata)
+                            }
+                            
+                            ddlResult.onSuccess { ddl ->
+                                previewDDL = ddl
+                                previewIsDestructive = false
+                                pendingDDLExecution = {
+                                    SchemaEditorViewModel.executeSequenceCreate(driver, ddl)
+                                }
+                                showDDLPreview = true
+                                showSequenceEditor = false
+                            }.onFailure { error ->
+                                ddlErrorMessage = error.message ?: "Failed to generate DDL"
+                                showDDLError = true
+                            }
+                        } catch (e: Exception) {
+                            ddlErrorMessage = e.message ?: "Unknown error"
+                            showDDLError = true
+                        }
+                    }
                 },
             )
         }
@@ -454,8 +500,53 @@ fun SchemaBrowserScreen(
                     showDDLPreview = false
                 },
                 onExecute = {
-                    // TODO: Execute DDL via driver (Task 30)
-                    println("App: Execute DDL -> $previewDDL")
+                    coroutineScope.launch {
+                        val name = activeProfileName ?: "Connection"
+                        onStatusTextChanged("Status: Executing DDL ($name)")
+                        try {
+                            val result = pendingDDLExecution()
+                            result.onSuccess {
+                                onStatusTextChanged("Status: DDL executed successfully ($name)")
+                                showDDLPreview = false
+                                editingSequence = null
+                                forceRefresh()
+                                ensureSchemaLoaded(force = true)
+                            }.onFailure { error ->
+                                onStatusTextChanged("Status: DDL execution failed")
+                                showDDLPreview = false
+                                ddlErrorMessage = if (error is DDLExecutionException) {
+                                    "${error.userError.title}: ${error.userError.description}\n${error.userError.suggestion}"
+                                } else {
+                                    error.message ?: "Unknown error"
+                                }
+                                showDDLError = true
+                            }
+                        } catch (e: Exception) {
+                            onStatusTextChanged("Status: DDL execution failed")
+                            showDDLPreview = false
+                            ddlErrorMessage = e.message ?: "Unknown error"
+                            showDDLError = true
+                        }
+                    }
+                },
+            )
+        }
+        
+        if (showDDLError) {
+            AlertDialog(
+                onDismissRequest = {
+                    showDDLError = false
+                    ddlErrorMessage = ""
+                },
+                title = { Text("DDL Error") },
+                text = { Text(ddlErrorMessage) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showDDLError = false
+                        ddlErrorMessage = ""
+                    }) {
+                        Text("OK")
+                    }
                 },
             )
         }

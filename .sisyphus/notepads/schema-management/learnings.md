@@ -936,3 +936,83 @@ val tableDefinition = TableDefinition(
 - Task 27: Generate DDL for CREATE/ALTER TABLE with all constraints
 - Task 28: Generate DDL for CREATE INDEX statements
 - Validation: FK target table exists, target columns exist, FK columns match ref columns count
+
+
+## SchemaEditorViewModel Implementation (Task 27)
+
+### Architecture Pattern
+- **Single object ViewModel**: Stateless object with suspend functions for DDL operations
+- **Separation of concerns**: 
+  - DDL generation (preview) returns `Result<String>`
+  - DDL execution returns `Result<Unit>`
+  - Allows two-step flow: preview → user confirmation → execution
+- **Error handling**: Custom `DDLExecutionException` wraps `UserFriendlyError` for UI display
+
+### ViewModel Functions
+```kotlin
+suspend fun createSequenceDDL(driver, definition): Result<String>
+suspend fun executeSequenceCreate(driver, ddl): Result<Unit>
+suspend fun alterSequenceDDL(driver, name, changes): Result<String>
+suspend fun executeSequenceAlter(driver, ddl): Result<Unit>
+suspend fun dropSequenceDDL(driver, name, ifExists): Result<String>
+suspend fun executeSequenceDrop(driver, ddl): Result<Unit>
+```
+
+### Flow Implementation
+1. **Validation**: `DDLValidator.validateIdentifier()` before DDL generation
+2. **Dialect resolution**: `getDialectForDriver()` maps driver name to dialect
+   - "PostgreSQL" → `PostgreSQLDDLDialect`
+   - "SQLite" → `SQLiteDDLDialect`
+3. **DDL generation**: `SequenceDDLBuilder.buildCreateSequence(dialect, sequence)`
+4. **Execution**: `driver.executeQuery(ddl)` → map result to `Result<Unit>`
+5. **Error mapping**: SQL exceptions → `DDLErrorMapper.mapError(sqlState, message)`
+
+### Wiring in SchemaBrowserScreen
+- **State variables added**:
+  - `pendingDDLExecution: suspend () -> Result<Unit>` - stores execution closure
+  - `showDDLError: Boolean` - controls error dialog visibility
+  - `ddlErrorMessage: String` - error message for display
+- **Flow**: SequenceEditorDialog onSave → generate DDL → store in `previewDDL` + `pendingDDLExecution` → show DDLPreviewDialog
+- **Execution**: DDLPreviewDialog onExecute → call `pendingDDLExecution()` → refresh schema on success
+- **Cache invalidation**: `forceRefresh()` + `ensureSchemaLoaded(force = true)` after successful DDL
+
+### Error Handling Pattern
+```kotlin
+result.onSuccess { 
+    // Update UI, show preview
+}.onFailure { error ->
+    ddlErrorMessage = error.message ?: "Failed"
+    showDDLError = true
+}
+
+// In execution:
+ddlErrorMessage = if (error is DDLExecutionException) {
+    "${error.userError.title}: ${error.userError.description}\n${error.userError.suggestion}"
+} else {
+    error.message ?: "Unknown error"
+}
+```
+
+### Key Design Decisions
+- **Suspend functions**: All operations are async (IO for validation, DDL generation, execution)
+- **Result type**: Kotlin's `Result` for explicit success/failure handling
+- **Stateless ViewModel**: No mutable state, purely functional transformations
+- **Dialect abstraction**: Driver name → DDLDialect mapping keeps driver details out of UI
+- **Closure storage**: `pendingDDLExecution` captures driver + ddl for deferred execution
+
+### Gotchas
+- **Type inference**: Initial lambda must return `Result.success(Unit)` not empty `{}`
+- **Error dialog**: Separate from schema load error dialog (different state variables)
+- **Schema refresh**: Must call both `forceRefresh()` (clear cache) and `ensureSchemaLoaded(force = true)` (reload)
+- **Driver null check**: Must check `activeDriver != null` before operations
+
+### Integration Points
+- DROP sequence: Uses same flow (validate → generate DDL → preview → execute)
+- CREATE sequence: Handles both create and edit modes (edit not fully implemented yet)
+- Error messages: DDLErrorMapper provides user-friendly SQLSTATE translations
+
+### Verification
+- Compilation successful: `./gradlew :app:compileKotlin` passes
+- Only deprecation warnings (non-blocking)
+- Type-safe: `Result<String>` for preview, `Result<Unit>` for execution
+- Error handling: Catches SQL exceptions and maps to UserFriendlyError
