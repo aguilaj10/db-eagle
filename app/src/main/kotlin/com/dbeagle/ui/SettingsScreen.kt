@@ -62,7 +62,7 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodyLarge,
             )
             Switch(
-                checked = darkMode,
+                checked = darkMode ?: false,
                 onCheckedChange = { viewModel.setDarkMode(it) },
             )
         }

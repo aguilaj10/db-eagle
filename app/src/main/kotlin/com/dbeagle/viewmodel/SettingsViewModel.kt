@@ -34,7 +34,7 @@ class SettingsViewModel(
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
-    val darkMode: StateFlow<Boolean> = themeManager.darkMode
+    val darkMode: StateFlow<Boolean?> = themeManager.darkModeOverride
 
     fun setDarkMode(enabled: Boolean) {
         themeManager.setDarkMode(enabled)

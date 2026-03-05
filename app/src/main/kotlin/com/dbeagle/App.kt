@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -88,7 +89,8 @@ fun main() {
         val sessionOrder by sessionViewModel.sessionOrder.collectAsState()
         val sessionStates by sessionViewModel.sessionStates.collectAsState()
         val activeProfileId by sessionViewModel.activeProfileId.collectAsState()
-        val darkMode by themeManager.darkMode.collectAsState()
+        val darkModeOverride by themeManager.darkModeOverride.collectAsState()
+        val darkMode = darkModeOverride ?: isSystemInDarkTheme()
 
         val activeSession = activeProfileId?.let { sessionStates[it] }
         val activeDriver = activeProfileId?.let { sessionViewModel.getDriver(it) }

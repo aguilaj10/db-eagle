@@ -8,13 +8,15 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Singleton manager for application theme state.
  * Owns dark mode preference and persistence.
+ * 
+ * darkModeOverride: null means "use system preference", non-null is user's explicit choice.
  */
 class ThemeManager {
-    private val _darkMode = MutableStateFlow(AppPreferences.load().darkMode ?: false)
-    val darkMode: StateFlow<Boolean> = _darkMode.asStateFlow()
+    private val _darkModeOverride = MutableStateFlow(AppPreferences.load().darkMode)
+    val darkModeOverride: StateFlow<Boolean?> = _darkModeOverride.asStateFlow()
 
     fun setDarkMode(enabled: Boolean) {
-        _darkMode.value = enabled
+        _darkModeOverride.value = enabled
         val currentSettings = AppPreferences.load()
         AppPreferences.save(currentSettings.copy(darkMode = enabled))
     }
