@@ -5,7 +5,7 @@ import com.dbeagle.edit.InlineUpdate
 import com.dbeagle.export.CsvExporter
 import com.dbeagle.export.JsonExporter
 import com.dbeagle.export.SqlExporter
-import com.dbeagle.history.FileQueryHistoryRepository
+import com.dbeagle.history.QueryHistoryRepository
 import com.dbeagle.model.QueryHistoryEntry
 import com.dbeagle.model.QueryResult
 import com.dbeagle.query.QueryExecutor
@@ -25,7 +25,7 @@ import java.io.File
  * Manages query execution, export logic, history recording, and inline edits.
  */
 class QueryEditorViewModel(
-    private val historyRepository: FileQueryHistoryRepository,
+    private val historyRepository: QueryHistoryRepository,
 ) : BaseViewModel() {
 
     data class QueryEditorUiState(
