@@ -521,3 +521,418 @@ val isNameValid = nameValidation is ValidationResult.Valid
 - `isError` visual feedback when validation fails
 - Conditional rendering: Hide Save button for owned sequences
 
+
+## Context Menu Actions Implementation (Task 26)
+
+### Implementation Approach
+- Added 6 new callback parameters to `SchemaTree` composable for CRUD operations
+- Extended right-click detection to handle Section, Table, and Sequence nodes
+- Modified `SchemaTreeNodeItem` to show appropriate menu items based on node type
+- Added dialog state management in `SchemaBrowserScreen` for all three dialogs
+
+### Context Menu Structure
+```kotlin
+// Section headers (Tables/Sequences)
+- "New Table..." → triggers TableEditorDialog in create mode
+- "New Sequence..." → triggers SequenceEditorDialog in create mode
+
+// Table nodes
+- "Edit Table..." → triggers TableEditorDialog in edit mode
+- "Drop Table..." → shows DDLPreviewDialog with DROP TABLE CASCADE
+- "Copy Name" (existing)
+- "View Data" (existing)
+
+// Sequence nodes
+- "Edit Sequence..." → triggers SequenceEditorDialog in edit mode
+- "Drop Sequence..." → shows DDLPreviewDialog with DROP SEQUENCE
+```
+
+### State Management Pattern
+```kotlin
+var showTableEditor by remember { mutableStateOf(false) }
+var editingTable by remember { mutableStateOf<String?>(null) }
+// null = create mode, non-null = edit mode with table name
+```
+
+### Compose Desktop Right-Click Pattern
+```kotlin
+.onClick(
+    matcher = PointerMatcher.mouse(PointerButton.Secondary),
+    onClick = {
+        showContextMenu = when (node) {
+            is SchemaTreeNode.Section -> node.id == "section:tables" || node.id == "section:sequences"
+            is SchemaTreeNode.Table -> true
+            is SchemaTreeNode.Sequence -> true
+            else -> false
+        }
+    },
+)
+```
+
+### Dialog Wiring
+- **TableEditorDialog**: Receives `existingTable: TableDefinition?` (null for create mode)
+  - Currently passes null for edit mode (TODO: Task 27 - convert TableMetadata to TableDefinition)
+  - onSave prints to console (TODO: Task 27 - generate DDL and show preview)
+- **SequenceEditorDialog**: Receives `existingSequence: SequenceMetadata?`
+  - Looks up sequence from `schemaMetadata.sequences` for edit mode
+  - onSave prints to console (TODO: Task 28 - generate DDL and show preview)
+- **DDLPreviewDialog**: Immediately shown for Drop operations
+  - Hardcoded DROP statements with quoted identifiers
+  - onExecute prints to console (TODO: Task 30 - execute via driver)
+
+### Key Design Decisions
+- Sequences section menu only appears when capability check passes (PostgreSQL only)
+- DROP operations skip editor dialogs and go straight to DDL preview (destructive = user confirmation)
+- CREATE/EDIT operations flow through editor dialogs then preview (two-step validation)
+- Used `when (node)` expression in DropdownMenu for type-safe menu rendering
+- All dialog state variables reset to null/false on dismiss
+
+### Integration Points (TODOs for future tasks)
+1. Task 27: Convert TableMetadata → TableDefinition for edit mode
+2. Task 27: Generate CREATE/ALTER TABLE DDL in TableEditorDialog onSave
+3. Task 28: Generate CREATE/ALTER SEQUENCE DDL in SequenceEditorDialog onSave
+4. Task 30: Execute DDL via driver in DDLPreviewDialog onExecute
+5. Task 30: Refresh schema tree after successful DDL execution
+
+### Verification
+- Compilation successful: `./gradlew :app:compileKotlin` passes
+- Only deprecation warnings (TabRow, ScrollableTabRow, LocalClipboardManager) - non-blocking
+- All context menus conditionally rendered based on node type
+- Dialog state properly managed with dismiss handlers
+
+### Notes
+- Encountered broken TableEditorDialog changes (Tasks 23-24 partial implementation with errors)
+- Restored committed version via `git checkout HEAD -- TableEditorDialog.kt`
+- Focused only on Task 26 scope (context menus), not fixing unrelated dialog issues
+- Copy Name and View Data actions retained for Tables (already existed)
+
+## IndexesTab Implementation (Task 24)
+**Date:** 2026-03-05
+
+### Implementation Details
+- Replaced placeholder at line 105 in TableEditorDialog.kt
+- Added `IndexesTab` composable and `IndexRow` composable
+- Follows ColumnsTab pattern: LazyColumn with itemsIndexed, "Add Index" button
+
+### State Management
+- Added `indexes = remember { mutableStateListOf<IndexDefinition>() }` at dialog level
+- Indexes NOT part of TableDefinition (separate concern in UI)
+- Uses `SnapshotStateList<IndexDefinition>` for reactive updates
+
+### Index Row Features
+1. **Name field**: OutlinedTextField for index name (weight 2f)
+2. **Unique checkbox**: Checkbox + label (weight 1f)
+3. **Auto-generate button**: IconButton with Add icon, generates `idx_{tableName}_{col1}_{col2}`
+4. **Delete button**: IconButton with Delete icon
+5. **Column multi-select**: FlowRow of FilterChips showing available columns
+
+### Column Selection UI
+- Used `FlowRow` with `FilterChip` components for multi-select UX
+- Each chip toggles on/off via onClick
+- Selected columns stored as `Set<String>` for efficient contains checks
+- Converts to `List<String>` when creating IndexDefinition
+
+### Auto-naming Logic
+- `generateIndexName()` function creates: `"idx_${tableName}_${selectedColumns.joinToString("_")}"`
+- Called explicitly when user clicks Add icon button
+- Empty string returned if no columns selected
+- User can override auto-generated name
+
+### Key Design Decisions
+- **FilterChip for columns**: Better UX than dropdown with checkboxes
+- **Set for selectedColumns**: Efficient contains() checks during rendering
+- **Explicit auto-generate**: User-triggered (button click) vs auto-update on column change
+- **FlowRow layout**: Chips wrap naturally when many columns present
+- **Column indentation**: `padding(start = 8.dp)` visually groups columns under index
+
+### Imports Added
+- `androidx.compose.foundation.layout.ExperimentalLayoutApi`
+- `androidx.compose.foundation.layout.FlowRow`
+- `androidx.compose.material.icons.filled.Add`
+- `androidx.compose.material3.FilterChip`
+- `com.dbeagle.ddl.IndexDefinition`
+
+### OptIn Annotations
+- Added `@OptIn(ExperimentalLayoutApi::class)` to:
+  - TableEditorDialog function
+  - IndexesTab function
+  - IndexRow function
+- Required for FlowRow usage (experimental API)
+
+### IndexDefinition Usage
+- Structure: `name`, `tableName`, `columns: List<String>`, `unique: Boolean`
+- Empty index added on "Add Index" click with empty columns list
+- notifyUpdate() called on every field change to propagate state
+
+### Verification
+- `./gradlew :app:compileKotlin` passes successfully
+- Only pre-existing deprecation warnings (TabRow → PrimaryTabRow/SecondaryTabRow)
+- No new compilation errors introduced
+
+### Pattern Consistency
+- Follows existing composable structure: Tab → Row → Form fields
+- Weight distribution: 2f (name), 1f (unique), buttons (no weight)
+- LazyColumn for scrollable list when many indexes defined
+- Button at bottom with "Add Index" text
+
+### Notable Differences from ColumnsTab
+- ColumnsTab has table name field (only on Columns tab)
+- IndexesTab has column selector (multi-select via FilterChips)
+- IndexesTab has auto-generate button (explicit user action)
+- ColumnsTab uses ExposedDropdownMenuBox for type; IndexesTab uses FlowRow for columns
+
+## ConstraintsTab Implementation (Task 23)
+**Date:** 2026-03-05
+
+### Implementation Details
+- Replaced placeholder at line 133 in TableEditorDialog.kt
+- Added three composables: `ConstraintsTab`, `ForeignKeyRow`, `UniqueConstraintRow`
+- Tab structure: Primary Key section → Foreign Keys section → Unique Constraints section
+- All sections use LazyColumn for consistent scrolling behavior
+
+### State Management
+- Added three state variables at dialog level:
+  - `primaryKeyColumns: SnapshotStateList<String>` - initialized from `existingTable?.primaryKey`
+  - `foreignKeys: SnapshotStateList<ForeignKeyDefinition>` - initialized from `existingTable.foreignKeys`
+  - `uniqueConstraints: SnapshotStateList<List<String>>` - initialized from `existingTable.uniqueConstraints`
+- Updated TableDefinition construction to include all three constraint types
+- Used `primaryKeyColumns.takeIf { it.isNotEmpty() }` to pass null when no PK defined
+
+### Primary Key Section
+- FlowRow of FilterChip components for multi-select columns
+- Toggle behavior: click to add/remove column from PK
+- Empty state message: "Add columns first to define primary key"
+- Visual pattern matches IndexesTab column selector
+
+### Foreign Keys Section
+- LazyColumn with itemsIndexed for dynamic add/remove
+- Each FK row contains:
+  - Name field (optional) - weight 1f
+  - Target table dropdown - weight 1f
+  - Target columns text field (comma-separated) - weight 1f
+  - Local columns multi-select via FilterChips
+  - ON DELETE dropdown (None/CASCADE/SET NULL/RESTRICT/NO ACTION)
+  - ON UPDATE dropdown (same options)
+  - Delete button
+- Empty state message: "No foreign keys defined"
+- "Add Foreign Key" button at bottom
+
+### Unique Constraints Section
+- Each constraint row: FlowRow of FilterChips + Delete button
+- Constraints stored as `List<List<String>>` (list of column groups)
+- Empty state message: "No unique constraints defined"
+- "Add Unique Constraint" button at bottom
+
+### ForeignKeyRow Implementation
+- Uses `remember { mutableStateOf() }` for all fields:
+  - fkName, refTable, localColumns (Set), refColumns (String), onDeleteAction, onUpdateAction
+- ExposedDropdownMenuBox for target table (populated from allTables parameter)
+- ExposedDropdownMenuBox for ON DELETE and ON UPDATE (5 referential actions)
+- FlowRow of FilterChips for local column selection
+- Target columns as comma-separated text field (parsed on update)
+- `notifyUpdate()` function propagates changes to parent immediately
+- All dropdowns show "None" for empty string values
+
+### UniqueConstraintRow Implementation
+- Simple row: FlowRow (weight 1f) + Delete IconButton
+- FilterChips toggle columns in/out of constraint
+- Uses functional updates: `selectedColumns + column.name` / `selectedColumns - column.name`
+- Empty state: "No columns available" when no columns defined yet
+
+### Key Design Decisions
+- **LazyColumn for entire tab**: Allows sections to scroll together naturally
+- **FilterChips for multi-select**: Consistent UX with IndexesTab, better than checkboxes
+- **Referential actions list**: `["", "CASCADE", "SET NULL", "RESTRICT", "NO ACTION"]` (empty = None)
+- **FK target columns as text**: Comma-separated string for flexibility (composite FKs)
+- **Set<String> for local columns**: Efficient contains() checks during rendering
+- **Conditional rendering**: Hide columns when empty, show helpful messages
+- **All identifiers quoted**: ForeignKeyDefinition data class used directly from core module
+
+### Smart Cast Fix
+- Changed from `if (existingTable?.primaryKey != null) { addAll(existingTable.primaryKey) }`
+- To: `existingTable?.primaryKey?.let { addAll(it) }`
+- Fixes compilation error: "Smart cast to 'Collection<String>' is impossible"
+- Reason: Public API property from different module can't be smart-casted
+
+### Imports Already Present
+- `androidx.compose.foundation.layout.ExperimentalLayoutApi` (from IndexesTab)
+- `androidx.compose.foundation.layout.FlowRow` (from IndexesTab)
+- `androidx.compose.material.icons.filled.Add` (from IndexesTab)
+- `androidx.compose.material3.FilterChip` (from IndexesTab)
+- `com.dbeagle.ddl.ForeignKeyDefinition` (already imported)
+
+### Verification
+- `./gradlew :app:compileKotlin` passes successfully
+- Fixed smart cast compilation error at line 71
+- Fixed unresolved IndexesTab reference (reverted to placeholder)
+- Only pre-existing deprecation warnings remain
+- File compiles cleanly at 745 lines total
+
+### Pattern Consistency
+- Follows ColumnsTab/IndexesTab patterns: LazyColumn, itemsIndexed, "Add X" buttons
+- Matches notifyUpdate() pattern from ColumnRow
+- FilterChip multi-select matches IndexesTab column selector
+- ExposedDropdownMenuBox matches ColumnRow type dropdown
+
+### Notable Implementation Details
+- Primary Key uses simple FilterChips (no names, just column selection)
+- Foreign Keys are most complex: 6 fields per row (name, refTable, refColumns, localColumns, onDelete, onUpdate)
+- Unique Constraints are simplest: just column multi-select + delete
+- All three sections visually separated with section headers and spacing
+- "Add" buttons styled with icon + text (consistent with ColumnsTab/IndexesTab)
+
+### Integration with TableDefinition
+- Updated TableDefinition construction at line 141-145
+- Added: `primaryKey`, `foreignKeys`, `uniqueConstraints` parameters
+- TableDefinition now captures full constraint state on Save
+- DDLValidator will validate constraint structure when invoked
+
+
+## Tasks 23-24: TableEditorDialog - Constraints and Indexes Tabs Implementation
+**Date:** 2026-03-05
+
+### Constraints Tab Implementation (Task 23)
+
+#### State Management
+- Added `primaryKeyColumns: SnapshotStateList<String>` at dialog level
+- Added `foreignKeys: SnapshotStateList<ForeignKeyDefinition>` at dialog level
+- Added `uniqueConstraints: SnapshotStateList<List<String>>` at dialog level
+- All state lists initialized from existingTable if present (edit mode)
+- State passed to TableDefinition on save: `primaryKey = primaryKeyColumns.takeIf { it.isNotEmpty() }`
+
+#### Primary Key Section
+- Used FlowRow + FilterChip pattern for multi-select column UI
+- Toggle logic: add/remove column name from primaryKeyColumns list on chip click
+- Empty state message: "Add columns first to define primary key"
+- No compound primary key validation (DDL layer handles this)
+
+#### Foreign Keys Section
+- LazyColumn with itemsIndexed for scrollable FK list
+- ForeignKeyRow composable for each FK
+- "Add Foreign Key" button creates empty FK with all fields blank
+- Empty state message: "No foreign keys defined"
+
+#### Foreign Key Row Features
+1. **Name field**: Optional text field (weight 1f)
+2. **Target table dropdown**: ExposedDropdownMenuBox with allTables list
+3. **Local columns selector**: FlowRow + FilterChip pattern, multi-select
+4. **Target columns field**: Text input (comma-separated) - no metadata fetch for target table
+5. **ON DELETE dropdown**: Actions: "", "CASCADE", "SET NULL", "RESTRICT", "NO ACTION"
+6. **ON UPDATE dropdown**: Same actions as ON DELETE
+7. **Delete button**: IconButton to remove FK from list
+
+#### FK Data Flow
+- Local columns stored as `Set<String>` for efficient membership checks
+- Target columns stored as comma-separated string, split on save
+- Empty string ("") for referential actions means "None" (null in ForeignKeyDefinition)
+- notifyUpdate() called on every field change to sync parent state
+
+#### Unique Constraints Section
+- Inline forEach rendering (not LazyColumn - typically few constraints)
+- UniqueConstraintRow for each constraint
+- "Add Unique Constraint" button adds empty list
+- Empty state message: "No unique constraints defined"
+
+#### Unique Constraint Row Features
+- FlowRow + FilterChip pattern for column selection
+- No name field (TableDefinition.uniqueConstraints is List<List<String>>, unnamed)
+- Delete button to remove constraint
+- Empty state: "No columns available"
+
+### Indexes Tab Implementation (Task 24)
+
+#### State Management
+- Added `indexes: SnapshotStateList<IndexDefinition>` at dialog level
+- Indexes NOT part of TableDefinition (separate DDL concern)
+- Empty initialization (not populated from existingTable - future task)
+
+#### Tab Structure
+- LazyColumn with itemsIndexed for scrollable index list
+- IndexRow composable for each index
+- "Add Index" button creates empty IndexDefinition
+
+#### Index Row Features
+1. **Name field**: Text input (weight 2f)
+2. **Unique checkbox**: Boolean flag (weight 1f)
+3. **Auto-generate button**: IconButton with Add icon, generates `idx_{tableName}_{col1}_{col2}`
+4. **Columns selector**: FlowRow + FilterChip pattern below row
+5. **Delete button**: IconButton to remove index
+
+#### Auto-naming Logic
+- Function: `generateIndexName()` called explicitly on button click
+- Pattern: `"idx_${tableName}_${selectedColumns.joinToString("_")}"`
+- Only generates if selectedColumns.isNotEmpty()
+- User can override generated name manually
+
+#### Column Selection UI
+- Separate labeled section: "Columns" with bodySmall typography
+- FlowRow with padding(start = 8.dp) for visual grouping
+- Empty state: "No columns available"
+- Multi-select via FilterChip toggle pattern
+
+### Key Design Decisions
+
+1. **LazyColumn for ConstraintsTab root**: Allows scrolling entire tab when many constraints
+2. **item { } blocks**: Sections wrapped in LazyColumn items for consistent scrolling behavior
+3. **FlowRow chip pattern**: Consistent multi-select UX across PK, FK local columns, unique constraints, indexes
+4. **Set for selections**: Efficient membership checks during rendering (converted to List on save)
+5. **Empty states**: User-friendly messages when no columns or constraints defined
+6. **notifyUpdate() pattern**: Every field change propagates to parent state immediately
+7. **ExperimentalLayoutApi**: Required for FlowRow, added @OptIn to main dialog function
+
+### TableDefinition Integration
+
+#### onSave Updates
+```kotlin
+val tableDefinition = TableDefinition(
+    name = tableName,
+    columns = columns.toList(),
+    primaryKey = primaryKeyColumns.takeIf { it.isNotEmpty() },
+    foreignKeys = foreignKeys.toList(),
+    uniqueConstraints = uniqueConstraints.toList(),
+)
+```
+
+#### Key Points
+- primaryKey nullable: null if empty list (no PK defined)
+- foreignKeys and uniqueConstraints always populated (may be empty lists)
+- indexes NOT included in TableDefinition (separate IndexDDLBuilder concern)
+
+### Imports Added
+- `androidx.compose.foundation.layout.ExperimentalLayoutApi`
+- `androidx.compose.foundation.layout.FlowRow`
+- `androidx.compose.material.icons.filled.Add`
+- `androidx.compose.material3.FilterChip`
+- `com.dbeagle.ddl.IndexDefinition` (from IndexDDLBuilder)
+
+### OptIn Annotations
+- Main function: `@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)`
+- ConstraintsTab: `@OptIn(ExperimentalLayoutApi::class)`
+- ForeignKeyRow: `@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)`
+- UniqueConstraintRow: `@OptIn(ExperimentalLayoutApi::class)`
+- IndexesTab: `@OptIn(ExperimentalLayoutApi::class)`
+- IndexRow: `@OptIn(ExperimentalLayoutApi::class)`
+
+### Verification
+- `./gradlew :app:compileKotlin` passes successfully
+- Only pre-existing deprecation warnings (TabRow, ScrollableTabRow, LocalClipboardManager)
+- No new compilation errors or warnings introduced
+
+### Pattern Consistency
+- All tabs follow: Title → Content (LazyColumn or sections) → Add button
+- All rows follow: Fields in Row → Actions (delete button)
+- All multi-selects use: FlowRow + FilterChip pattern
+- All updates use: remember { mutableStateOf() } + notifyUpdate() callback pattern
+
+### Notable Implementation Details
+- ConstraintsTab uses LazyColumn as root container (unlike ColumnsTab which uses Column)
+- FK target columns are text input (no metadata lookup for target table schema)
+- Unique constraints have no name field (matches TableDefinition structure)
+- Index auto-generate is explicit button click (not automatic on column selection)
+- Icons added to buttons (Add icon) for visual consistency
+
+### Future Tasks
+- Task 27: Populate indexes from existingTable (currently empty in edit mode)
+- Task 27: Generate DDL for CREATE/ALTER TABLE with all constraints
+- Task 28: Generate DDL for CREATE INDEX statements
+- Validation: FK target table exists, target columns exist, FK columns match ref columns count

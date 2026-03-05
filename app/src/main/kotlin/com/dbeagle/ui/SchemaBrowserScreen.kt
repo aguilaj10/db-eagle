@@ -37,6 +37,9 @@ import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.navigation.NavigationTab
 import com.dbeagle.session.SessionViewModel
+import com.dbeagle.ui.dialogs.DDLPreviewDialog
+import com.dbeagle.ui.dialogs.SequenceEditorDialog
+import com.dbeagle.ui.dialogs.TableEditorDialog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -55,6 +58,14 @@ fun SchemaBrowserScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     var schemaJob by remember(activeProfileId) { mutableStateOf<Job?>(null) }
+
+    var showTableEditor by remember { mutableStateOf(false) }
+    var showSequenceEditor by remember { mutableStateOf(false) }
+    var editingTable by remember { mutableStateOf<String?>(null) }
+    var editingSequence by remember { mutableStateOf<String?>(null) }
+    var showDDLPreview by remember { mutableStateOf(false) }
+    var previewDDL by remember { mutableStateOf("") }
+    var previewIsDestructive by remember { mutableStateOf(false) }
 
     val ttlMs = 5 * 60 * 1000L
     val pid = activeProfileId
@@ -359,6 +370,93 @@ fun SchemaBrowserScreen(
                 },
                 onCopyName = { name -> println("App: Copy Name -> $name") },
                 onViewData = { name -> println("App: View Data -> $name") },
+                onNewTable = {
+                    editingTable = null
+                    showTableEditor = true
+                },
+                onEditTable = { tableName ->
+                    editingTable = tableName
+                    showTableEditor = true
+                },
+                onDropTable = { tableName ->
+                    previewDDL = "DROP TABLE \"$tableName\" CASCADE;"
+                    previewIsDestructive = true
+                    showDDLPreview = true
+                },
+                onNewSequence = {
+                    editingSequence = null
+                    showSequenceEditor = true
+                },
+                onEditSequence = { sequenceName ->
+                    editingSequence = sequenceName
+                    showSequenceEditor = true
+                },
+                onDropSequence = { sequenceName ->
+                    previewDDL = "DROP SEQUENCE \"$sequenceName\";"
+                    previewIsDestructive = true
+                    showDDLPreview = true
+                },
+            )
+        }
+
+        if (showTableEditor) {
+            val allTables = schemaMetadata?.tables?.map { it.name } ?: emptyList()
+            val existingTableDef = editingTable?.let { tableName ->
+                schemaMetadata?.tables?.find { it.name == tableName }?.let { tableMetadata ->
+                    val tableKey = "${tableMetadata.schema}.${tableMetadata.name}"
+                    val columns = columnsCache[tableKey]?.columns ?: emptyList()
+                    // TODO: Convert TableMetadata + Columns to TableDefinition (Task 27)
+                    null
+                }
+            }
+            
+            TableEditorDialog(
+                existingTable = existingTableDef,
+                allTables = allTables,
+                onDismiss = { 
+                    showTableEditor = false
+                    editingTable = null
+                },
+                onSave = { tableDef ->
+                    // TODO: Generate DDL and show preview (Task 27)
+                    showTableEditor = false
+                    editingTable = null
+                    println("App: Save table -> ${tableDef.name}")
+                },
+            )
+        }
+
+        if (showSequenceEditor) {
+            val existingSeq = editingSequence?.let { seqName ->
+                schemaMetadata?.sequences?.find { it.name == seqName }
+            }
+            
+            SequenceEditorDialog(
+                existingSequence = existingSeq,
+                onDismiss = {
+                    showSequenceEditor = false
+                    editingSequence = null
+                },
+                onSave = { seqMetadata ->
+                    // TODO: Generate DDL and show preview (Task 28)
+                    showSequenceEditor = false
+                    editingSequence = null
+                    println("App: Save sequence -> ${seqMetadata.name}")
+                },
+            )
+        }
+
+        if (showDDLPreview) {
+            DDLPreviewDialog(
+                ddlSql = previewDDL,
+                isDestructive = previewIsDestructive,
+                onDismiss = {
+                    showDDLPreview = false
+                },
+                onExecute = {
+                    // TODO: Execute DDL via driver (Task 30)
+                    println("App: Execute DDL -> $previewDDL")
+                },
             )
         }
     }

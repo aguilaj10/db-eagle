@@ -76,6 +76,12 @@ fun SchemaTree(
     onNodeExpansionChanged: (SchemaTreeNode, Boolean) -> Unit = { _, _ -> },
     onCopyName: (String) -> Unit = {},
     onViewData: (String) -> Unit = {},
+    onNewTable: () -> Unit = {},
+    onEditTable: (tableName: String) -> Unit = {},
+    onDropTable: (tableName: String) -> Unit = {},
+    onNewSequence: () -> Unit = {},
+    onEditSequence: (sequenceName: String) -> Unit = {},
+    onDropSequence: (sequenceName: String) -> Unit = {},
 ) {
     var expandedIds by remember { mutableStateOf(setOf<String>()) }
 
@@ -113,6 +119,12 @@ fun SchemaTree(
                 onNodeExpansionChanged = onNodeExpansionChanged,
                 onCopyName = onCopyName,
                 onViewData = onViewData,
+                onNewTable = onNewTable,
+                onEditTable = onEditTable,
+                onDropTable = onDropTable,
+                onNewSequence = onNewSequence,
+                onEditSequence = onEditSequence,
+                onDropSequence = onDropSequence,
             )
         }
     }
@@ -128,6 +140,12 @@ private fun SchemaTreeNodeItem(
     onNodeExpansionChanged: (SchemaTreeNode, Boolean) -> Unit,
     onCopyName: (String) -> Unit,
     onViewData: (String) -> Unit,
+    onNewTable: () -> Unit,
+    onEditTable: (tableName: String) -> Unit,
+    onDropTable: (tableName: String) -> Unit,
+    onNewSequence: () -> Unit,
+    onEditSequence: (sequenceName: String) -> Unit,
+    onDropSequence: (sequenceName: String) -> Unit,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
 
@@ -145,8 +163,11 @@ private fun SchemaTreeNodeItem(
                 .onClick(
                     matcher = PointerMatcher.mouse(PointerButton.Secondary),
                     onClick = {
-                        if (node is SchemaTreeNode.Table) {
-                            showContextMenu = true
+                        showContextMenu = when (node) {
+                            is SchemaTreeNode.Section -> node.id == "section:tables" || node.id == "section:sequences"
+                            is SchemaTreeNode.Table -> true
+                            is SchemaTreeNode.Sequence -> true
+                            else -> false
                         }
                     },
                 )
@@ -246,20 +267,77 @@ private fun SchemaTreeNodeItem(
             expanded = showContextMenu,
             onDismissRequest = { showContextMenu = false },
         ) {
-            DropdownMenuItem(
-                text = { Text("Copy Name") },
-                onClick = {
-                    onCopyName(node.label)
-                    showContextMenu = false
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("View Data") },
-                onClick = {
-                    onViewData(node.label)
-                    showContextMenu = false
-                },
-            )
+            when (node) {
+                is SchemaTreeNode.Section -> {
+                    when (node.id) {
+                        "section:tables" -> {
+                            DropdownMenuItem(
+                                text = { Text("New Table...") },
+                                onClick = {
+                                    onNewTable()
+                                    showContextMenu = false
+                                },
+                            )
+                        }
+                        "section:sequences" -> {
+                            DropdownMenuItem(
+                                text = { Text("New Sequence...") },
+                                onClick = {
+                                    onNewSequence()
+                                    showContextMenu = false
+                                },
+                            )
+                        }
+                    }
+                }
+                is SchemaTreeNode.Table -> {
+                    DropdownMenuItem(
+                        text = { Text("Edit Table...") },
+                        onClick = {
+                            onEditTable(node.label)
+                            showContextMenu = false
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Drop Table...") },
+                        onClick = {
+                            onDropTable(node.label)
+                            showContextMenu = false
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Copy Name") },
+                        onClick = {
+                            onCopyName(node.label)
+                            showContextMenu = false
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("View Data") },
+                        onClick = {
+                            onViewData(node.label)
+                            showContextMenu = false
+                        },
+                    )
+                }
+                is SchemaTreeNode.Sequence -> {
+                    DropdownMenuItem(
+                        text = { Text("Edit Sequence...") },
+                        onClick = {
+                            onEditSequence(node.label)
+                            showContextMenu = false
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Drop Sequence...") },
+                        onClick = {
+                            onDropSequence(node.label)
+                            showContextMenu = false
+                        },
+                    )
+                }
+                else -> {}
+            }
         }
     }
 }
