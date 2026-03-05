@@ -15,5 +15,7 @@ data class SchemaMetadata(
     val tables: List<TableMetadata>,
     val views: List<String> = emptyList(),
     val indexes: List<String> = emptyList(),
+    val indexDetails: List<IndexMetadata> = emptyList(),
     val foreignKeys: List<ForeignKeyRelationship> = emptyList(),
+    val sequences: List<SequenceMetadata> = emptyList(),
 )

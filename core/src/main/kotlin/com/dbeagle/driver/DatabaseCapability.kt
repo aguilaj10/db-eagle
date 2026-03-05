@@ -40,4 +40,7 @@ sealed class DatabaseCapability {
 
     @Serializable
     data object BatchInsert : DatabaseCapability()
+
+    @Serializable
+    data object Sequences : DatabaseCapability()
 }
