@@ -384,9 +384,21 @@ fun SchemaBrowserScreen(
                     showTableEditor = true
                 },
                 onDropTable = { tableName ->
-                    previewDDL = "DROP TABLE \"$tableName\" CASCADE;"
-                    previewIsDestructive = true
-                    showDDLPreview = true
+                    val driver = activeDriver ?: return@SchemaTree
+                    coroutineScope.launch {
+                        val ddlResult = SchemaEditorViewModel.dropTableDDL(driver, tableName, cascade = true)
+                        ddlResult.onSuccess { ddl ->
+                            previewDDL = ddl
+                            previewIsDestructive = true
+                            pendingDDLExecution = {
+                                SchemaEditorViewModel.executeTableDrop(driver, ddl)
+                            }
+                            showDDLPreview = true
+                        }.onFailure { error ->
+                            ddlErrorMessage = error.message ?: "Failed to generate DROP DDL"
+                            showDDLError = true
+                        }
+                    }
                 },
                 onNewSequence = {
                     editingSequence = null
@@ -435,10 +447,39 @@ fun SchemaBrowserScreen(
                     editingTable = null
                 },
                 onSave = { tableDef ->
-                    // TODO: Generate DDL and show preview (Task 27)
-                    showTableEditor = false
-                    editingTable = null
-                    println("App: Save table -> ${tableDef.name}")
+                    val driver = activeDriver
+                    if (driver == null) {
+                        showTableEditor = false
+                        editingTable = null
+                        return@TableEditorDialog
+                    }
+                    
+                    coroutineScope.launch {
+                        try {
+                            val isCreateMode = editingTable == null
+                            val ddlResult = if (isCreateMode) {
+                                SchemaEditorViewModel.createTableDDL(driver, tableDef)
+                            } else {
+                                SchemaEditorViewModel.createTableDDL(driver, tableDef)
+                            }
+                            
+                            ddlResult.onSuccess { ddl ->
+                                previewDDL = ddl
+                                previewIsDestructive = false
+                                pendingDDLExecution = {
+                                    SchemaEditorViewModel.executeTableCreate(driver, ddl)
+                                }
+                                showDDLPreview = true
+                                showTableEditor = false
+                            }.onFailure { error ->
+                                ddlErrorMessage = error.message ?: "Failed to generate DDL"
+                                showDDLError = true
+                            }
+                        } catch (e: Exception) {
+                            ddlErrorMessage = e.message ?: "Unknown error"
+                            showDDLError = true
+                        }
+                    }
                 },
             )
         }
@@ -509,6 +550,7 @@ fun SchemaBrowserScreen(
                                 onStatusTextChanged("Status: DDL executed successfully ($name)")
                                 showDDLPreview = false
                                 editingSequence = null
+                                editingTable = null
                                 forceRefresh()
                                 ensureSchemaLoaded(force = true)
                             }.onFailure { error ->

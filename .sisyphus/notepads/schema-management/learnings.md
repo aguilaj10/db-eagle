@@ -1016,3 +1016,154 @@ ddlErrorMessage = if (error is DDLExecutionException) {
 - Only deprecation warnings (non-blocking)
 - Type-safe: `Result<String>` for preview, `Result<Unit>` for execution
 - Error handling: Catches SQL exceptions and maps to UserFriendlyError
+
+## Task 28: Table CRUD Flow Implementation
+**Date:** 2026-03-05
+
+### Implementation Details
+- Added table DDL methods to SchemaEditorViewModel following exact pattern from sequence CRUD (Task 27)
+- Wired TableEditorDialog callbacks in SchemaBrowserScreen to generate and execute DDL
+- Created TableChanges data class for incremental ALTER operations
+- Implemented SQLite limitation checks for unsupported ALTER operations
+
+### SchemaEditorViewModel Table Methods
+1. **createTableDDL(driver, definition)**: 
+   - Validates table definition using DDLValidator.validateTableDefinition
+   - Generates CREATE TABLE DDL with columns, PK, UNIQUE, FK constraints
+   - Returns Result<String> for preview
+   
+2. **executeTableCreate(driver, ddl)**:
+   - Executes CREATE TABLE via executeDDL helper
+   - Returns Result<Unit>
+   
+3. **alterTableDDL(driver, tableName, changes)**:
+   - Validates table name via DDLValidator.validateIdentifier
+   - Checks dialect.supportsDropColumn() BEFORE generating DROP COLUMN statements
+   - Returns UnsupportedOperationException with clear message if SQLite and DROP COLUMN requested
+   - Generates multiple ALTER statements (ADD/DROP columns/constraints)
+   - Joins statements with semicolons: "stmt1;\nstmt2;\nstmt3;"
+   
+4. **executeTableAlter(driver, ddl)**:
+   - Executes ALTER TABLE via executeDDL helper
+   
+5. **dropTableDDL(driver, tableName, cascade)**:
+   - Validates table name
+   - Generates DROP TABLE with optional CASCADE
+   - Defaults cascade=true for safety (drops dependent objects)
+   
+6. **executeTableDrop(driver, ddl)**:
+   - Executes DROP TABLE via executeDDL helper
+
+### TableChanges Data Class
+- Structure: addedColumns, droppedColumns, addedConstraints, droppedConstraints, addedIndexes, droppedIndexes
+- All fields are List types with empty list defaults
+- Designed for incremental ALTER operations (not used for CREATE TABLE)
+- addedIndexes/droppedIndexes fields exist but not used in alterTableDDL (indexes are separate DDL concern)
+
+### SchemaBrowserScreen Wiring
+#### TableEditorDialog onSave Callback
+```kotlin
+onSave = { tableDef ->
+    val driver = activeDriver ?: return
+    coroutineScope.launch {
+        val ddlResult = SchemaEditorViewModel.createTableDDL(driver, tableDef)
+        ddlResult.onSuccess { ddl ->
+            previewDDL = ddl
+            previewIsDestructive = false
+            pendingDDLExecution = { SchemaEditorViewModel.executeTableCreate(driver, ddl) }
+            showDDLPreview = true
+            showTableEditor = false
+        }.onFailure { error ->
+            ddlErrorMessage = error.message ?: "Failed to generate DDL"
+            showDDLError = true
+        }
+    }
+}
+```
+
+#### onDropTable Callback
+```kotlin
+onDropTable = { tableName ->
+    val driver = activeDriver ?: return
+    coroutineScope.launch {
+        val ddlResult = SchemaEditorViewModel.dropTableDDL(driver, tableName, cascade = true)
+        ddlResult.onSuccess { ddl ->
+            previewDDL = ddl
+            previewIsDestructive = true
+            pendingDDLExecution = { SchemaEditorViewModel.executeTableDrop(driver, ddl) }
+            showDDLPreview = true
+        }.onFailure { error ->
+            ddlErrorMessage = error.message ?: "Failed to generate DROP DDL"
+            showDDLError = true
+        }
+    }
+}
+```
+
+#### DDL Execution Flow
+- DDLPreviewDialog onExecute calls pendingDDLExecution()
+- On success: clears editingSequence AND editingTable, calls forceRefresh() + ensureSchemaLoaded(force=true)
+- On failure: shows DDLExecutionException with UserFriendlyError details
+
+### SQLite Limitations Handling
+- alterTableDDL checks `dialect.supportsDropColumn()` before attempting DROP COLUMN
+- Returns Result.failure with UnsupportedOperationException and user-friendly message:
+  - "ALTER TABLE DROP COLUMN is not supported by SQLite. To remove columns, you must recreate the table with the desired schema."
+- No automatic table recreation implemented (as per MUST NOT DO requirements)
+- User sees clear error message in DDL error dialog
+
+### Key Design Decisions
+- **Followed sequence CRUD pattern exactly**: Same validation → generation → preview → execution flow
+- **Multi-statement ALTER**: Joins multiple ALTER statements with semicolons for batch execution
+- **CASCADE default**: DROP TABLE defaults to CASCADE=true to prevent orphaned foreign keys
+- **Edit mode not implemented**: Currently both create and edit modes use createTableDDL (full table recreation)
+  - TODO: Future task to implement true ALTER TABLE for edit mode using TableChanges
+- **Indexes separate**: Indexes NOT included in TableDefinition DDL (separate IndexDDLBuilder concern)
+
+### Validation Integration
+- Table name validated via DDLValidator.validateIdentifier
+- Full table structure validated via DDLValidator.validateTableDefinition (columns, names, duplicates)
+- Validation errors returned as Result.failure with concatenated error messages
+- DDL generation only proceeds on ValidationResult.Valid
+
+### Error Handling
+- SQL exceptions caught and mapped via DDLErrorMapper.mapError(sqlState, message)
+- UserFriendlyError displayed in DDL error dialog with title, description, suggestion
+- UnsupportedOperationException for SQLite limitations (not SQLException)
+- Generic exceptions fallback to "Unknown error" with raw message
+
+### Imports Added to SchemaEditorViewModel
+- com.dbeagle.ddl.ColumnDefinition
+- com.dbeagle.ddl.ConstraintDefinition
+- com.dbeagle.ddl.IndexDDLBuilder
+- com.dbeagle.ddl.IndexDefinition
+- com.dbeagle.ddl.TableDDLBuilder
+- com.dbeagle.ddl.TableDefinition
+
+### Verification
+- Compilation successful: `./gradlew :app:compileKotlin` passes
+- Only pre-existing deprecation warnings (TabRow, ScrollableTabRow, LocalClipboardManager)
+- No new compilation errors or warnings introduced
+- Type-safe: Result<String> for preview, Result<Unit> for execution
+
+### Pattern Consistency with Task 27
+- Same suspend function signatures (async operations)
+- Same validation → generation → execution split
+- Same Result<T> return types
+- Same error handling via DDLErrorMapper
+- Same executeDDL helper for all execution methods
+- Same dialect resolution via getDialectForDriver
+
+### Notable Implementation Details
+- alterTableDDL can generate multiple statements (one per change)
+- Empty changes list returns Result.failure with "No changes specified" message
+- DROP TABLE uses IF EXISTS (conditional on dialect.supportsIfExists())
+- Foreign key constraints included in CREATE TABLE DDL (via TableDefinition.foreignKeys)
+- Unique constraints included in CREATE TABLE DDL (via TableDefinition.uniqueConstraints)
+
+### Future Enhancements (Not in Scope)
+- Implement true ALTER TABLE for edit mode (detect column/constraint diffs, generate incremental changes)
+- Auto-detect SQLite table recreation requirement and offer wizard
+- Generate CREATE INDEX statements for TableEditorDialog indexes tab
+- Populate existingTable in edit mode (currently passes null, always creates new table)
+

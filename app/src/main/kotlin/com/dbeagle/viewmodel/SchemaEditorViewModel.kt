@@ -1,12 +1,18 @@
 package com.dbeagle.viewmodel
 
+import com.dbeagle.ddl.ColumnDefinition
+import com.dbeagle.ddl.ConstraintDefinition
 import com.dbeagle.ddl.DDLDialect
 import com.dbeagle.ddl.DDLErrorMapper
 import com.dbeagle.ddl.DDLValidator
+import com.dbeagle.ddl.IndexDDLBuilder
+import com.dbeagle.ddl.IndexDefinition
 import com.dbeagle.ddl.PostgreSQLDDLDialect
 import com.dbeagle.ddl.SequenceChanges
 import com.dbeagle.ddl.SequenceDDLBuilder
 import com.dbeagle.ddl.SQLiteDDLDialect
+import com.dbeagle.ddl.TableDDLBuilder
+import com.dbeagle.ddl.TableDefinition
 import com.dbeagle.ddl.UserFriendlyError
 import com.dbeagle.ddl.ValidationResult
 import com.dbeagle.driver.DatabaseDriver
@@ -14,6 +20,15 @@ import com.dbeagle.model.SequenceMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.sql.SQLException
+
+data class TableChanges(
+    val addedColumns: List<ColumnDefinition> = emptyList(),
+    val droppedColumns: List<String> = emptyList(),
+    val addedConstraints: List<ConstraintDefinition> = emptyList(),
+    val droppedConstraints: List<String> = emptyList(),
+    val addedIndexes: List<IndexDefinition> = emptyList(),
+    val droppedIndexes: List<String> = emptyList(),
+)
 
 /**
  * ViewModel for schema DDL operations (create/alter/drop sequences and tables).
@@ -171,6 +186,190 @@ object SchemaEditorViewModel {
      * @return Success (Unit), or Failure with UserFriendlyError
      */
     suspend fun executeSequenceDrop(
+        driver: DatabaseDriver,
+        ddl: String,
+    ): Result<Unit> {
+        return executeDDL(driver, ddl)
+    }
+    
+    /**
+     * Generates CREATE TABLE DDL for preview.
+     *
+     * Validates the table name and column definitions, then generates dialect-specific DDL.
+     *
+     * @param driver The database driver (used to determine dialect)
+     * @param definition The table definition (name, columns, constraints)
+     * @return Success with DDL string, or Failure with validation errors
+     */
+    suspend fun createTableDDL(
+        driver: DatabaseDriver,
+        definition: TableDefinition,
+    ): Result<String> {
+        return withContext(Dispatchers.Default) {
+            // Validate table definition
+            val validation = DDLValidator.validateTableDefinition(definition)
+            if (validation is ValidationResult.Invalid) {
+                return@withContext Result.failure(
+                    IllegalArgumentException(validation.errors.joinToString("; "))
+                )
+            }
+            
+            // Get dialect based on driver
+            val dialect = getDialectForDriver(driver)
+            
+            // Generate DDL
+            val ddl = TableDDLBuilder.buildCreateTable(dialect, definition)
+            
+            Result.success(ddl)
+        }
+    }
+    
+    /**
+     * Executes CREATE TABLE DDL.
+     *
+     * Runs the DDL statement and maps any errors to user-friendly messages.
+     *
+     * @param driver The database driver
+     * @param ddl The DDL string to execute
+     * @return Success (Unit), or Failure with UserFriendlyError
+     */
+    suspend fun executeTableCreate(
+        driver: DatabaseDriver,
+        ddl: String,
+    ): Result<Unit> {
+        return executeDDL(driver, ddl)
+    }
+    
+    /**
+     * Generates ALTER TABLE DDL for preview.
+     *
+     * Validates the table name and generates dialect-specific DDL for incremental changes.
+     * Checks dialect support for DROP COLUMN and other ALTER operations.
+     *
+     * @param driver The database driver
+     * @param tableName The table name to alter
+     * @param changes The changes to apply (add/drop columns, constraints, indexes)
+     * @return Success with DDL string, or Failure with validation/support errors
+     */
+    suspend fun alterTableDDL(
+        driver: DatabaseDriver,
+        tableName: String,
+        changes: TableChanges,
+    ): Result<String> {
+        return withContext(Dispatchers.Default) {
+            // Validate identifier
+            val nameValidation = DDLValidator.validateIdentifier(tableName)
+            if (nameValidation is ValidationResult.Invalid) {
+                return@withContext Result.failure(
+                    IllegalArgumentException(nameValidation.errors.joinToString("; "))
+                )
+            }
+            
+            // Get dialect
+            val dialect = getDialectForDriver(driver)
+            
+            // Check SQLite limitations
+            if (changes.droppedColumns.isNotEmpty() && !dialect.supportsDropColumn()) {
+                return@withContext Result.failure(
+                    UnsupportedOperationException(
+                        "ALTER TABLE DROP COLUMN is not supported by SQLite. " +
+                        "To remove columns, you must recreate the table with the desired schema."
+                    )
+                )
+            }
+            
+            // Generate DDL statements
+            val statements = buildList<String> {
+                // Add columns
+                changes.addedColumns.forEach { col ->
+                    add(TableDDLBuilder.buildAlterTableAddColumn(dialect, tableName, col))
+                }
+                
+                // Drop columns
+                changes.droppedColumns.forEach { col ->
+                    add(TableDDLBuilder.buildAlterTableDropColumn(dialect, tableName, col))
+                }
+                
+                // Add constraints
+                changes.addedConstraints.forEach { constraint ->
+                    add(TableDDLBuilder.buildAlterTableAddConstraint(dialect, tableName, constraint))
+                }
+                
+                // Drop constraints
+                changes.droppedConstraints.forEach { constraintName ->
+                    add(TableDDLBuilder.buildAlterTableDropConstraint(dialect, tableName, constraintName))
+                }
+            }
+            
+            if (statements.isEmpty()) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("No changes specified for ALTER TABLE operation")
+                )
+            }
+            
+            // Join multiple statements with semicolons
+            val ddl = statements.joinToString(";\n") + ";"
+            
+            Result.success(ddl)
+        }
+    }
+    
+    /**
+     * Executes ALTER TABLE DDL.
+     *
+     * @param driver The database driver
+     * @param ddl The DDL string to execute
+     * @return Success (Unit), or Failure with UserFriendlyError
+     */
+    suspend fun executeTableAlter(
+        driver: DatabaseDriver,
+        ddl: String,
+    ): Result<Unit> {
+        return executeDDL(driver, ddl)
+    }
+    
+    /**
+     * Generates DROP TABLE DDL for preview.
+     *
+     * Validates the table name and generates dialect-specific DDL.
+     *
+     * @param driver The database driver
+     * @param tableName The table name to drop
+     * @param cascade Whether to cascade the drop to dependent objects (default true)
+     * @return Success with DDL string, or Failure with validation errors
+     */
+    suspend fun dropTableDDL(
+        driver: DatabaseDriver,
+        tableName: String,
+        cascade: Boolean = true,
+    ): Result<String> {
+        return withContext(Dispatchers.Default) {
+            // Validate identifier
+            val nameValidation = DDLValidator.validateIdentifier(tableName)
+            if (nameValidation is ValidationResult.Invalid) {
+                return@withContext Result.failure(
+                    IllegalArgumentException(nameValidation.errors.joinToString("; "))
+                )
+            }
+            
+            // Get dialect
+            val dialect = getDialectForDriver(driver)
+            
+            // Generate DDL
+            val ddl = TableDDLBuilder.buildDropTable(dialect, tableName, cascade)
+            
+            Result.success(ddl)
+        }
+    }
+    
+    /**
+     * Executes DROP TABLE DDL.
+     *
+     * @param driver The database driver
+     * @param ddl The DDL string to execute
+     * @return Success (Unit), or Failure with UserFriendlyError
+     */
+    suspend fun executeTableDrop(
         driver: DatabaseDriver,
         ddl: String,
     ): Result<Unit> {
