@@ -12,38 +12,24 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.dbeagle.pool.DatabaseConnectionPool
-import com.dbeagle.settings.AppPreferences
-import com.dbeagle.settings.AppSettings
+import com.dbeagle.viewmodel.SettingsViewModel
+import org.koin.core.context.GlobalContext
 
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var settings by remember { mutableStateOf(AppPreferences.load()) }
-    var resultLimitInput by remember { mutableStateOf(settings.resultLimit.toString()) }
-    var queryTimeoutInput by remember { mutableStateOf(settings.queryTimeoutSeconds.toString()) }
-    var connectionTimeoutInput by remember { mutableStateOf(settings.connectionTimeoutSeconds.toString()) }
-    var maxConnectionsInput by remember { mutableStateOf(settings.maxConnections.toString()) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    var poolCount by remember { mutableStateOf(0) }
-    var allPools by remember { mutableStateOf<Map<String, DatabaseConnectionPool.PoolStats>>(emptyMap()) }
-
-    fun refreshPoolStats() {
-        poolCount = DatabaseConnectionPool.getPoolCount()
-        allPools = DatabaseConnectionPool.getAllPoolStats()
-    }
+    val viewModel = remember { GlobalContext.get().get<SettingsViewModel>() }
+    val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
-        refreshPoolStats()
+        viewModel.refreshPoolStats()
     }
 
     Column(
@@ -55,41 +41,41 @@ fun SettingsScreen(
             style = MaterialTheme.typography.headlineMedium,
         )
 
-        if (errorMessage != null) {
+        if (uiState.errorMessage != null) {
             Text(
-                text = errorMessage!!,
+                text = uiState.errorMessage!!,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
 
         OutlinedTextField(
-            value = resultLimitInput,
-            onValueChange = { resultLimitInput = it },
+            value = uiState.resultLimitInput,
+            onValueChange = { viewModel.updateResultLimit(it) },
             label = { Text("Result Limit (max rows)") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
 
         OutlinedTextField(
-            value = queryTimeoutInput,
-            onValueChange = { queryTimeoutInput = it },
+            value = uiState.queryTimeoutInput,
+            onValueChange = { viewModel.updateQueryTimeout(it) },
             label = { Text("Query Timeout (seconds)") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
 
         OutlinedTextField(
-            value = connectionTimeoutInput,
-            onValueChange = { connectionTimeoutInput = it },
+            value = uiState.connectionTimeoutInput,
+            onValueChange = { viewModel.updateConnectionTimeout(it) },
             label = { Text("Connection Timeout (seconds)") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
 
         OutlinedTextField(
-            value = maxConnectionsInput,
-            onValueChange = { maxConnectionsInput = it },
+            value = uiState.maxConnectionsInput,
+            onValueChange = { viewModel.updateMaxConnections(it) },
             label = { Text("Max Connections") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
@@ -101,21 +87,7 @@ fun SettingsScreen(
         ) {
             Button(
                 onClick = {
-                    try {
-                        val newSettings = AppSettings(
-                            resultLimit = resultLimitInput.toInt(),
-                            queryTimeoutSeconds = queryTimeoutInput.toInt(),
-                            connectionTimeoutSeconds = connectionTimeoutInput.toInt(),
-                            maxConnections = maxConnectionsInput.toInt(),
-                        )
-                        AppPreferences.save(newSettings)
-                        settings = newSettings
-                        errorMessage = null
-                    } catch (e: NumberFormatException) {
-                        errorMessage = "Invalid number format. Please enter valid integers."
-                    } catch (e: IllegalArgumentException) {
-                        errorMessage = e.message ?: "Invalid settings values. All values must be greater than 0."
-                    }
+                    viewModel.saveSettings()
                 },
             ) {
                 Text("Save")
@@ -123,12 +95,7 @@ fun SettingsScreen(
 
             Button(
                 onClick = {
-                    settings = AppSettings()
-                    resultLimitInput = settings.resultLimit.toString()
-                    queryTimeoutInput = settings.queryTimeoutSeconds.toString()
-                    connectionTimeoutInput = settings.connectionTimeoutSeconds.toString()
-                    maxConnectionsInput = settings.maxConnections.toString()
-                    AppPreferences.save(settings)
+                    viewModel.resetToDefaults()
                 },
             ) {
                 Text("Reset to Defaults")
@@ -148,17 +115,17 @@ fun SettingsScreen(
             style = MaterialTheme.typography.titleMedium,
         )
 
-        Button(onClick = { refreshPoolStats() }) {
+        Button(onClick = { viewModel.refreshPoolStats() }) {
             Text("Refresh Pool Stats")
         }
 
         Text(
-            text = "Connection pools: $poolCount",
+            text = "Connection pools: ${uiState.poolCount}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        if (allPools.isEmpty()) {
+        if (uiState.allPools.isEmpty()) {
             Text(
                 text = "No pools initialized.",
                 style = MaterialTheme.typography.bodySmall,
@@ -166,7 +133,7 @@ fun SettingsScreen(
             )
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                allPools.toSortedMap().forEach { (id, s) ->
+                uiState.allPools.toSortedMap().forEach { (id, s) ->
                     Text(
                         text = "Pool ${id.take(8)}: active=${s.active}, idle=${s.idle}, total=${s.total}, waiting=${s.waiting}",
                         style = MaterialTheme.typography.bodySmall,

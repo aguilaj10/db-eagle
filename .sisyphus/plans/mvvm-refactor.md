@@ -584,7 +584,7 @@ Max Concurrent: 3 (Wave 2)
 
 ---
 
-- [ ] 6. Extract SettingsViewModel
+- [x] 6. Extract SettingsViewModel
 
   **What to do**:
   - Create `app/src/main/kotlin/com/dbeagle/viewmodel/SettingsViewModel.kt`
