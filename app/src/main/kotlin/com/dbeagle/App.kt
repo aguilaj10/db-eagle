@@ -77,6 +77,7 @@ import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.query.QueryExecutor
 import com.dbeagle.session.SessionViewModel
 import com.dbeagle.ui.ExportFormat
+import com.dbeagle.ui.SchemaTreeNode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -93,7 +94,6 @@ private data class MemoryStats(
     val maxBytes: Long,
 ) {
     val usedMb: Long get() = usedBytes / (1024L * 1024L)
-    val totalMb: Long get() = totalBytes / (1024L * 1024L)
     val maxMb: Long get() = maxBytes / (1024L * 1024L)
 }
 
@@ -433,7 +433,6 @@ fun main() {
                                         val coroutineScope = rememberCoroutineScope()
                                         var isRunning by remember(activeProfileId) { mutableStateOf(false) }
                                         var queryJob by remember(activeProfileId) { mutableStateOf<Job?>(null) }
-                                        var queryError by remember(activeProfileId) { mutableStateOf<String?>(null) }
                                         var editError by remember(activeProfileId) { mutableStateOf<String?>(null) }
                                         var showExportDialog by remember(activeProfileId) { mutableStateOf(false) }
 
@@ -507,15 +506,13 @@ fun main() {
                                                 },
                                                 onRun = {
                                                     if (isRunning) return@SQLEditor
-                                                    val driver = activeDriver
-                                                    if (driver == null) {
+                                                    if (activeDriver == null) {
                                                         statusText = "Status: No active connection"
                                                         return@SQLEditor
                                                     }
 
                                                     queryJob = coroutineScope.launch {
                                                         isRunning = true
-                                                        queryError = null
                                                         val name = activeProfileName ?: "Connection"
                                                         statusText = "Status: Running query ($name)"
 
@@ -529,10 +526,11 @@ fun main() {
                                                         sessionViewModel.clearQueryResult(pid)
 
                                                         val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
-
+                                                        
+                                                        //TODO use kotlin.nano.time API with measureNanoTime
                                                         val startNs = System.nanoTime()
                                                         try {
-                                                            val r = withContext(Dispatchers.IO) { QueryExecutor(driver).execute(sqlToRun) }
+                                                            val r = withContext(Dispatchers.IO) { QueryExecutor(activeDriver).execute(sqlToRun) }
                                                             when (r) {
                                                                 is QueryResult.Success -> {
                                                                     sessionViewModel.recordQueryResult(pid, sqlToRun, r)
@@ -565,9 +563,10 @@ fun main() {
                                                                     )
                                                                 }
                                                             }
-                                                        } catch (e: CancellationException) {
+                                                        } catch (_: CancellationException) {
                                                             statusText = "Status: Query canceled"
                                                         } catch (e: Exception) {
+                                                            //TODO use kotlin.nano.time API with measureNanoTime
                                                             val durationMs = (System.nanoTime() - startNs) / 1_000_000
                                                             statusText = "Status: Error in ${durationMs}ms: ${e.message ?: "Error"}"
                                                             ErrorHandler.showQueryError(
@@ -684,7 +683,6 @@ fun main() {
                                         val pid = activeProfileId
                                         val schemaState = pid?.let { sessionStates[it]?.schema } ?: SessionViewModel.SchemaUiState()
                                         val isLoadingSchema = schemaState.isLoading
-                                        val schemaLoadedAtMs = schemaState.loadedAtMs
                                         val schemaNodes = schemaState.nodes
                                         val schemaDialogError = schemaState.dialogError
                                         val columnsCache = schemaState.columnsCache
@@ -694,13 +692,13 @@ fun main() {
                                             return (System.currentTimeMillis() - loadedAt) > ttlMs
                                         }
 
-                                        fun buildTree(schema: SchemaMetadata): List<com.dbeagle.ui.SchemaTreeNode> {
+                                        fun buildTree(schema: SchemaMetadata): List<SchemaTreeNode> {
                                             val tables = schema.tables
                                                 .sortedWith(compareBy({ it.schema }, { it.name }))
                                                 .map { t ->
                                                     val tableKey = "${t.schema}.${t.name}"
                                                     val cached = columnsCache[tableKey]?.columns ?: emptyList()
-                                                    com.dbeagle.ui.SchemaTreeNode.Table(
+                                                    SchemaTreeNode.Table(
                                                         id = "table:$tableKey",
                                                         label = t.name,
                                                         children = cached,
@@ -710,7 +708,7 @@ fun main() {
                                             val views = schema.views
                                                 .sorted()
                                                 .map { v ->
-                                                    com.dbeagle.ui.SchemaTreeNode.View(
+                                                    SchemaTreeNode.View(
                                                         id = "view:$v",
                                                         label = v,
                                                     )
@@ -719,24 +717,24 @@ fun main() {
                                             val indexes = schema.indexes
                                                 .sorted()
                                                 .map { idx ->
-                                                    com.dbeagle.ui.SchemaTreeNode.Index(
+                                                    SchemaTreeNode.Index(
                                                         id = "index:$idx",
                                                         label = idx,
                                                     )
                                                 }
 
                                             return listOf(
-                                                com.dbeagle.ui.SchemaTreeNode.Section(
+                                                SchemaTreeNode.Section(
                                                     id = "section:tables",
                                                     label = "Tables",
                                                     children = tables,
                                                 ),
-                                                com.dbeagle.ui.SchemaTreeNode.Section(
+                                                SchemaTreeNode.Section(
                                                     id = "section:views",
                                                     label = "Views",
                                                     children = views,
                                                 ),
-                                                com.dbeagle.ui.SchemaTreeNode.Section(
+                                                SchemaTreeNode.Section(
                                                     id = "section:indexes",
                                                     label = "Indexes",
                                                     children = indexes,
@@ -746,22 +744,22 @@ fun main() {
 
                                         fun updateTableChildren(
                                             tableKey: String,
-                                            newChildren: List<com.dbeagle.ui.SchemaTreeNode.Column>,
+                                            newChildren: List<SchemaTreeNode.Column>,
                                         ) {
                                             if (pid == null) return
                                             sessionViewModel.updateSchemaState(pid) { s ->
                                                 s.copy(
                                                     nodes = s.nodes.map { node ->
-                                                        if (node is com.dbeagle.ui.SchemaTreeNode.Section && node.id == "section:tables") {
-                                                            com.dbeagle.ui.SchemaTreeNode.Section(
+                                                        if (node is SchemaTreeNode.Section && node.id == "section:tables") {
+                                                            SchemaTreeNode.Section(
                                                                 id = node.id,
                                                                 label = node.label,
                                                                 children = node.children.map { child ->
                                                                     if (
-                                                                        child is com.dbeagle.ui.SchemaTreeNode.Table &&
+                                                                        child is SchemaTreeNode.Table &&
                                                                         child.id == "table:$tableKey"
                                                                     ) {
-                                                                        com.dbeagle.ui.SchemaTreeNode.Table(
+                                                                        SchemaTreeNode.Table(
                                                                             id = child.id,
                                                                             label = child.label,
                                                                             children = newChildren,
@@ -793,8 +791,7 @@ fun main() {
                                         }
 
                                         fun ensureSchemaLoaded(force: Boolean) {
-                                            val driver = activeDriver
-                                            if (driver == null) {
+                                            if (activeDriver == null) {
                                                 if (pid != null) {
                                                     sessionViewModel.updateSchemaState(pid) { s ->
                                                         s.copy(nodes = emptyList(), loadedAtMs = null, columnsCache = emptyMap())
@@ -814,14 +811,14 @@ fun main() {
                                                 statusText = "Status: Loading schema ($name)"
                                                 sessionViewModel.updateSchemaState(pid) { it.copy(isLoading = true, dialogError = null) }
                                                 try {
-                                                    val schema = withContext(Dispatchers.IO) { driver.getSchema() }
+                                                    val schema = withContext(Dispatchers.IO) { activeDriver.getSchema() }
                                                     val nodes = buildTree(schema)
                                                     val now = System.currentTimeMillis()
                                                     sessionViewModel.updateSchemaState(pid) {
                                                         it.copy(nodes = nodes, loadedAtMs = now, isLoading = false)
                                                     }
                                                     statusText = "Status: Schema loaded ($name)"
-                                                } catch (e: CancellationException) {
+                                                } catch (_: CancellationException) {
                                                     statusText = "Status: Schema load canceled"
                                                 } catch (e: Exception) {
                                                     statusText = "Status: Failed to load schema: ${e.message ?: "Error"}"
@@ -845,7 +842,7 @@ fun main() {
                                                     if (pid != null) sessionViewModel.updateSchemaState(pid) { it.copy(dialogError = null) }
                                                 },
                                                 title = { Text("Schema Error") },
-                                                text = { Text(schemaDialogError ?: "") },
+                                                text = { Text(schemaDialogError) },
                                                 confirmButton = {
                                                     TextButton(onClick = {
                                                         if (pid != null) sessionViewModel.updateSchemaState(pid) { it.copy(dialogError = null) }
@@ -880,7 +877,7 @@ fun main() {
                                                             forceRefresh()
                                                             ensureSchemaLoaded(force = true)
                                                         },
-                                                        enabled = hasConnection && !isLoadingSchema,
+                                                        enabled = hasConnection,
                                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                                         modifier = Modifier.height(32.dp),
                                                     ) {
@@ -907,9 +904,9 @@ fun main() {
                                                     modifier = Modifier.fillMaxSize(),
                                                     onNodeExpansionChanged = { node, expanded ->
                                                         if (!expanded) return@SchemaTree
-                                                        if (node !is com.dbeagle.ui.SchemaTreeNode.Table) return@SchemaTree
+                                                        if (node !is SchemaTreeNode.Table) return@SchemaTree
 
-                                                        val driver = activeDriver ?: return@SchemaTree
+                                                        val driver = activeDriver
 
                                                         val activePid = pid ?: return@SchemaTree
 
@@ -928,7 +925,7 @@ fun main() {
                                                                 val cols = withContext(Dispatchers.IO) { driver.getColumns(tableName) }
                                                                     .sortedBy { it.name }
                                                                     .map { c ->
-                                                                        com.dbeagle.ui.SchemaTreeNode.Column(
+                                                                        SchemaTreeNode.Column(
                                                                             id = "col:$tableKey.${c.name}",
                                                                             label = c.name,
                                                                             type = c.type,
@@ -942,7 +939,7 @@ fun main() {
                                                                 }
                                                                 updateTableChildren(tableKey, cols)
                                                                 statusText = "Status: Columns loaded ($name: $tableName)"
-                                                            } catch (e: CancellationException) {
+                                                            } catch (_: CancellationException) {
                                                                 statusText = "Status: Query canceled"
                                                             } catch (e: Exception) {
                                                                 statusText = "Status: Failed to load columns: ${e.message ?: "Error"}"
@@ -984,13 +981,6 @@ fun main() {
                                         com.dbeagle.ui.SettingsScreen(
                                             onClose = { selectedTab = NavigationTab.Connections },
                                             modifier = Modifier.fillMaxSize(),
-                                        )
-                                    }
-                                    else -> {
-                                        Text(
-                                            text = "${selectedTab.title} Content\n(Placeholder)",
-                                            style = MaterialTheme.typography.headlineSmall,
-                                            color = MaterialTheme.colorScheme.onBackground,
                                         )
                                     }
                                 }
