@@ -342,7 +342,6 @@ fun main() {
                                     }
                                     NavigationTab.Favorites -> {
                                         FavoritesScreen(
-                                            repository = favoritesRepository,
                                             onLoadQuery = { query ->
                                                 val pid = activeProfileId
                                                 if (pid == null) scratchSql = query else sessionViewModel.updateQueryEditorSql(pid, query)
@@ -353,7 +352,6 @@ fun main() {
                                     }
                                     NavigationTab.History -> {
                                         HistoryScreen(
-                                            repository = historyRepository,
                                             onLoadQuery = { query ->
                                                 val pid = activeProfileId
                                                 if (pid == null) scratchSql = query else sessionViewModel.updateQueryEditorSql(pid, query)

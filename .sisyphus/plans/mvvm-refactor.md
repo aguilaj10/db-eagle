@@ -667,7 +667,7 @@ Max Concurrent: 3 (Wave 2)
 
 ---
 
-- [ ] 7. Extract FavoritesViewModel
+- [x] 7. Extract FavoritesViewModel
 
   **What to do**:
   - Create `app/src/main/kotlin/com/dbeagle/viewmodel/FavoritesViewModel.kt`
@@ -738,7 +738,7 @@ Max Concurrent: 3 (Wave 2)
 
 ---
 
-- [ ] 8. Extract HistoryViewModel
+- [x] 8. Extract HistoryViewModel
 
   **What to do**:
   - Create `app/src/main/kotlin/com/dbeagle/viewmodel/HistoryViewModel.kt`

@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,57 +40,49 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.dbeagle.favorites.FavoritesRepository
 import com.dbeagle.model.FavoriteQuery
+import com.dbeagle.viewmodel.FavoritesViewModel
+import org.koin.core.context.GlobalContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
 fun FavoritesScreen(
-    repository: FavoritesRepository,
     onLoadQuery: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var favorites by remember { mutableStateOf(repository.getAll()) }
-    var searchQuery by remember { mutableStateOf("") }
-    var editingFavorite by remember { mutableStateOf<FavoriteQuery?>(null) }
-    var deletingFavorite by remember { mutableStateOf<FavoriteQuery?>(null) }
+    val viewModel = remember { GlobalContext.get().get<FavoritesViewModel>() }
+    val uiState by viewModel.uiState.collectAsState()
 
-    val displayedFavorites = remember(searchQuery, favorites) {
-        if (searchQuery.isBlank()) favorites else repository.search(searchQuery)
-    }
+    val displayedFavorites = viewModel.getDisplayedFavorites()
 
-    if (editingFavorite != null) {
+    if (uiState.editingFavorite != null) {
         EditFavoriteDialog(
-            favorite = editingFavorite!!,
-            onDismiss = { editingFavorite = null },
+            favorite = uiState.editingFavorite!!,
+            onDismiss = { viewModel.setEditingFavorite(null) },
             onSave = { updated ->
-                repository.save(updated)
-                favorites = repository.getAll()
-                editingFavorite = null
+                viewModel.saveFavorite(updated)
             },
         )
     }
 
-    if (deletingFavorite != null) {
+    if (uiState.deletingFavorite != null) {
         AlertDialog(
-            onDismissRequest = { deletingFavorite = null },
+            onDismissRequest = { viewModel.setDeletingFavorite(null) },
             title = { Text("Delete Favorite") },
-            text = { Text("Are you sure you want to delete '${deletingFavorite!!.name}'? This cannot be undone.") },
+            text = { Text("Are you sure you want to delete '${uiState.deletingFavorite!!.name}'? This cannot be undone.") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        repository.delete(deletingFavorite!!.id)
-                        favorites = repository.getAll()
-                        deletingFavorite = null
+                        viewModel.deleteFavorite(uiState.deletingFavorite!!.id)
                     },
                 ) {
                     Text("Delete")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deletingFavorite = null }) {
+                TextButton(onClick = { viewModel.setDeletingFavorite(null) }) {
                     Text("Cancel")
                 }
             },
@@ -111,8 +104,8 @@ fun FavoritesScreen(
             )
 
             OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
+                value = uiState.searchQuery,
+                onValueChange = { viewModel.updateSearchQuery(it) },
                 placeholder = { Text("Search favorites...") },
                 singleLine = true,
                 modifier = Modifier.width(300.dp),
@@ -128,7 +121,7 @@ fun FavoritesScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = if (searchQuery.isBlank()) {
+                    text = if (uiState.searchQuery.isBlank()) {
                         "No favorites yet.\nSave queries from Query Editor to see them here."
                     } else {
                         "No favorites match your search."
@@ -146,8 +139,8 @@ fun FavoritesScreen(
                     FavoriteCard(
                         favorite = favorite,
                         onClick = { onLoadQuery(favorite.query) },
-                        onEdit = { editingFavorite = favorite },
-                        onDelete = { deletingFavorite = favorite },
+                        onEdit = { viewModel.setEditingFavorite(favorite) },
+                        onDelete = { viewModel.setDeletingFavorite(favorite) },
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }

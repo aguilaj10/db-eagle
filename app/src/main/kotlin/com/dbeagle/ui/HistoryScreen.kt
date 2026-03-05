@@ -22,48 +22,45 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.dbeagle.history.QueryHistoryRepository
 import com.dbeagle.model.QueryHistoryEntry
+import com.dbeagle.viewmodel.HistoryViewModel
+import org.koin.core.context.GlobalContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
 fun HistoryScreen(
-    repository: QueryHistoryRepository,
     onLoadQuery: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var entries by remember { mutableStateOf(repository.getAll()) }
-    var showClearDialog by remember { mutableStateOf(false) }
+    val viewModel = remember { GlobalContext.get().get<HistoryViewModel>() }
+    val uiState by viewModel.uiState.collectAsState()
 
-    if (showClearDialog) {
+    if (uiState.showClearDialog) {
         AlertDialog(
-            onDismissRequest = { showClearDialog = false },
+            onDismissRequest = { viewModel.hideClearDialog() },
             title = { Text("Clear History") },
             text = { Text("Are you sure you want to clear all query history? This cannot be undone.") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        repository.clear()
-                        entries = emptyList()
-                        showClearDialog = false
+                        viewModel.clearHistory()
                     },
                 ) {
                     Text("Clear")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) {
+                TextButton(onClick = { viewModel.hideClearDialog() }) {
                     Text("Cancel")
                 }
             },
@@ -79,14 +76,14 @@ fun HistoryScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "${entries.size} ${if (entries.size == 1) "entry" else "entries"}",
+                text = "${uiState.entries.size} ${if (uiState.entries.size == 1) "entry" else "entries"}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Button(
-                onClick = { showClearDialog = true },
-                enabled = entries.isNotEmpty(),
+                onClick = { viewModel.showClearDialog() },
+                enabled = uiState.entries.isNotEmpty(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp),
             ) {
@@ -96,7 +93,7 @@ fun HistoryScreen(
 
         HorizontalDivider()
 
-        if (entries.isEmpty()) {
+        if (uiState.entries.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -112,7 +109,7 @@ fun HistoryScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(8.dp),
             ) {
-                items(entries) { entry ->
+                items(uiState.entries) { entry ->
                     HistoryEntryCard(
                         entry = entry,
                         onClick = { onLoadQuery(entry.query) },

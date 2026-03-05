@@ -1,6 +1,8 @@
 package com.dbeagle.di
 
 import com.dbeagle.viewmodel.ConnectionListViewModel
+import com.dbeagle.viewmodel.FavoritesViewModel
+import com.dbeagle.viewmodel.HistoryViewModel
 import com.dbeagle.viewmodel.QueryEditorViewModel
 import com.dbeagle.viewmodel.SettingsViewModel
 import org.koin.core.parameter.parametersOf
@@ -13,4 +15,6 @@ val viewModelModule =
         }
         factory { QueryEditorViewModel(get()) }
         factory { SettingsViewModel() }
+        factory { HistoryViewModel(get()) }
+        factory { FavoritesViewModel(get()) }
     }
