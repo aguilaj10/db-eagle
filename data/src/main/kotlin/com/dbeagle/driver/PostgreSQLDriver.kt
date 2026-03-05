@@ -5,8 +5,10 @@ import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
 import com.dbeagle.model.ForeignKeyRelationship
+import com.dbeagle.model.IndexMetadata
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
+import com.dbeagle.model.SequenceMetadata
 import com.dbeagle.model.TableMetadata
 import com.dbeagle.pool.DatabaseConnectionPool
 import kotlinx.coroutines.Dispatchers
@@ -248,6 +250,139 @@ class PostgreSQLDriver : DatabaseDriver {
         }
     }
 
+    override suspend fun getSequences(): List<SequenceMetadata> {
+        val db = database ?: return emptyList()
+        val cfg = config!!
+
+        return withContext(Dispatchers.IO) {
+            transaction(db) {
+                val jdbc = connection.connection as Connection
+
+                // First, get basic sequence info from information_schema
+                val sequences = jdbc.createStatement().use { stmt ->
+                    stmt.executeQuery("""
+                        SELECT sequence_name, start_value, increment, minimum_value, maximum_value, cycle_option
+                        FROM information_schema.sequences
+                        WHERE sequence_schema = 'public'
+                    """.trimIndent()).use { rs ->
+                        buildList {
+                            while (rs.next()) {
+                                val name = rs.getString("sequence_name")
+                                val startValue = rs.getLong("start_value")
+                                val increment = rs.getLong("increment")
+                                val minValue = rs.getLong("minimum_value")
+                                val maxValue = rs.getLong("maximum_value")
+                                val cycle = rs.getString("cycle_option") == "YES"
+
+                                add(
+                                    Triple(
+                                        name,
+                                        SequenceMetadata(
+                                            name = name,
+                                            schema = "public",
+                                            startValue = startValue,
+                                            increment = increment,
+                                            minValue = minValue,
+                                            maxValue = maxValue,
+                                            cycle = cycle,
+                                        ),
+                                        mutableMapOf<String, Pair<String, String>>()
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Now, get ownership info from pg_depend
+                val ownershipMap = mutableMapOf<String, Pair<String, String>>()
+                jdbc.createStatement().use { stmt ->
+                    stmt.executeQuery("""
+                        SELECT s.relname AS sequence_name,
+                               t.relname AS table_name,
+                               a.attname AS column_name
+                        FROM pg_class s
+                        JOIN pg_depend d ON d.objid = s.oid
+                        JOIN pg_class t ON d.refobjid = t.oid
+                        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+                        WHERE s.relkind = 'S'
+                          AND d.deptype = 'a'
+                          AND s.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+                    """.trimIndent()).use { rs ->
+                        while (rs.next()) {
+                            val seqName = rs.getString("sequence_name")
+                            val tableName = rs.getString("table_name")
+                            val columnName = rs.getString("column_name")
+                            ownershipMap[seqName] = tableName to columnName
+                        }
+                    }
+                }
+
+                // Merge ownership info into sequence metadata
+                sequences.map { (name, metadata, _) ->
+                    val ownership = ownershipMap[name]
+                    metadata.copy(
+                        ownedByTable = ownership?.first,
+                        ownedByColumn = ownership?.second
+                    )
+                }.sortedBy { it.name }
+            }
+        }
+    }
+
+    override suspend fun getIndexDetails(tableName: String): List<IndexMetadata> {
+        val db = database ?: return emptyList()
+        val cfg = config!!
+
+        return withContext(Dispatchers.IO) {
+            transaction(db) {
+                val jdbc = connection.connection as Connection
+                jdbc.metaData.getIndexInfo(null, "public", tableName, false, false).use { rs ->
+                    // Group by index name to handle composite indexes
+                    val indexMap = mutableMapOf<String, MutableList<Pair<Int, String>>>()
+                    val indexUnique = mutableMapOf<String, Boolean>()
+                    val indexType = mutableMapOf<String, String>()
+
+                    while (rs.next()) {
+                        val indexName = rs.getString("INDEX_NAME")
+                        if (indexName.isNullOrBlank()) continue
+
+                        val columnName = rs.getString("COLUMN_NAME")
+                        if (columnName.isNullOrBlank()) continue
+
+                        val ordinalPosition = rs.getShort("ORDINAL_POSITION").toInt()
+                        val nonUnique = rs.getBoolean("NON_UNIQUE")
+                        val indexTypeValue = rs.getShort("TYPE")
+
+                        indexMap.getOrPut(indexName) { mutableListOf() }
+                            .add(ordinalPosition to columnName)
+
+                        indexUnique[indexName] = !nonUnique
+
+                        // Map JDBC index type constants to readable strings
+                        indexType[indexName] = when (indexTypeValue.toInt()) {
+                            DatabaseMetaData.tableIndexClustered.toInt() -> "CLUSTERED"
+                            DatabaseMetaData.tableIndexHashed.toInt() -> "HASHED"
+                            DatabaseMetaData.tableIndexOther.toInt() -> "OTHER"
+                            else -> "BTREE"
+                        }
+                    }
+
+                    // Build IndexMetadata objects with properly ordered columns
+                    indexMap.map { (name, columns) ->
+                        IndexMetadata(
+                            name = name,
+                            tableName = tableName,
+                            columns = columns.sortedBy { it.first }.map { it.second },
+                            unique = indexUnique[name] ?: false,
+                            type = indexType[name]
+                        )
+                    }.sortedBy { it.name }
+                }
+            }
+        }
+    }
+
     override fun getCapabilities(): Set<DatabaseCapability> = setOf(
         DatabaseCapability.Transactions,
         DatabaseCapability.PreparedStatements,
@@ -255,6 +390,7 @@ class PostgreSQLDriver : DatabaseDriver {
         DatabaseCapability.Schemas,
         DatabaseCapability.Views,
         DatabaseCapability.Indexes,
+        DatabaseCapability.Sequences,
     )
 
     override fun getName(): String = "PostgreSQL"

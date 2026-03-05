@@ -5,8 +5,10 @@ import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
 import com.dbeagle.model.ForeignKeyRelationship
+import com.dbeagle.model.IndexMetadata
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
+import com.dbeagle.model.SequenceMetadata
 import com.dbeagle.model.TableMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -277,6 +279,61 @@ class SQLiteDriver : DatabaseDriver {
                 true
             } catch (_: Exception) {
                 false
+            }
+        }
+    }
+
+    override suspend fun getSequences(): List<SequenceMetadata> = emptyList()
+
+    override suspend fun getIndexDetails(tableName: String): List<IndexMetadata> {
+        val db = database ?: return emptyList()
+        val cfg = config!!
+        val escapedTable = escapeSqlitePragmaIdent(tableName)
+
+        return withContext(Dispatchers.IO) {
+            transaction(db) {
+                val jdbc = connection.connection as Connection
+
+                // Get list of indexes from PRAGMA index_list
+                val indexes = jdbc.createStatement().use { stmt ->
+                    stmt.queryTimeout = cfg.queryTimeoutSeconds
+                    stmt.executeQuery("PRAGMA index_list('$escapedTable')").use { rs ->
+                        buildList {
+                            while (rs.next()) {
+                                val name = rs.getString("name")
+                                val unique = rs.getInt("unique") != 0
+                                if (!name.isNullOrBlank()) {
+                                    add(name to unique)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // For each index, get columns from PRAGMA index_info
+                indexes.map { (indexName, unique) ->
+                    val escapedIndex = escapeSqlitePragmaIdent(indexName)
+                    val columns = jdbc.createStatement().use { stmt ->
+                        stmt.queryTimeout = cfg.queryTimeoutSeconds
+                        stmt.executeQuery("PRAGMA index_info('$escapedIndex')").use { rs ->
+                            buildList {
+                                while (rs.next()) {
+                                    val columnName = rs.getString("name")
+                                    if (!columnName.isNullOrBlank()) {
+                                        add(columnName)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    IndexMetadata(
+                        name = indexName,
+                        tableName = tableName,
+                        columns = columns,
+                        unique = unique,
+                        type = null
+                    )
+                }.sortedBy { it.name }
             }
         }
     }
