@@ -2,6 +2,7 @@ package com.dbeagle
 
 import com.dbeagle.test.BaseTest
 import com.dbeagle.test.DatabaseTestContainers
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -39,7 +40,15 @@ class SmokeTest : BaseTest() {
             println("Skipping: PostgreSQL container not available (Docker may not be running)")
             return
         }
-        val connection = DatabaseTestContainers.getConnection()
+
+        // Verify connection is actually usable before proceeding
+        val connection = try {
+            DatabaseTestContainers.getConnection()
+        } catch (e: Exception) {
+            assumeTrue(false, "PostgreSQL container started but connection failed: ${e.message}")
+            return
+        }
+
         try {
             val statement = connection.createStatement()
             val resultSet = statement.executeQuery("SELECT 1")

@@ -20,8 +20,20 @@ class DatabaseConnectionPoolTest {
 
             postgresContainer?.start()
             dockerAvailable = postgresContainer?.isRunning == true
+
+            if (dockerAvailable) {
+                try {
+                    val testConn = java.sql.DriverManager.getConnection(
+                        postgresContainer!!.jdbcUrl,
+                        postgresContainer!!.username,
+                        postgresContainer!!.password,
+                    )
+                    testConn.close()
+                } catch (e: Exception) {
+                    dockerAvailable = false
+                }
+            }
         } catch (e: Exception) {
-            // Docker not available - tests will be skipped
             dockerAvailable = false
         }
     }
