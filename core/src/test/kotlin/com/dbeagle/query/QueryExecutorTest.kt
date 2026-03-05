@@ -9,8 +9,13 @@ import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.settings.AppPreferences
 import com.dbeagle.settings.AppSettings
-import kotlin.test.*
 import kotlinx.coroutines.runBlocking
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class QueryExecutorTest {
     @BeforeTest
@@ -71,12 +76,10 @@ class QueryExecutorTest {
         val driver = object : DatabaseDriver {
             override suspend fun connect(config: ConnectionConfig) = Unit
             override suspend fun disconnect() = Unit
-            override suspend fun executeQuery(sql: String, params: List<Any>): QueryResult {
-                return if (sql.trimStart().startsWith("update", ignoreCase = true)) {
-                    QueryResult.Success(columnNames = emptyList(), rows = emptyList())
-                } else {
-                    QueryResult.Error("no")
-                }
+            override suspend fun executeQuery(sql: String, params: List<Any>): QueryResult = if (sql.trimStart().startsWith("update", ignoreCase = true)) {
+                QueryResult.Success(columnNames = emptyList(), rows = emptyList())
+            } else {
+                QueryResult.Error("no")
             }
 
             override suspend fun getSchema(): SchemaMetadata = SchemaMetadata(tables = emptyList())

@@ -2,18 +2,21 @@ package com.dbeagle.session
 
 import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.QueryResult
+import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.ui.SchemaTreeNode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
 class SessionViewModel(
-    private val closePool: suspend (profileId: String) -> Unit = { DatabaseConnectionPool.closePool(it) }
+    private val closePool: suspend (profileId: String) -> Unit = { DatabaseConnectionPool.closePool(it) },
 ) {
     data class ColumnCacheEntry(
         val loadedAtMs: Long,
-        val columns: List<SchemaTreeNode.Column>
+        val columns: List<SchemaTreeNode.Column>,
     )
 
     data class SchemaUiState(
@@ -21,7 +24,8 @@ class SessionViewModel(
         val loadedAtMs: Long? = null,
         val nodes: List<SchemaTreeNode> = emptyList(),
         val dialogError: String? = null,
-        val columnsCache: Map<String, ColumnCacheEntry> = emptyMap()
+        val columnsCache: Map<String, ColumnCacheEntry> = emptyMap(),
+        val schemaMetadata: SchemaMetadata? = null,
     )
 
     data class SessionUiState(
@@ -32,7 +36,7 @@ class SessionViewModel(
         val lastQueryResult: QueryResult.Success? = null,
         val resultColumns: List<String> = emptyList(),
         val resultRows: List<List<String>> = emptyList(),
-        val schema: SchemaUiState = SchemaUiState()
+        val schema: SchemaUiState = SchemaUiState(),
     )
 
     private val drivers = LinkedHashMap<String, DatabaseDriver>()
@@ -60,15 +64,20 @@ class SessionViewModel(
         _connectingProfileId.value = profileId
     }
 
-    fun openSession(profileId: String, profileName: String?, driver: DatabaseDriver) {
+    fun openSession(
+        profileId: String,
+        profileName: String?,
+        driver: DatabaseDriver,
+    ) {
         val wasEmpty = drivers.isEmpty()
         drivers[profileId] = driver
 
         val prev = _sessionStates.value[profileId]
-        val next = prev?.copy(profileName = profileName) ?: SessionUiState(
-            profileId = profileId,
-            profileName = profileName
-        )
+        val next =
+            prev?.copy(profileName = profileName) ?: SessionUiState(
+                profileId = profileId,
+                profileName = profileName,
+            )
         _sessionStates.value = _sessionStates.value + (profileId to next)
 
         if (!_sessionOrder.value.contains(profileId)) {
@@ -91,7 +100,7 @@ class SessionViewModel(
         val driver = drivers.remove(profileId)
         if (driver != null) {
             try {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     driver.disconnect()
                 }
             } catch (_: Exception) {
@@ -99,7 +108,7 @@ class SessionViewModel(
         }
 
         try {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 closePool(profileId)
             }
         } catch (_: Exception) {
@@ -114,24 +123,32 @@ class SessionViewModel(
         }
     }
 
-    fun updateQueryEditorSql(profileId: String, sql: String) {
+    fun updateQueryEditorSql(
+        profileId: String,
+        sql: String,
+    ) {
         updateSession(profileId) { it.copy(queryEditorSql = sql) }
     }
 
-    fun recordQueryResult(profileId: String, executedSql: String, result: QueryResult.Success) {
+    fun recordQueryResult(
+        profileId: String,
+        executedSql: String,
+        result: QueryResult.Success,
+    ) {
         val columns = result.columnNames
-        val rows = result.rows.map { rowMap ->
-            columns.map { col ->
-                val cellValue = rowMap[col] ?: ""
-                truncateCell(cellValue)
+        val rows =
+            result.rows.map { rowMap ->
+                columns.map { col ->
+                    val cellValue = rowMap[col] ?: ""
+                    truncateCell(cellValue)
+                }
             }
-        }
         updateSession(profileId) {
             it.copy(
                 lastExecutedSql = executedSql,
                 lastQueryResult = result,
                 resultColumns = columns,
-                resultRows = rows
+                resultRows = rows,
             )
         }
     }
@@ -142,22 +159,27 @@ class SessionViewModel(
                 lastExecutedSql = null,
                 lastQueryResult = null,
                 resultColumns = emptyList(),
-                resultRows = emptyList()
+                resultRows = emptyList(),
             )
         }
     }
 
-    fun updateSchemaState(profileId: String, transform: (SchemaUiState) -> SchemaUiState) {
+    fun updateSchemaState(
+        profileId: String,
+        transform: (SchemaUiState) -> SchemaUiState,
+    ) {
         updateSession(profileId) { s -> s.copy(schema = transform(s.schema)) }
     }
 
-    private fun updateSession(profileId: String, transform: (SessionUiState) -> SessionUiState) {
+    private fun updateSession(
+        profileId: String,
+        transform: (SessionUiState) -> SessionUiState,
+    ) {
         val current = _sessionStates.value[profileId] ?: return
         _sessionStates.value = _sessionStates.value + (profileId to transform(current))
     }
 
-    private fun truncateCell(value: String): String =
-        if (value.length > 500) value.substring(0, 500) else value
+    private fun truncateCell(value: String): String = if (value.length > 500) value.substring(0, 500) else value
 
     companion object {
         const val DEFAULT_SQL: String = "SELECT * FROM users;\n"

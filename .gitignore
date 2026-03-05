@@ -1,3 +1,8 @@
+# Node.js (used for tooling only)
+node_modules/
+package.json
+package-lock.json
+
 # Gradle
 .gradle/
 build/
@@ -61,3 +66,13 @@ local.properties
 /.sisyphus/evidence/task-33-leak-detection.txt
 /.sisyphus/boulder.json
 /.sisyphus/plans/kotlin-gradle-upgrade.md
+/.sisyphus/notepads/mvvm-refactor/decisions.md
+/.sisyphus/notepads/mvvm-refactor/issues.md
+/.sisyphus/notepads/mvvm-refactor/learnings.md
+/.sisyphus/notepads/mvvm-refactor/problems.md
+/.sisyphus/notepads/f2-code-quality-review/learnings.md
+/.sisyphus/notepads/dark-mode-theme/decisions.md
+/.sisyphus/notepads/db-eagle-branding/learnings.md
+/.sisyphus/plans/dark-mode-theme.md
+/.sisyphus/plans/schema-management.md
+/.sisyphus/plans/schema-management.md

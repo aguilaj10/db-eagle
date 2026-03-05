@@ -10,5 +10,5 @@ data class FavoriteQuery(
     val query: String,
     val tags: List<String> = emptyList(),
     val created: Long = System.currentTimeMillis(),
-    val lastModified: Long = System.currentTimeMillis()
+    val lastModified: Long = System.currentTimeMillis(),
 )

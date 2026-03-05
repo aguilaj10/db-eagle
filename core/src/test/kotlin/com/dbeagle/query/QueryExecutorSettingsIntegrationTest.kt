@@ -7,7 +7,10 @@ import com.dbeagle.settings.AppSettings
 import com.dbeagle.test.BaseTest
 import kotlinx.coroutines.runBlocking
 import java.io.File
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class QueryExecutorSettingsIntegrationTest : BaseTest() {
     private class FakeDriver : DatabaseDriver {
@@ -22,7 +25,7 @@ class QueryExecutorSettingsIntegrationTest : BaseTest() {
             val rows = (1..2000).map { mapOf("id" to it.toString(), "value" to "row$it") }
             return QueryResult.Success(
                 columnNames = listOf("id", "value"),
-                rows = rows
+                rows = rows,
             )
         }
         override suspend fun getSchema(): com.dbeagle.model.SchemaMetadata = com.dbeagle.model.SchemaMetadata(emptyList())
@@ -59,7 +62,7 @@ class QueryExecutorSettingsIntegrationTest : BaseTest() {
             resultLimit = 250,
             queryTimeoutSeconds = 90,
             connectionTimeoutSeconds = 45,
-            maxConnections = 15
+            maxConnections = 15,
         )
         AppPreferences.save(custom)
 
@@ -92,7 +95,7 @@ class QueryExecutorSettingsIntegrationTest : BaseTest() {
             resultLimit = 500,
             queryTimeoutSeconds = 75,
             connectionTimeoutSeconds = 40,
-            maxConnections = 12
+            maxConnections = 12,
         )
         AppPreferences.save(settings)
         output.appendLine("Saved: resultLimit=${settings.resultLimit}, queryTimeout=${settings.queryTimeoutSeconds}, connectionTimeout=${settings.connectionTimeoutSeconds}, maxConnections=${settings.maxConnections}")
@@ -110,10 +113,10 @@ class QueryExecutorSettingsIntegrationTest : BaseTest() {
         val driver = FakeDriver()
         val executor = QueryExecutor(driver)
         val result = executor.execute("SELECT * FROM test_table")
-        
+
         output.appendLine("Query executed: ${driver.queryExecuted}")
         output.appendLine("LIMIT parameter sent to driver: ${driver.paramsReceived?.get(0)}")
-        
+
         val success = result as QueryResult.Success
         output.appendLine("Rows returned: ${success.rows.size}")
         output.appendLine("Verification: rows returned matches resultLimit = ${success.rows.size == 500}")
@@ -123,7 +126,7 @@ class QueryExecutorSettingsIntegrationTest : BaseTest() {
         output.appendLine("Settings persist correctly and resultLimit=500 causes QueryExecutor to return exactly 500 rows.")
 
         evidenceFile.writeText(output.toString())
-        
+
         assertTrue(evidenceFile.exists(), "Evidence file should exist")
         assertTrue(evidenceFile.readText().contains("resultLimit=500"), "Evidence should contain resultLimit=500")
         assertTrue(evidenceFile.readText().contains("Rows returned: 500"), "Evidence should prove 500 rows returned")

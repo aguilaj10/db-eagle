@@ -8,43 +8,45 @@ import com.dbeagle.model.ForeignKeyRelationship
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.model.TableMetadata
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.coroutines.runBlocking
 
 class DatabaseDriverTest {
-    private val testConfig = ConnectionConfig(
-        profile = ConnectionProfile(
-            id = "test-profile",
-            name = "Test Database",
-            type = DatabaseType.PostgreSQL,
-            host = "localhost",
-            port = 5432,
-            database = "testdb",
-            username = "testuser",
-            encryptedPassword = "encrypted-password",
-            options = emptyMap()
+    private val testConfig =
+        ConnectionConfig(
+            profile =
+            ConnectionProfile(
+                id = "test-profile",
+                name = "Test Database",
+                type = DatabaseType.PostgreSQL,
+                host = "localhost",
+                port = 5432,
+                database = "testdb",
+                username = "testuser",
+                encryptedPassword = "encrypted-password",
+                options = emptyMap(),
+            ),
         )
-    )
 
     @Test
     fun testMockDriverImplementation() = runBlocking {
         val driver = MockDatabaseDriver()
-        
+
         driver.connect(testConfig)
         assertTrue(driver.isConnected, "Driver should be connected after connect()")
-        
+
         val testResult = driver.executeQuery("SELECT 1", emptyList())
         assertTrue(testResult is QueryResult.Success, "Query should succeed")
 
         assertEquals(listOf("column1"), testResult.columnNames)
         assertEquals(1, testResult.rows.size)
-        
+
         val isAlive = driver.testConnection()
         assertTrue(isAlive, "Test connection should return true")
-        
+
         driver.disconnect()
         assertFalse(driver.isConnected, "Driver should be disconnected after disconnect()")
     }
@@ -53,7 +55,7 @@ class DatabaseDriverTest {
     fun testCapabilityExposure() = runBlocking {
         val driver = MockDatabaseDriver()
         val capabilities = driver.getCapabilities()
-        
+
         assertTrue(DatabaseCapability.Transactions in capabilities, "Should support transactions")
         assertTrue(DatabaseCapability.PreparedStatements in capabilities, "Should support prepared statements")
         assertTrue(DatabaseCapability.ForeignKeys in capabilities, "Should support foreign keys")
@@ -63,11 +65,11 @@ class DatabaseDriverTest {
     fun testSchemaMetadataRetrieval() = runBlocking {
         val driver = MockDatabaseDriver()
         driver.connect(testConfig)
-        
+
         val schema = driver.getSchema()
         assertEquals(1, schema.tables.size, "Should return one table")
         assertEquals("mock_table", schema.tables[0].name)
-        
+
         val tables = driver.getTables()
         assertEquals(listOf("mock_table"), tables)
     }
@@ -76,7 +78,7 @@ class DatabaseDriverTest {
     fun testColumnMetadataRetrieval() = runBlocking {
         val driver = MockDatabaseDriver()
         driver.connect(testConfig)
-        
+
         val columns = driver.getColumns("mock_table")
         assertEquals(2, columns.size)
         assertEquals("id", columns[0].name)
@@ -87,7 +89,7 @@ class DatabaseDriverTest {
     fun testForeignKeyRetrieval() = runBlocking {
         val driver = MockDatabaseDriver()
         driver.connect(testConfig)
-        
+
         val foreignKeys = driver.getForeignKeys()
         assertEquals(1, foreignKeys.size)
         assertEquals("mock_table", foreignKeys[0].fromTable)
@@ -112,74 +114,64 @@ class MockDatabaseDriver : DatabaseDriver {
         isConnected = false
     }
 
-    override suspend fun executeQuery(sql: String, params: List<Any>): QueryResult {
-        return QueryResult.Success(
-            columnNames = listOf("column1"),
-            rows = listOf(mapOf("column1" to "value1"))
-        )
-    }
+    override suspend fun executeQuery(
+        sql: String,
+        params: List<Any>,
+    ): QueryResult = QueryResult.Success(
+        columnNames = listOf("column1"),
+        rows = listOf(mapOf("column1" to "value1")),
+    )
 
-    override suspend fun getSchema(): SchemaMetadata {
-        return SchemaMetadata(
-            tables = listOf(
-                TableMetadata(
-                    name = "mock_table",
-                    schema = "public",
-                    columns = listOf(
-                        ColumnMetadata("id", "INTEGER", false),
-                        ColumnMetadata("name", "VARCHAR", true)
-                    ),
-                    primaryKey = listOf("id")
-                )
+    override suspend fun getSchema(): SchemaMetadata = SchemaMetadata(
+        tables =
+        listOf(
+            TableMetadata(
+                name = "mock_table",
+                schema = "public",
+                columns =
+                listOf(
+                    ColumnMetadata("id", "INTEGER", false),
+                    ColumnMetadata("name", "VARCHAR", true),
+                ),
+                primaryKey = listOf("id"),
             ),
-            foreignKeys = listOf(
-                ForeignKeyRelationship(
-                    fromTable = "mock_table",
-                    fromColumn = "id",
-                    toTable = "other_table",
-                    toColumn = "id"
-                )
-            )
-        )
-    }
-
-    override suspend fun getTables(): List<String> {
-        return listOf("mock_table")
-    }
-
-    override suspend fun getColumns(table: String): List<ColumnMetadata> {
-        return listOf(
-            ColumnMetadata("id", "INTEGER", false),
-            ColumnMetadata("name", "VARCHAR", true)
-        )
-    }
-
-    override suspend fun getForeignKeys(): List<ForeignKeyRelationship> {
-        return listOf(
+        ),
+        foreignKeys =
+        listOf(
             ForeignKeyRelationship(
                 fromTable = "mock_table",
                 fromColumn = "id",
                 toTable = "other_table",
-                toColumn = "id"
-            )
-        )
-    }
+                toColumn = "id",
+            ),
+        ),
+    )
 
-    override suspend fun testConnection(): Boolean {
-        return isConnected
-    }
+    override suspend fun getTables(): List<String> = listOf("mock_table")
 
-    override fun getCapabilities(): Set<DatabaseCapability> {
-        return setOf(
-            DatabaseCapability.Transactions,
-            DatabaseCapability.PreparedStatements,
-            DatabaseCapability.ForeignKeys,
-            DatabaseCapability.Indexes,
-            DatabaseCapability.Schemas
-        )
-    }
+    override suspend fun getColumns(table: String): List<ColumnMetadata> = listOf(
+        ColumnMetadata("id", "INTEGER", false),
+        ColumnMetadata("name", "VARCHAR", true),
+    )
 
-    override fun getName(): String {
-        return "Mock Driver"
-    }
+    override suspend fun getForeignKeys(): List<ForeignKeyRelationship> = listOf(
+        ForeignKeyRelationship(
+            fromTable = "mock_table",
+            fromColumn = "id",
+            toTable = "other_table",
+            toColumn = "id",
+        ),
+    )
+
+    override suspend fun testConnection(): Boolean = isConnected
+
+    override fun getCapabilities(): Set<DatabaseCapability> = setOf(
+        DatabaseCapability.Transactions,
+        DatabaseCapability.PreparedStatements,
+        DatabaseCapability.ForeignKeys,
+        DatabaseCapability.Indexes,
+        DatabaseCapability.Schemas,
+    )
+
+    override fun getName(): String = "Mock Driver"
 }

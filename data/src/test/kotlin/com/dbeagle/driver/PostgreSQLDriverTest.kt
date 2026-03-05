@@ -19,11 +19,12 @@ class PostgreSQLDriverTest {
     @BeforeTest
     fun setup() {
         try {
-            postgresContainer = PostgreSQLContainer("postgres:15-alpine")
-                .withDatabaseName("testdb")
-                .withUsername("testuser")
-                .withPassword("testpass")
-                .withStartupTimeoutSeconds(60)
+            postgresContainer =
+                PostgreSQLContainer("postgres:15-alpine")
+                    .withDatabaseName("testdb")
+                    .withUsername("testuser")
+                    .withPassword("testpass")
+                    .withStartupTimeoutSeconds(60)
 
             postgresContainer?.start()
             dockerAvailable = postgresContainer?.isRunning == true
@@ -114,7 +115,7 @@ class PostgreSQLDriverTest {
                     it.toTable == "users" &&
                     it.toColumn == "id"
             },
-            "Expected orders.user_id -> users.id foreign key"
+            "Expected orders.user_id -> users.id foreign key",
         )
 
         val schema = driver.getSchema()
@@ -124,25 +125,121 @@ class PostgreSQLDriverTest {
 
         driver.disconnect()
     }
+
+    @Test
+    fun testGetSequencesReturnsMetadata() = kotlinx.coroutines.runBlocking {
+        if (!dockerAvailable) return@runBlocking
+
+        val container = postgresContainer!!
+        val driver = PostgreSQLDriver()
+        driver.connect(connectionConfig(container))
+
+        val sequences = driver.getSequences()
+
+        // PostgreSQL automatically creates sequences for SERIAL columns
+        // users.id and orders.id are SERIAL, so we expect sequences named users_id_seq and orders_id_seq
+        assertTrue(sequences.isNotEmpty(), "Expected at least one sequence from SERIAL columns")
+
+        val usersIdSeq = sequences.find { it.name == "users_id_seq" }
+        assertTrue(usersIdSeq != null, "Expected users_id_seq sequence from SERIAL column")
+
+        if (usersIdSeq != null) {
+            assertEquals("public", usersIdSeq.schema)
+            assertEquals(1L, usersIdSeq.startValue)
+            assertEquals(1L, usersIdSeq.increment)
+            assertTrue(usersIdSeq.minValue > 0)
+            assertTrue(usersIdSeq.maxValue > usersIdSeq.minValue)
+            assertEquals("users", usersIdSeq.ownedByTable)
+            assertEquals("id", usersIdSeq.ownedByColumn)
+        }
+
+        driver.disconnect()
+    }
+
+    @Test
+    fun testGetIndexDetailsReturnsMetadata() = kotlinx.coroutines.runBlocking {
+        if (!dockerAvailable) return@runBlocking
+
+        val container = postgresContainer!!
+        val driver = PostgreSQLDriver()
+        driver.connect(connectionConfig(container))
+
+        // PostgreSQL automatically creates indexes for primary keys
+        val usersIndexes = driver.getIndexDetails("users")
+        assertTrue(usersIndexes.isNotEmpty(), "Expected at least the primary key index")
+
+        val pkIndex = usersIndexes.find { it.name == "users_pkey" }
+        assertTrue(pkIndex != null, "Expected users_pkey index")
+
+        if (pkIndex != null) {
+            assertEquals("users", pkIndex.tableName)
+            assertEquals(listOf("id"), pkIndex.columns)
+            assertTrue(pkIndex.unique, "Primary key index should be unique")
+        }
+
+        // Test indexes for orders table
+        val ordersIndexes = driver.getIndexDetails("orders")
+        assertTrue(ordersIndexes.isNotEmpty(), "Expected at least the primary key index")
+
+        val ordersPkIndex = ordersIndexes.find { it.name == "orders_pkey" }
+        assertTrue(ordersPkIndex != null, "Expected orders_pkey index")
+
+        if (ordersPkIndex != null) {
+            assertEquals("orders", ordersPkIndex.tableName)
+            assertEquals(listOf("id"), ordersPkIndex.columns)
+            assertTrue(ordersPkIndex.unique, "Primary key index should be unique")
+        }
+
+        driver.disconnect()
+    }
+
+    @Test
+    fun testTableMetadataIncludesPrimaryKey() = kotlinx.coroutines.runBlocking {
+        if (!dockerAvailable) return@runBlocking
+
+        val container = postgresContainer!!
+        val driver = PostgreSQLDriver()
+        driver.connect(connectionConfig(container))
+
+        val schema = driver.getSchema()
+        val usersTable = schema.tables.find { it.name == "users" }
+        assertTrue(usersTable != null, "Expected users table in schema")
+
+        if (usersTable != null) {
+            assertTrue(usersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+            assertEquals(listOf("id"), usersTable.primaryKey)
+        }
+
+        val ordersTable = schema.tables.find { it.name == "orders" }
+        assertTrue(ordersTable != null, "Expected orders table in schema")
+
+        if (ordersTable != null) {
+            assertTrue(ordersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+            assertEquals(listOf("id"), ordersTable.primaryKey)
+        }
+
+        driver.disconnect()
+    }
 }
 
 private fun connectionConfig(container: PostgreSQLContainer<*>): ConnectionConfig {
-    val profile = ConnectionProfile(
-        id = "test-postgres-driver",
-        name = "Test PostgreSQL Driver",
-        type = DatabaseType.PostgreSQL,
-        host = container.host,
-        port = container.firstMappedPort,
-        database = container.databaseName,
-        username = container.username,
-        encryptedPassword = "",
-        options = mapOf("password" to container.password)
-    )
+    val profile =
+        ConnectionProfile(
+            id = "test-postgres-driver",
+            name = "Test PostgreSQL Driver",
+            type = DatabaseType.PostgreSQL,
+            host = container.host,
+            port = container.firstMappedPort,
+            database = container.databaseName,
+            username = container.username,
+            encryptedPassword = "",
+            options = mapOf("password" to container.password),
+        )
 
     return ConnectionConfig(
         profile = profile,
         connectionTimeoutSeconds = 30,
-        queryTimeoutSeconds = 60
+        queryTimeoutSeconds = 60,
     )
 }
 
@@ -157,7 +254,7 @@ private fun seedSchema(container: PostgreSQLContainer<*>) {
                     name TEXT NOT NULL,
                     email TEXT
                 );
-                """.trimIndent()
+                """.trimIndent(),
             )
             st.execute(
                 """
@@ -167,7 +264,7 @@ private fun seedSchema(container: PostgreSQLContainer<*>) {
                     total_cents INTEGER NOT NULL,
                     CONSTRAINT fk_orders_users FOREIGN KEY (user_id) REFERENCES users(id)
                 );
-                """.trimIndent()
+                """.trimIndent(),
             )
             st.execute("TRUNCATE TABLE orders RESTART IDENTITY;")
             st.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE;")

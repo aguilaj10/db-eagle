@@ -4,7 +4,15 @@ import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
 import kotlinx.coroutines.test.runTest
 import java.util.prefs.Preferences
-import kotlin.test.*
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ConnectionProfileRepositoryTest {
 
@@ -16,10 +24,10 @@ class ConnectionProfileRepositoryTest {
     fun setup() {
         preferences = Preferences.userRoot().node("com.dbeagle.profiles.test")
         preferences.clear()
-        
+
         repository = PreferencesBackedConnectionProfileRepository(
             masterPasswordProvider = MasterPasswordProvider { testMasterPassword },
-            preferences = preferences
+            preferences = preferences,
         )
     }
 
@@ -41,7 +49,7 @@ class ConnectionProfileRepositoryTest {
             database = "testdb",
             username = "testuser",
             encryptedPassword = "",
-            options = mapOf("ssl" to "true")
+            options = mapOf("ssl" to "true"),
         )
 
         repository.save(profile, plaintextPassword)
@@ -75,7 +83,7 @@ class ConnectionProfileRepositoryTest {
             port = 5432,
             database = "db1",
             username = "user1",
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
         val profile2 = ConnectionProfile(
             id = "id-2",
@@ -85,7 +93,7 @@ class ConnectionProfileRepositoryTest {
             port = 0,
             database = "db2",
             username = "user2",
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         repository.save(profile1, "password1")
@@ -113,7 +121,7 @@ class ConnectionProfileRepositoryTest {
             port = 5432,
             database = "db",
             username = "user",
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         repository.save(profile, "password")
@@ -133,14 +141,14 @@ class ConnectionProfileRepositoryTest {
             port = 5432,
             database = "db",
             username = "user",
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         repository.save(profile, "secret-password")
 
         val wrongPasswordRepo = PreferencesBackedConnectionProfileRepository(
             masterPasswordProvider = MasterPasswordProvider { "wrong-master-password" },
-            preferences = preferences
+            preferences = preferences,
         )
 
         val exception = assertFailsWith<IllegalArgumentException> {
@@ -160,7 +168,7 @@ class ConnectionProfileRepositoryTest {
             port = 5432,
             database = "db",
             username = "user",
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         repository.save(profile, plaintextPassword)
@@ -184,11 +192,11 @@ class ConnectionProfileRepositoryTest {
             port = 5432,
             database = "db",
             username = "user",
-            encryptedPassword = ""
+            encryptedPassword = "",
         )
 
         repository.save(profile, "password1")
-        
+
         val updated = profile.copy(name = "Updated Name")
         repository.save(updated, "password2")
 

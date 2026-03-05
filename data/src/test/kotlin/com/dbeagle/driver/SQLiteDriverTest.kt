@@ -5,12 +5,12 @@ import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
 import com.dbeagle.model.QueryResult
 import com.dbeagle.query.QueryExecutor
+import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.coroutines.runBlocking
 
 class SQLiteDriverTest {
     private lateinit var driver: SQLiteDriver
@@ -28,7 +28,7 @@ class SQLiteDriverTest {
                   name TEXT NOT NULL,
                   email TEXT
                 );
-                """.trimIndent()
+                """.trimIndent(),
             )
 
             driver.executeQuery(
@@ -39,14 +39,14 @@ class SQLiteDriverTest {
                   total_cents INTEGER NOT NULL,
                   FOREIGN KEY(user_id) REFERENCES users(id)
                 );
-                """.trimIndent()
+                """.trimIndent(),
             )
 
             driver.executeQuery(
-                "INSERT INTO users(id, name, email) VALUES (1, 'Alice', 'alice@example.com'), (2, 'Bob', 'bob@example.com');"
+                "INSERT INTO users(id, name, email) VALUES (1, 'Alice', 'alice@example.com'), (2, 'Bob', 'bob@example.com');",
             )
             driver.executeQuery(
-                "INSERT INTO orders(id, user_id, total_cents) VALUES (1, 1, 1000), (2, 1, 2500), (3, 2, 3000);"
+                "INSERT INTO orders(id, user_id, total_cents) VALUES (1, 1, 1000), (2, 1, 2500), (3, 2, 3000);",
             )
         }
     }
@@ -67,10 +67,11 @@ class SQLiteDriverTest {
 
     @Test
     fun testPreparedStatementParams() = runBlocking {
-        val result = driver.executeQuery(
-            sql = "SELECT name FROM users WHERE id = ?",
-            params = listOf(1)
-        )
+        val result =
+            driver.executeQuery(
+                sql = "SELECT name FROM users WHERE id = ?",
+                params = listOf(1),
+            )
         assertTrue(result is QueryResult.Success)
 
         assertEquals(listOf("name"), result.columnNames)
@@ -79,26 +80,29 @@ class SQLiteDriverTest {
 
     @Test
     fun testUpdatePersistsViaQueryExecutorWithParams() = runBlocking {
-        val before = driver.executeQuery(
-            sql = "SELECT name FROM users WHERE id = ?",
-            params = listOf(1)
-        )
+        val before =
+            driver.executeQuery(
+                sql = "SELECT name FROM users WHERE id = ?",
+                params = listOf(1),
+            )
         assertTrue(before is QueryResult.Success)
         assertEquals("Alice", before.rows.single()["name"])
 
-        val update = QueryExecutor(driver).execute(
-            sql = "UPDATE users SET name = ? WHERE id = ?",
-            params = listOf("AliceUpdated", 1)
-        )
+        val update =
+            QueryExecutor(driver).execute(
+                sql = "UPDATE users SET name = ? WHERE id = ?",
+                params = listOf("AliceUpdated", 1),
+            )
         assertTrue(update is QueryResult.Success)
 
         assertEquals(listOf("updatedCount"), update.columnNames)
         assertEquals("1", update.rows.single()["updatedCount"])
 
-        val after = driver.executeQuery(
-            sql = "SELECT name FROM users WHERE id = ?",
-            params = listOf(1)
-        )
+        val after =
+            driver.executeQuery(
+                sql = "SELECT name FROM users WHERE id = ?",
+                params = listOf(1),
+            )
         assertTrue(after is QueryResult.Success)
         assertEquals("AliceUpdated", after.rows.single()["name"])
     }
@@ -122,7 +126,7 @@ class SQLiteDriverTest {
                     it.toTable == "users" &&
                     it.toColumn == "id"
             },
-            "Expected orders.user_id -> users.id foreign key"
+            "Expected orders.user_id -> users.id foreign key",
         )
 
         val schema = driver.getSchema()
@@ -138,24 +142,68 @@ class SQLiteDriverTest {
         assertTrue(DatabaseCapability.PreparedStatements in caps)
         assertTrue(DatabaseCapability.ForeignKeys in caps)
     }
+
+    @Test
+    fun testGetSequencesReturnsEmpty() = runBlocking {
+        val sequences = driver.getSequences()
+        assertTrue(sequences.isEmpty(), "SQLite does not support sequences")
+    }
+
+    @Test
+    fun testGetIndexDetailsReturnsMetadata() = runBlocking {
+        driver.executeQuery("CREATE INDEX idx_users_email ON users(email);")
+
+        val usersIndexes = driver.getIndexDetails("users")
+        assertTrue(usersIndexes.isNotEmpty(), "Expected at least the created index")
+
+        val emailIndex = usersIndexes.find { it.name == "idx_users_email" }
+        assertTrue(emailIndex != null, "Expected idx_users_email index")
+
+        if (emailIndex != null) {
+            assertEquals("users", emailIndex.tableName)
+            assertEquals(listOf("email"), emailIndex.columns)
+            assertEquals(false, emailIndex.unique)
+        }
+    }
+
+    @Test
+    fun testTableMetadataIncludesPrimaryKey() = runBlocking {
+        val schema = driver.getSchema()
+        val usersTable = schema.tables.find { it.name == "users" }
+        assertTrue(usersTable != null, "Expected users table in schema")
+
+        if (usersTable != null) {
+            assertTrue(usersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+            assertEquals(listOf("id"), usersTable.primaryKey)
+        }
+
+        val ordersTable = schema.tables.find { it.name == "orders" }
+        assertTrue(ordersTable != null, "Expected orders table in schema")
+
+        if (ordersTable != null) {
+            assertTrue(ordersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+            assertEquals(listOf("id"), ordersTable.primaryKey)
+        }
+    }
 }
 
 private fun connectionConfig(): ConnectionConfig {
-    val profile = ConnectionProfile(
-        id = "test-sqlite-driver",
-        name = "Test SQLite Driver",
-        type = DatabaseType.SQLite,
-        host = "",
-        port = 0,
-        database = ":memory:",
-        username = "",
-        encryptedPassword = "",
-        options = emptyMap()
-    )
+    val profile =
+        ConnectionProfile(
+            id = "test-sqlite-driver",
+            name = "Test SQLite Driver",
+            type = DatabaseType.SQLite,
+            host = "",
+            port = 0,
+            database = ":memory:",
+            username = "",
+            encryptedPassword = "",
+            options = emptyMap(),
+        )
 
     return ConnectionConfig(
         profile = profile,
         connectionTimeoutSeconds = 30,
-        queryTimeoutSeconds = 60
+        queryTimeoutSeconds = 60,
     )
 }

@@ -9,5 +9,5 @@ data class QueryHistoryEntry(
     val query: String,
     val timestamp: Long = System.currentTimeMillis(),
     val durationMs: Long,
-    val connectionProfileId: String
+    val connectionProfileId: String,
 )

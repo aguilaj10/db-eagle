@@ -6,13 +6,17 @@ import com.dbeagle.settings.AppPreferences
 
 class QueryExecutor(
     private val driver: DatabaseDriver,
-    private val defaultPageSize: Int = getDefaultPageSize()
+    private val defaultPageSize: Int = getDefaultPageSize(),
 ) {
     init {
         require(defaultPageSize > 0) { "defaultPageSize must be > 0" }
     }
 
-    suspend fun execute(sql: String, params: List<Any> = emptyList(), pageSize: Int = defaultPageSize): QueryResult {
+    suspend fun execute(
+        sql: String,
+        params: List<Any> = emptyList(),
+        pageSize: Int = defaultPageSize,
+    ): QueryResult {
         val trimmed = sql.trim()
         if (!looksLikeSelect(trimmed)) {
             return driver.executeQuery(sql, params)
@@ -24,24 +28,36 @@ class QueryExecutor(
         return when (val first = executePage(baseSql = baseSql, params = params, pageSize = pageSize, offset = 0)) {
             is PageOutcome.Err -> first.result
             is PageOutcome.Ok -> {
-                val rs = ResultSetImpl(
-                    baseSql = baseSql,
-                    baseParams = params,
-                    pageSize = pageSize,
-                    nextOffset = pageSize,
-                    hasMore = first.hasMore
-                )
+                val rs =
+                    ResultSetImpl(
+                        baseSql = baseSql,
+                        baseParams = params,
+                        pageSize = pageSize,
+                        nextOffset = pageSize,
+                        hasMore = first.hasMore,
+                    )
                 first.page.copy(resultSet = rs)
             }
         }
     }
 
     private sealed interface PageOutcome {
-        data class Ok(val page: QueryResult.Success, val hasMore: Boolean) : PageOutcome
-        data class Err(val result: QueryResult.Error) : PageOutcome
+        data class Ok(
+            val page: QueryResult.Success,
+            val hasMore: Boolean,
+        ) : PageOutcome
+
+        data class Err(
+            val result: QueryResult.Error,
+        ) : PageOutcome
     }
 
-    private suspend fun executePage(baseSql: String, params: List<Any>, pageSize: Int, offset: Int): PageOutcome {
+    private suspend fun executePage(
+        baseSql: String,
+        params: List<Any>,
+        pageSize: Int,
+        offset: Int,
+    ): PageOutcome {
         val limit = pageSize + 1
         val paginatedSql = "SELECT * FROM ( $baseSql ) AS q LIMIT ? OFFSET ?"
         val paginatedParams = params + listOf(limit, offset)
@@ -60,7 +76,7 @@ class QueryExecutor(
         private val baseParams: List<Any>,
         private val pageSize: Int,
         private var nextOffset: Int,
-        private var hasMore: Boolean
+        private var hasMore: Boolean,
     ) : PaginatedResultSet {
         override fun hasMore(): Boolean = hasMore
 
@@ -96,12 +112,10 @@ class QueryExecutor(
     companion object {
         const val DEFAULT_PAGE_SIZE: Int = 1000
 
-        private fun getDefaultPageSize(): Int {
-            return try {
-                AppPreferences.load().resultLimit
-            } catch (_: Exception) {
-                DEFAULT_PAGE_SIZE
-            }
+        private fun getDefaultPageSize(): Int = try {
+            AppPreferences.load().resultLimit
+        } catch (_: Exception) {
+            DEFAULT_PAGE_SIZE
         }
     }
 }

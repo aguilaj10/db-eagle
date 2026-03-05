@@ -1,7 +1,11 @@
 package com.dbeagle.favorites
 
 import com.dbeagle.model.FavoriteQuery
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -22,7 +26,7 @@ class FileFavoritesRepositoryTest {
             query = "SELECT * FROM users",
             tags = listOf("sql", "users"),
             created = 1000,
-            lastModified = 1000
+            lastModified = 1000,
         )
         Thread.sleep(10)
         val fav2 = FavoriteQuery(
@@ -31,7 +35,7 @@ class FileFavoritesRepositoryTest {
             query = "SELECT * FROM orders",
             tags = listOf("sql", "orders"),
             created = 2000,
-            lastModified = 2000
+            lastModified = 2000,
         )
 
         repo.save(fav1)
@@ -54,7 +58,7 @@ class FileFavoritesRepositoryTest {
             query = "SELECT 1",
             tags = listOf("original"),
             created = 1000,
-            lastModified = 1000
+            lastModified = 1000,
         )
         repo.save(original)
 
@@ -62,7 +66,7 @@ class FileFavoritesRepositoryTest {
 
         val updated = original.copy(
             name = "Updated Name",
-            tags = listOf("updated")
+            tags = listOf("updated"),
         )
         repo.save(updated)
 
@@ -83,7 +87,7 @@ class FileFavoritesRepositoryTest {
             id = "fav1",
             name = "Test",
             query = "SELECT 1",
-            tags = emptyList()
+            tags = emptyList(),
         )
         repo.save(fav)
 
@@ -186,8 +190,8 @@ class FileFavoritesRepositoryTest {
                     id = "fav$i",
                     name = "Favorite $i",
                     query = "SELECT $i",
-                    tags = listOf("tag$i")
-                )
+                    tags = listOf("tag$i"),
+                ),
             )
         }
 
@@ -210,8 +214,8 @@ class FileFavoritesRepositoryTest {
                 id = "fav1",
                 name = "Test",
                 query = "SELECT 1",
-                tags = emptyList()
-            )
+                tags = emptyList(),
+            ),
         )
 
         assertTrue(favoritesFile.exists())

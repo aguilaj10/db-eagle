@@ -24,22 +24,24 @@ class DatabaseConnectionPoolLeakDetectionTest {
         System.setProperty("org.slf4j.simpleLogger.showDateTime", "true")
         System.setProperty("org.slf4j.simpleLogger.dateTimeFormat", "yyyy-MM-dd HH:mm:ss.SSS")
 
-        val repoRoot = generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
-            .firstOrNull { File(it, ".sisyphus").exists() }
-            ?: File(System.getProperty("user.dir"))
+        val repoRoot =
+            generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
+                .firstOrNull { File(it, ".sisyphus").exists() }
+                ?: File(System.getProperty("user.dir"))
         val evidenceDir = File(repoRoot, ".sisyphus/evidence").apply { mkdirs() }
         val evidenceFile = File(evidenceDir, "task-33-leak-detection.txt")
 
-        val profile = ConnectionProfile(
-            id = "task-33-leak-${Instant.now().toEpochMilli()}",
-            name = "Task 33 Leak Detection",
-            type = DatabaseType.SQLite,
-            host = "",
-            port = 0,
-            database = ":memory:",
-            username = "",
-            encryptedPassword = "",
-        )
+        val profile =
+            ConnectionProfile(
+                id = "task-33-leak-${Instant.now().toEpochMilli()}",
+                name = "Task 33 Leak Detection",
+                type = DatabaseType.SQLite,
+                host = "",
+                port = 0,
+                database = ":memory:",
+                username = "",
+                encryptedPassword = "",
+            )
 
         val buf = ByteArrayOutputStream()
         val capture = PrintStream(buf, true, StandardCharsets.UTF_8)
@@ -78,18 +80,18 @@ class DatabaseConnectionPoolLeakDetectionTest {
                     appendLine("--- Captured WARN excerpt (Hikari leak detection) ---")
                     appendLine(excerpt.ifBlank { "(no leak excerpt found)" })
                     appendLine("--- End excerpt ---")
-                }
+                },
             )
 
             assertTrue(
                 afterSleepLog.contains("Connection leak detection triggered", ignoreCase = true) ||
                     fullLog.contains("Connection leak detection triggered", ignoreCase = true),
-                "Expected Hikari leak detection WARN to be emitted after ~30s. Captured log:\n$fullLog"
+                "Expected Hikari leak detection WARN to be emitted after ~30s. Captured log:\n$fullLog",
             )
             assertTrue(evidenceFile.exists(), "Evidence file should exist")
             assertTrue(
                 evidenceFile.readText().contains("Connection leak detection triggered", ignoreCase = true),
-                "Evidence file should include leak detection WARN line"
+                "Evidence file should include leak detection WARN line",
             )
         } finally {
             opened.forEach {

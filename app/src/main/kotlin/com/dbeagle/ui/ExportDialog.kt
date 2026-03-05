@@ -1,25 +1,48 @@
 package com.dbeagle.ui
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.HeadlessException
-import kotlinx.coroutines.launch
 
 enum class ExportFormat {
-    CSV, JSON, SQL
+    CSV,
+    JSON,
+    SQL,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportDialog(
     onDismiss: () -> Unit,
-    onExportRequested: suspend (ExportFormat, String, (Int, Boolean) -> Unit) -> Unit
+    onExportRequested: suspend (ExportFormat, String, (Int, Boolean) -> Unit) -> Unit,
 ) {
     var selectedFormat by remember { mutableStateOf(ExportFormat.CSV) }
     var filePath by remember { mutableStateOf("") }
@@ -34,19 +57,19 @@ fun ExportDialog(
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text("Select Format:", style = MaterialTheme.typography.titleSmall)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     ExportFormat.entries.forEach { format ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(
                                 selected = selectedFormat == format,
                                 onClick = { selectedFormat = format },
-                                enabled = !isExporting
+                                enabled = !isExporting,
                             )
                             Text(format.name, modifier = Modifier.padding(start = 4.dp))
                         }
@@ -56,7 +79,7 @@ fun ExportDialog(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     OutlinedTextField(
                         value = filePath,
@@ -64,9 +87,9 @@ fun ExportDialog(
                         label = { Text("Export File Path") },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
-                        enabled = !isExporting
+                        enabled = !isExporting,
                     )
-                    
+
                     Button(
                         onClick = {
                             try {
@@ -85,7 +108,7 @@ fun ExportDialog(
                             }
                         },
                         enabled = !isExporting,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(top = 8.dp),
                     ) {
                         Text("Browse")
                     }
@@ -94,7 +117,7 @@ fun ExportDialog(
                 if (isExporting) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         if (showProgress) {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -126,7 +149,7 @@ fun ExportDialog(
                         }
                     }
                 },
-                enabled = filePath.isNotBlank() && !isExporting
+                enabled = filePath.isNotBlank() && !isExporting,
             ) {
                 Text("Export")
             }
@@ -134,10 +157,10 @@ fun ExportDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isExporting
+                enabled = !isExporting,
             ) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }

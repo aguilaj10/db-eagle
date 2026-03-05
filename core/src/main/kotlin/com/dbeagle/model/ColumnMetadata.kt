@@ -7,5 +7,5 @@ data class ColumnMetadata(
     val name: String,
     val type: String,
     val nullable: Boolean,
-    val defaultValue: String? = null
+    val defaultValue: String? = null,
 )

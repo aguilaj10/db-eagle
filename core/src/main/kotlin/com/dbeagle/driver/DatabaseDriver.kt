@@ -3,9 +3,10 @@ package com.dbeagle.driver
 import com.dbeagle.model.ColumnMetadata
 import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.ForeignKeyRelationship
+import com.dbeagle.model.IndexMetadata
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
-import com.dbeagle.model.TableMetadata
+import com.dbeagle.model.SequenceMetadata
 
 interface DatabaseDriver {
     /**
@@ -23,7 +24,10 @@ interface DatabaseDriver {
      * Executes a query with optional parameters and returns the result.
      * [sql] is the query string; [params] are optional parameter values for prepared statements.
      */
-    suspend fun executeQuery(sql: String, params: List<Any> = emptyList()): QueryResult
+    suspend fun executeQuery(
+        sql: String,
+        params: List<Any> = emptyList(),
+    ): QueryResult
 
     /**
      * Retrieves complete schema metadata including tables, views, indexes, and foreign keys.
@@ -60,4 +64,15 @@ interface DatabaseDriver {
      * Returns the driver name (e.g., "PostgreSQL", "SQLite").
      */
     fun getName(): String
+
+    /**
+     * Retrieves all sequences in the database.
+     * Returns empty list for databases that don't support sequences.
+     */
+    suspend fun getSequences(): List<SequenceMetadata> = emptyList()
+
+    /**
+     * Retrieves detailed index information for the specified table.
+     */
+    suspend fun getIndexDetails(tableName: String): List<IndexMetadata> = emptyList()
 }

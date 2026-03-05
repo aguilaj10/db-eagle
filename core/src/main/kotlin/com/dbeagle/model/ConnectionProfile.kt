@@ -13,5 +13,5 @@ data class ConnectionProfile(
     val database: String,
     val username: String,
     val encryptedPassword: String,
-    val options: Map<String, String> = emptyMap()
+    val options: Map<String, String> = emptyMap(),
 )

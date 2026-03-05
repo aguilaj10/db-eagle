@@ -7,7 +7,6 @@ import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.ForeignKeyRelationship
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
-import com.dbeagle.model.TableMetadata
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,14 +25,16 @@ class SessionViewModelTest {
             disconnectedCount++
         }
 
-        override suspend fun executeQuery(sql: String, params: List<Any>): QueryResult =
-            QueryResult.Error("not used")
+        override suspend fun executeQuery(
+            sql: String,
+            params: List<Any>,
+        ): QueryResult = QueryResult.Error("not used")
 
         override suspend fun getSchema(): SchemaMetadata = SchemaMetadata(
             tables = emptyList(),
             views = emptyList(),
             indexes = emptyList(),
-            foreignKeys = emptyList()
+            foreignKeys = emptyList(),
         )
 
         override suspend fun getTables(): List<String> = emptyList()

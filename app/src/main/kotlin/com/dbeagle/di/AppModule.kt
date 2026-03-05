@@ -7,6 +7,7 @@ import org.koin.dsl.module
  * Combines all sub-modules (core, data) for top-level wiring.
  * Main entry point for Koin configuration.
  */
-val appModule = module {
-    includes(coreModule, dataModule)
-}
+val appModule =
+    module {
+        includes(coreModule, dataModule, viewModelModule)
+    }

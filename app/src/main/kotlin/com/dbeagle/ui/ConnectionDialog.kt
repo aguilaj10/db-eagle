@@ -1,8 +1,25 @@
 package com.dbeagle.ui
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -15,10 +32,10 @@ import java.util.UUID
 fun ConnectionDialog(
     initialProfile: ConnectionProfile?,
     onDismiss: () -> Unit,
-    onSave: (ConnectionProfile, String) -> Unit
+    onSave: (ConnectionProfile, String) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialProfile?.name ?: "") }
-    var type by remember { mutableStateOf<DatabaseType>(initialProfile?.type ?: DatabaseType.PostgreSQL) }
+    var type by remember { mutableStateOf(initialProfile?.type ?: DatabaseType.PostgreSQL) }
     var host by remember { mutableStateOf(initialProfile?.host ?: "localhost") }
     var port by remember { mutableStateOf(initialProfile?.port?.toString() ?: "5432") }
     var database by remember { mutableStateOf(initialProfile?.database ?: "") }
@@ -26,7 +43,7 @@ fun ConnectionDialog(
     var password by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
 
-    val isPostgreSQL = type is DatabaseType.PostgreSQL
+    val isPostgresSQL = type is DatabaseType.PostgreSQL
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -34,64 +51,62 @@ fun ConnectionDialog(
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 ExposedDropdownMenuBox(
                     expanded = expanded,
-                    onExpandedChange = { expanded = it }
+                    onExpandedChange = { expanded = it },
                 ) {
                     OutlinedTextField(
-                        value = if (isPostgreSQL) "PostgreSQL" else "SQLite",
+                        value = if (isPostgresSQL) "PostgresSQL" else "SQLite",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Type") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth()
+                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        onDismissRequest = { expanded = false },
                     ) {
                         DropdownMenuItem(
-                            text = { Text("PostgreSQL") },
+                            text = { Text("PostgresSQL") },
                             onClick = {
-                                type = DatabaseType.PostgreSQL
                                 expanded = false
-                            }
+                            },
                         )
                         DropdownMenuItem(
                             text = { Text("SQLite") },
                             onClick = {
-                                type = DatabaseType.SQLite
                                 expanded = false
-                            }
+                            },
                         )
                     }
                 }
 
-                if (isPostgreSQL) {
+                if (isPostgresSQL) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = host,
                             onValueChange = { host = it },
                             label = { Text("Host") },
                             singleLine = true,
-                            modifier = Modifier.weight(2f)
+                            modifier = Modifier.weight(2f),
                         )
                         OutlinedTextField(
                             value = port,
                             onValueChange = { port = it },
                             label = { Text("Port") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -99,18 +114,18 @@ fun ConnectionDialog(
                 OutlinedTextField(
                     value = database,
                     onValueChange = { database = it },
-                    label = { Text(if (isPostgreSQL) "Database" else "Database File Path") },
+                    label = { Text(if (isPostgresSQL) "Database" else "Database File Path") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
-                if (isPostgreSQL) {
+                if (isPostgresSQL) {
                     OutlinedTextField(
                         value = username,
                         onValueChange = { username = it },
                         label = { Text("Username") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
 
@@ -120,26 +135,26 @@ fun ConnectionDialog(
                     label = { Text(if (initialProfile == null) "Password" else "Password (re-enter to save)") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val pPort = port.toIntOrNull() ?: if (isPostgreSQL) 5432 else 0
+                    val pPort = port.toIntOrNull() ?: if (isPostgresSQL) 5432 else 0
                     val newProfile = ConnectionProfile(
                         id = initialProfile?.id ?: UUID.randomUUID().toString(),
                         name = name,
                         type = type,
-                        host = if (isPostgreSQL) host else "",
+                        host = if (isPostgresSQL) host else "",
                         port = pPort,
                         database = database,
-                        username = if (isPostgreSQL) username else "",
-                        encryptedPassword = initialProfile?.encryptedPassword ?: ""
+                        username = if (isPostgresSQL) username else "",
+                        encryptedPassword = initialProfile?.encryptedPassword ?: "",
                     )
                     onSave(newProfile, password)
-                }
+                },
             ) {
                 Text("Save")
             }
@@ -148,6 +163,6 @@ fun ConnectionDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }
