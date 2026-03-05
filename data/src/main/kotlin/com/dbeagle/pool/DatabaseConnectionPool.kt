@@ -174,7 +174,7 @@ object DatabaseConnectionPool {
 
     /**
      * Build JDBC URL from connection profile.
-     * Supports PostgreSQL and SQLite.
+     * Supports PostgreSQL, SQLite, and Oracle.
      *
      * @param profile Connection profile
      * @return JDBC URL string
@@ -186,6 +186,9 @@ object DatabaseConnectionPool {
         is DatabaseType.SQLite -> {
             // SQLite uses file path in database field
             "jdbc:sqlite:${profile.database}"
+        }
+        is DatabaseType.Oracle -> {
+            "jdbc:oracle:thin:@${profile.host}:${profile.port}:${profile.database}"
         }
     }
 }

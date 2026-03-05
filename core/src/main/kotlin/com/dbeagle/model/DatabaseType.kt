@@ -9,4 +9,7 @@ sealed class DatabaseType {
 
     @Serializable
     object SQLite : DatabaseType()
+
+    @Serializable
+    object Oracle : DatabaseType()
 }
