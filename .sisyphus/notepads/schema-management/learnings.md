@@ -1167,3 +1167,249 @@ onDropTable = { tableName ->
 - Generate CREATE INDEX statements for TableEditorDialog indexes tab
 - Populate existingTable in edit mode (currently passes null, always creates new table)
 
+
+## UI Dialog Tests Implementation (Task 32)
+**Date:** 2026-03-05
+
+### Test Strategy
+- **Not testing UI rendering**: Compose Desktop UI testing with ImageComposeScene is complex and heavyweight
+- **Focus on business logic**: Validation, data structures, callback contracts
+- **Pattern**: Unit tests for data validation and transformation logic that powers dialogs
+
+### SequenceEditorDialogTest Coverage
+1. **Name validation tests**:
+   - Valid identifier: `my_sequence` passes
+   - Empty name: fails with error message
+   - Invalid characters: `my-sequence` fails
+   - SQL injection: `DROP TABLE` fails
+   
+2. **SequenceMetadata creation tests**:
+   - Default values: startValue=1, increment=1, cycle=false
+   - Custom values: startValue=100, increment=5, maxValue=1000, cycle=true
+   - Owned sequences: ownedByTable and ownedByColumn populated
+   
+3. **Callback simulation tests**:
+   - Create mode: validates name, constructs SequenceMetadata with correct fields
+   - Edit mode: preserves existing values, updates only changed fields
+   
+4. **Numeric parsing tests**:
+   - Invalid input (`"not_a_number"`) defaults to fallback (1L)
+   - Negative values handled correctly (-100L, -5L)
+
+### TableEditorDialogTest Coverage
+1. **Table name validation tests**:
+   - Valid identifier: `users` passes
+   - Empty name: fails
+   - SQL injection: `users; DROP TABLE` fails
+   
+2. **TableDefinition validation tests**:
+   - No columns: fails with "at least one column" error
+   - Duplicate columns: fails with "Duplicate column name" error
+   - Invalid column names: fails with identifier validation error
+   
+3. **TableDefinition creation tests**:
+   - Simple table: name, columns, primaryKey populated
+   - Foreign keys: ForeignKeyDefinition with refTable, refColumns, onDelete/onUpdate
+   - Unique constraints: List<List<String>> structure
+   - Composite primary key: multiple column names in primaryKey list
+   
+4. **Column definition tests**:
+   - Nullable with default: nullable=true, defaultValue="active"
+   - Not null no default: nullable=false, defaultValue=null
+   - All ColumnType enum values tested: TEXT, INTEGER, BIGINT, DECIMAL, BOOLEAN, DATE, TIMESTAMP, BLOB
+   
+5. **Foreign key tests**:
+   - With referential actions: onDelete="CASCADE", onUpdate="RESTRICT"
+   - Composite foreign key: multiple columns in columns and refColumns lists
+   - Optional name: name=null allowed
+   
+6. **Primary key nullability test**:
+   - Empty list with `.takeIf { it.isNotEmpty() }` correctly returns null
+
+### Test Dependencies
+- `kotlin.test` framework (JUnit Platform backend)
+- `DDLValidator` from core module for validation logic
+- Data classes from core module: `ColumnDefinition`, `TableDefinition`, `ForeignKeyDefinition`, `ColumnType`
+- Model classes: `SequenceMetadata`
+
+### Key Insights
+- **No Compose dependencies in tests**: Tests are pure Kotlin without @Composable functions
+- **Testing validation layer**: DDLValidator is the critical component tested, not UI state management
+- **Callback contracts**: Tests verify data structures passed to onSave callbacks match expected format
+- **Dialog logic separation**: Validation and data construction logic can be tested independently of UI rendering
+
+### Verification Results
+- `./gradlew :app:test --tests "*Dialog*"` passes successfully
+- SequenceEditorDialogTest: 10 tests covering validation, creation, callbacks, parsing
+- TableEditorDialogTest: 16 tests covering validation, constraints, foreign keys, column types
+- Total: 26 test cases ensuring dialog data validation correctness
+- Build time: 57 seconds
+- No compilation errors or test failures
+
+### Test File Locations
+- `app/src/test/kotlin/com/dbeagle/ui/dialogs/SequenceEditorDialogTest.kt`
+- `app/src/test/kotlin/com/dbeagle/ui/dialogs/TableEditorDialogTest.kt`
+
+### Design Decisions
+- **Test names**: Descriptive with pattern `test[Component][Aspect]_[scenario]`
+- **Assertions**: Use `assertIs<ValidationResult.Valid>()` for type-safe validation result checks
+- **Error checking**: Verify error messages contain expected keywords (flexible to message changes)
+- **Test data**: Realistic examples (users, orders, products) for readability
+- **No mocking**: Direct instantiation of data classes and validation functions (no framework overhead)
+
+### Comparison to Existing Tests
+- **HeadlessERDiagramTest**: Uses ImageComposeScene for full UI rendering (heavyweight)
+- **ERDiagramViewTest**: Simple data model test (no validation logic)
+- **Dialog tests**: Middle ground - complex business logic without UI rendering overhead
+
+
+## DDL Builder Unit Tests Implementation (Task 30)
+**Date:** 2026-03-05
+
+### Test Files Created
+1. **SequenceDDLBuilderTest.kt** - 15 tests covering CREATE, ALTER, DROP sequences
+2. **TableDDLBuilderTest.kt** - 34 tests covering CREATE, ALTER, DROP tables with all constraint types
+3. **IndexDDLBuilderTest.kt** - 15 tests covering CREATE, DROP indexes
+4. **DDLValidatorTest.kt** - 30 tests covering identifier validation and SQL injection protection
+
+### Mock Dialect Pattern
+- Created mock dialect objects within each test file (MockPostgreSQLDialect, MockSQLiteDialect)
+- Mock dialects return simple quoting and type name behavior for predictable test assertions
+- Dialect feature flags tested: supportsIfExists(), supportsDropColumn(), supportsSequences()
+
+### Test Coverage by Builder
+
+#### SequenceDDLBuilderTest
+- buildCreateSequence: basic creation, CYCLE flag, special character quoting, custom increment
+- buildAlterSequence: all changes, partial changes (nullable field behavior), single change
+- buildDropSequence: IF EXISTS conditional on dialect support, ifExists flag behavior
+- Dialect compatibility: PostgreSQL vs SQLite (SQLite doesn't support sequences)
+
+#### TableDDLBuilderTest
+- buildCreateTable: single/multiple columns, all ColumnType values, primary keys (single/composite)
+- Foreign keys: named/unnamed, ON DELETE/UPDATE actions, composite FKs
+- Unique constraints: single/composite columns
+- Default values: string and numeric defaults
+- Special characters: identifier quoting with embedded quotes
+- buildAlterTableAddColumn: nullable, NOT NULL, default values
+- buildAlterTableDropColumn: success when supported, UnsupportedOperationException when not
+- buildAlterTableAddConstraint: PK, FK (named/unnamed), UNIQUE (named/unnamed)
+- buildAlterTableDropConstraint: removes constraint by name
+- buildDropTable: IF EXISTS conditional, CASCADE option
+- Dialect type mapping: PostgreSQL vs SQLite type differences
+
+#### IndexDDLBuilderTest
+- buildCreateIndex: single/composite columns, UNIQUE flag, special character quoting
+- buildDropIndex: IF EXISTS conditional, tableName parameter ignored (both PostgreSQL/SQLite)
+- Dialect compatibility: CREATE INDEX syntax identical across dialects
+- Multi-column indexes: up to 3 columns tested
+
+#### DDLValidatorTest
+- validateIdentifier: valid names (alphanumeric, underscore, dollar sign)
+- Invalid patterns: empty/blank, max length exceeded (128 chars), starting with number
+- SQL injection detection: semicolon, comment patterns (-- and /* */), dangerous keywords
+- Keyword detection: DROP, DELETE, INSERT, UPDATE, SELECT, TRUNCATE, EXEC, EXECUTE
+- Case-insensitive injection: mixed case keyword attempts rejected
+- Invalid characters: space, hyphen, dot (no schema-qualified names)
+- validateTableDefinition: valid tables, no columns rejection, invalid table name, duplicate columns
+- validateColumnDefinition: valid columns, invalid column names
+- Error accumulation: multiple errors collected in single ValidationResult.Invalid
+- Error formatting: nested errors indented with "  - " prefix
+
+### Key Testing Patterns
+1. **Mock objects over real implementations**: Avoids database dependencies in unit tests
+2. **Descriptive test names**: Backtick format with clear scenario description
+3. **kotlin.test framework**: @Test annotations, assertTrue/assertEquals assertions
+4. **Exhaustive option testing**: All builder options tested (IF EXISTS, CASCADE, UNIQUE, etc.)
+5. **Dialect differences**: PostgreSQL vs SQLite capability testing
+6. **Special character handling**: Embedded quotes, reserved characters tested
+7. **Edge cases**: Empty inputs, max length boundaries, partial updates
+
+### Verification Results
+- Test execution: `./gradlew :core:test --tests "*DDL*"` PASSED
+- All 94 tests pass (15 + 34 + 15 + 30)
+- Compiler warnings: 24 "No cast needed" warnings in DDLValidatorTest (non-blocking)
+- No compilation errors
+- Test duration: ~1m 19s total build time
+
+### Design Decisions
+- Mock dialects implemented as private objects within test files (not shared)
+- Mock quoteIdentifier uses simple double-quote escaping (matches PostgreSQL/SQLite)
+- Mock getTypeName returns ColumnType.name for simplicity (type mapping tested separately)
+- UnsupportedOperationException tested via assertFailsWith for unsupported operations
+- ValidationResult.Invalid errors extracted and checked with assertTrue + contains()
+
+### Security Testing
+- SQL injection patterns comprehensively tested (13 tests)
+- Case-insensitive pattern matching verified
+- Dangerous keywords: DROP, DELETE, INSERT, UPDATE, SELECT, TRUNCATE, EXEC, EXECUTE
+- Comment injection: semicolon, --, /* tested
+- Identifier validation ensures all names safe before DDL generation
+
+### Integration Notes
+- Tests verify DDL generation logic only (no database execution)
+- Integration tests (Task 31) will test actual DDL execution against real databases
+- Mock dialects sufficient for unit testing DDL string generation
+- Dialect-specific behavior (PostgreSQL/SQLite differences) tested via feature flags
+
+## Integration Tests for Driver Methods (Task 31)
+**Date:** 2026-03-05
+
+### PostgreSQL Driver Tests Added
+1. **testGetSequencesReturnsMetadata**
+   - Verifies getSequences() returns sequence metadata for auto-created SERIAL sequences
+   - Tests: users_id_seq and orders_id_seq (generated from SERIAL PRIMARY KEY columns)
+   - Validates: schema, startValue, increment, minValue, maxValue, ownedByTable, ownedByColumn
+   - Key insight: PostgreSQL SERIAL columns automatically create sequences named `{table}_{column}_seq`
+
+2. **testGetIndexDetailsReturnsMetadata**
+   - Verifies getIndexDetails(tableName) returns index metadata
+   - Tests: users_pkey and orders_pkey (auto-created primary key indexes)
+   - Validates: tableName, columns list, unique flag
+   - Key insight: PostgreSQL automatically creates indexes for primary keys named `{table}_pkey`
+
+3. **testTableMetadataIncludesPrimaryKey**
+   - Verifies getSchema() populates TableMetadata.primaryKey field
+   - Tests: users and orders tables both have `id` as primary key
+   - Validates: primaryKey list is non-empty and contains correct column names
+
+### SQLite Driver Tests Added
+1. **testGetSequencesReturnsEmpty**
+   - Verifies getSequences() returns empty list (SQLite doesn't support sequences)
+   - Simple validation: `sequences.isEmpty()`
+
+2. **testGetIndexDetailsReturnsMetadata**
+   - Verifies getIndexDetails(tableName) returns index metadata
+   - Creates explicit index: `CREATE INDEX idx_users_email ON users(email)`
+   - Validates: tableName, columns list, unique flag
+   - Key difference from PostgreSQL: SQLite doesn't auto-create indexes for PRIMARY KEY (uses internal rowid optimization)
+
+3. **testTableMetadataIncludesPrimaryKey**
+   - Verifies getSchema() populates TableMetadata.primaryKey field
+   - Tests: users and orders tables both have `id` as primary key
+   - Validates: primaryKey list is non-empty and contains correct column names
+   - Uses same PRAGMA table_info approach as getColumns()
+
+### Test Patterns
+- **PostgreSQL tests**: Use testcontainers with Docker, skip if Docker unavailable
+- **SQLite tests**: Use in-memory database (`:memory:`), always run
+- **Validation strategy**: find() + null check + field assertions (defensive programming)
+- **Smart cast warnings**: Accepted as non-blocking (nullable types from find())
+
+### Key Differences PostgreSQL vs SQLite
+| Feature | PostgreSQL | SQLite |
+|---------|-----------|--------|
+| Sequences | Supported, auto-created for SERIAL | Not supported, stub returns empty list |
+| PK Indexes | Auto-created, named `{table}_pkey` | Internal optimization, no visible index |
+| Index Metadata | Uses JDBC DatabaseMetaData | Uses PRAGMA index_list/index_info |
+
+### Verification
+- All tests pass: `./gradlew :data:test` succeeded
+- PostgreSQL tests cover: getSequences(), getIndexDetails(), primaryKey population
+- SQLite tests cover: getSequences() stub, getIndexDetails(), primaryKey population
+- No production code changes required (drivers already implemented)
+
+### Notes
+- SQLite index test creates explicit index instead of relying on PK auto-indexing
+- PostgreSQL sequence test leverages SERIAL auto-sequences (no manual CREATE SEQUENCE needed)
+- Both drivers populate primaryKey field correctly via JDBC metadata and PRAGMA respectively

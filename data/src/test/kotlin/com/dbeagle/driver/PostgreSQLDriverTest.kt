@@ -125,6 +125,101 @@ class PostgreSQLDriverTest {
 
         driver.disconnect()
     }
+
+    @Test
+    fun testGetSequencesReturnsMetadata() = kotlinx.coroutines.runBlocking {
+        if (!dockerAvailable) return@runBlocking
+
+        val container = postgresContainer!!
+        val driver = PostgreSQLDriver()
+        driver.connect(connectionConfig(container))
+
+        val sequences = driver.getSequences()
+
+        // PostgreSQL automatically creates sequences for SERIAL columns
+        // users.id and orders.id are SERIAL, so we expect sequences named users_id_seq and orders_id_seq
+        assertTrue(sequences.isNotEmpty(), "Expected at least one sequence from SERIAL columns")
+
+        val usersIdSeq = sequences.find { it.name == "users_id_seq" }
+        assertTrue(usersIdSeq != null, "Expected users_id_seq sequence from SERIAL column")
+
+        if (usersIdSeq != null) {
+            assertEquals("public", usersIdSeq.schema)
+            assertEquals(1L, usersIdSeq.startValue)
+            assertEquals(1L, usersIdSeq.increment)
+            assertTrue(usersIdSeq.minValue > 0)
+            assertTrue(usersIdSeq.maxValue > usersIdSeq.minValue)
+            assertEquals("users", usersIdSeq.ownedByTable)
+            assertEquals("id", usersIdSeq.ownedByColumn)
+        }
+
+        driver.disconnect()
+    }
+
+    @Test
+    fun testGetIndexDetailsReturnsMetadata() = kotlinx.coroutines.runBlocking {
+        if (!dockerAvailable) return@runBlocking
+
+        val container = postgresContainer!!
+        val driver = PostgreSQLDriver()
+        driver.connect(connectionConfig(container))
+
+        // PostgreSQL automatically creates indexes for primary keys
+        val usersIndexes = driver.getIndexDetails("users")
+        assertTrue(usersIndexes.isNotEmpty(), "Expected at least the primary key index")
+
+        val pkIndex = usersIndexes.find { it.name == "users_pkey" }
+        assertTrue(pkIndex != null, "Expected users_pkey index")
+
+        if (pkIndex != null) {
+            assertEquals("users", pkIndex.tableName)
+            assertEquals(listOf("id"), pkIndex.columns)
+            assertTrue(pkIndex.unique, "Primary key index should be unique")
+        }
+
+        // Test indexes for orders table
+        val ordersIndexes = driver.getIndexDetails("orders")
+        assertTrue(ordersIndexes.isNotEmpty(), "Expected at least the primary key index")
+
+        val ordersPkIndex = ordersIndexes.find { it.name == "orders_pkey" }
+        assertTrue(ordersPkIndex != null, "Expected orders_pkey index")
+
+        if (ordersPkIndex != null) {
+            assertEquals("orders", ordersPkIndex.tableName)
+            assertEquals(listOf("id"), ordersPkIndex.columns)
+            assertTrue(ordersPkIndex.unique, "Primary key index should be unique")
+        }
+
+        driver.disconnect()
+    }
+
+    @Test
+    fun testTableMetadataIncludesPrimaryKey() = kotlinx.coroutines.runBlocking {
+        if (!dockerAvailable) return@runBlocking
+
+        val container = postgresContainer!!
+        val driver = PostgreSQLDriver()
+        driver.connect(connectionConfig(container))
+
+        val schema = driver.getSchema()
+        val usersTable = schema.tables.find { it.name == "users" }
+        assertTrue(usersTable != null, "Expected users table in schema")
+
+        if (usersTable != null) {
+            assertTrue(usersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+            assertEquals(listOf("id"), usersTable.primaryKey)
+        }
+
+        val ordersTable = schema.tables.find { it.name == "orders" }
+        assertTrue(ordersTable != null, "Expected orders table in schema")
+
+        if (ordersTable != null) {
+            assertTrue(ordersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+            assertEquals(listOf("id"), ordersTable.primaryKey)
+        }
+
+        driver.disconnect()
+    }
 }
 
 private fun connectionConfig(container: PostgreSQLContainer<*>): ConnectionConfig {
