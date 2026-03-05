@@ -2,6 +2,8 @@ package com.dbeagle.driver
 
 import com.dbeagle.model.ColumnMetadata
 import com.dbeagle.model.ConnectionConfig
+import com.dbeagle.model.ConnectionProfile
+import com.dbeagle.model.DatabaseType
 import com.dbeagle.model.ForeignKeyRelationship
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
@@ -28,7 +30,7 @@ class SQLiteDriver : DatabaseDriver {
 
     override suspend fun connect(config: ConnectionConfig) {
         val profile = config.profile
-        require(profile.type is com.dbeagle.model.DatabaseType.SQLite) {
+        require(profile.type is DatabaseType.SQLite) {
             "SQLiteDriver only supports DatabaseType.SQLite"
         }
 
@@ -349,7 +351,7 @@ class SQLiteDriver : DatabaseDriver {
         }
     }
 
-    private fun buildJdbcUrl(profile: com.dbeagle.model.ConnectionProfile): String = "jdbc:sqlite:${profile.database}"
+    private fun buildJdbcUrl(profile: ConnectionProfile): String = "jdbc:sqlite:${profile.database}"
 }
 
 private class NonClosingConnectionDataSource(

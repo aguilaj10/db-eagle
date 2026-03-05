@@ -2,6 +2,8 @@ package com.dbeagle.driver
 
 import com.dbeagle.model.ColumnMetadata
 import com.dbeagle.model.ConnectionConfig
+import com.dbeagle.model.ConnectionProfile
+import com.dbeagle.model.DatabaseType
 import com.dbeagle.model.ForeignKeyRelationship
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
@@ -26,7 +28,7 @@ class PostgreSQLDriver : DatabaseDriver {
 
     override suspend fun connect(config: ConnectionConfig) {
         val profile = config.profile
-        require(profile.type is com.dbeagle.model.DatabaseType.PostgreSQL) {
+        require(profile.type is DatabaseType.PostgreSQL) {
             "PostgreSQLDriver only supports DatabaseType.PostgreSQL"
         }
 
@@ -302,11 +304,11 @@ class PostgreSQLDriver : DatabaseDriver {
         }
     }
 
-    private fun buildJdbcUrl(profile: com.dbeagle.model.ConnectionProfile): String = "jdbc:postgresql://${profile.host}:${profile.port}/${profile.database}"
+    private fun buildJdbcUrl(profile: ConnectionProfile): String = "jdbc:postgresql://${profile.host}:${profile.port}/${profile.database}"
 }
 
 private class PoolBackedDataSource(
-    private val profile: com.dbeagle.model.ConnectionProfile,
+    private val profile: ConnectionProfile,
     private val password: String,
 ) : javax.sql.DataSource {
     override fun getConnection(): Connection = DatabaseConnectionPool.getConnection(profile, password)

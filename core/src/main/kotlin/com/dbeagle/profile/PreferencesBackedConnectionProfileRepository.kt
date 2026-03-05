@@ -3,6 +3,7 @@ package com.dbeagle.profile
 import com.dbeagle.crypto.CredentialEncryption
 import com.dbeagle.crypto.EncryptedData
 import com.dbeagle.model.ConnectionProfile
+import com.dbeagle.model.DatabaseType
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -40,8 +41,8 @@ class PreferencesBackedConnectionProfileRepository(
 
         val typeDiscriminator =
             when (profile.type) {
-                is com.dbeagle.model.DatabaseType.PostgreSQL -> "PostgreSQL"
-                is com.dbeagle.model.DatabaseType.SQLite -> "SQLite"
+                is DatabaseType.PostgreSQL -> "PostgreSQL"
+                is DatabaseType.SQLite -> "SQLite"
             }
 
         val stored =
@@ -71,8 +72,8 @@ class PreferencesBackedConnectionProfileRepository(
 
         val databaseType =
             when (stored.typeDiscriminator) {
-                "PostgreSQL" -> com.dbeagle.model.DatabaseType.PostgreSQL
-                "SQLite" -> com.dbeagle.model.DatabaseType.SQLite
+                "PostgreSQL" -> DatabaseType.PostgreSQL
+                "SQLite" -> DatabaseType.SQLite
                 else -> throw IllegalArgumentException("Unknown database type: ${stored.typeDiscriminator}")
             }
 
