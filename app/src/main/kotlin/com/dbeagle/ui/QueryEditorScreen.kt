@@ -43,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 @Composable
 fun QueryEditorScreen(
@@ -85,7 +86,7 @@ fun QueryEditorScreen(
                 }
 
                 try {
-                    val outputFile = java.io.File(path)
+                    val outputFile = File(path)
                     val exporter = when (format) {
                         ExportFormat.CSV -> CsvExporter()
                         ExportFormat.JSON -> JsonExporter()
