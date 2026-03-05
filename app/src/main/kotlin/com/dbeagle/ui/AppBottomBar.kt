@@ -84,16 +84,15 @@ fun AppBottomBar(
                 modifier = Modifier.padding(end = 16.dp),
             )
 
-            val stats = poolStats
-            val poolText = if (stats == null) {
+            val poolText = if (poolStats == null) {
                 "Pool: n/a"
             } else {
-                "Pool a=${stats.active} i=${stats.idle} t=${stats.total} w=${stats.waiting}"
+                "Pool a=${poolStats.active} i=${poolStats.idle} t=${poolStats.total} w=${poolStats.waiting}"
             }
             val poolColor = when {
-                stats == null -> MaterialTheme.colorScheme.onSurfaceVariant
-                stats.waiting > 0 -> MaterialTheme.colorScheme.error
-                stats.total > 0 && stats.active == stats.total -> MaterialTheme.colorScheme.tertiary
+                poolStats == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                poolStats.waiting > 0 -> MaterialTheme.colorScheme.error
+                poolStats.total > 0 && poolStats.active == poolStats.total -> MaterialTheme.colorScheme.tertiary
                 else -> MaterialTheme.colorScheme.primary
             }
 

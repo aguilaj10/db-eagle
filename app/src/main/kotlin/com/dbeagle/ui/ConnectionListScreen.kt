@@ -14,7 +14,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,7 +33,6 @@ import com.dbeagle.error.ErrorHandler
 import com.dbeagle.model.ConnectionConfig
 import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.pool.DatabaseConnectionPool
-import com.dbeagle.profile.MasterPasswordProvider
 import com.dbeagle.profile.PreferencesBackedConnectionProfileRepository
 import com.dbeagle.session.SessionViewModel
 import kotlinx.coroutines.CancellationException
@@ -49,14 +47,13 @@ fun ConnectionListScreen(
     masterPassword: String,
     sessionViewModel: SessionViewModel,
     onStatusTextChanged: (String) -> Unit,
-    snackbarHostState: SnackbarHostState,
     coroutineScope: CoroutineScope,
     triggerNewConnection: Boolean = false,
     onNewConnectionTriggered: () -> Unit = {},
 ) {
     val repository = remember(masterPassword) {
         PreferencesBackedConnectionProfileRepository(
-            masterPasswordProvider = MasterPasswordProvider { masterPassword },
+            masterPasswordProvider = { masterPassword },
         )
     }
 
@@ -166,10 +163,10 @@ fun ConnectionListScreen(
                 driver!!.connect(ConnectionConfig(profile = configProfile))
 
                 try {
-                    driver!!.getSchema()
+                    driver.getSchema()
                 } catch (schemaError: Exception) {
                     try {
-                        driver!!.disconnect()
+                        driver.disconnect()
                     } catch (_: Exception) {
                     } finally {
                         DatabaseConnectionPool.closePool(loaded.id)
@@ -186,7 +183,7 @@ fun ConnectionListScreen(
             updateActiveConnection(loaded.id)
 
             onStatusTextChanged("Status: Connected (${loaded.name})")
-        } catch (e: CancellationException) {
+        } catch (_: CancellationException) {
             try {
                 driver?.disconnect()
             } catch (_: Exception) {}
@@ -217,7 +214,7 @@ fun ConnectionListScreen(
             }) {
                 Icon(
                     Icons.Default.Add,
-                    contentDescription = "Add Connection"
+                    contentDescription = "Add Connection",
                 )
             }
         },

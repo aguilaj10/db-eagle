@@ -159,7 +159,7 @@ fun QueryEditorScreen(
                     sessionViewModel.clearQueryResult(pid)
 
                     val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
-                    
+
                     val startNs = System.nanoTime()
                     try {
                         val r = withContext(Dispatchers.IO) { QueryExecutor(activeDriver).execute(sqlToRun) }

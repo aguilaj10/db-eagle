@@ -35,7 +35,7 @@ fun ConnectionDialog(
     onSave: (ConnectionProfile, String) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialProfile?.name ?: "") }
-    var type by remember { mutableStateOf<DatabaseType>(initialProfile?.type ?: DatabaseType.PostgreSQL) }
+    var type by remember { mutableStateOf(initialProfile?.type ?: DatabaseType.PostgreSQL) }
     var host by remember { mutableStateOf(initialProfile?.host ?: "localhost") }
     var port by remember { mutableStateOf(initialProfile?.port?.toString() ?: "5432") }
     var database by remember { mutableStateOf(initialProfile?.database ?: "") }
@@ -43,7 +43,7 @@ fun ConnectionDialog(
     var password by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
 
-    val isPostgreSQL = type is DatabaseType.PostgreSQL
+    val isPostgresSQL = type is DatabaseType.PostgreSQL
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -66,7 +66,7 @@ fun ConnectionDialog(
                     onExpandedChange = { expanded = it },
                 ) {
                     OutlinedTextField(
-                        value = if (isPostgreSQL) "PostgreSQL" else "SQLite",
+                        value = if (isPostgresSQL) "PostgresSQL" else "SQLite",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Type") },
@@ -78,23 +78,21 @@ fun ConnectionDialog(
                         onDismissRequest = { expanded = false },
                     ) {
                         DropdownMenuItem(
-                            text = { Text("PostgreSQL") },
+                            text = { Text("PostgresSQL") },
                             onClick = {
-                                type = DatabaseType.PostgreSQL
                                 expanded = false
                             },
                         )
                         DropdownMenuItem(
                             text = { Text("SQLite") },
                             onClick = {
-                                type = DatabaseType.SQLite
                                 expanded = false
                             },
                         )
                     }
                 }
 
-                if (isPostgreSQL) {
+                if (isPostgresSQL) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = host,
@@ -116,12 +114,12 @@ fun ConnectionDialog(
                 OutlinedTextField(
                     value = database,
                     onValueChange = { database = it },
-                    label = { Text(if (isPostgreSQL) "Database" else "Database File Path") },
+                    label = { Text(if (isPostgresSQL) "Database" else "Database File Path") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                if (isPostgreSQL) {
+                if (isPostgresSQL) {
                     OutlinedTextField(
                         value = username,
                         onValueChange = { username = it },
@@ -144,15 +142,15 @@ fun ConnectionDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val pPort = port.toIntOrNull() ?: if (isPostgreSQL) 5432 else 0
+                    val pPort = port.toIntOrNull() ?: if (isPostgresSQL) 5432 else 0
                     val newProfile = ConnectionProfile(
                         id = initialProfile?.id ?: UUID.randomUUID().toString(),
                         name = name,
                         type = type,
-                        host = if (isPostgreSQL) host else "",
+                        host = if (isPostgresSQL) host else "",
                         port = pPort,
                         database = database,
-                        username = if (isPostgreSQL) username else "",
+                        username = if (isPostgresSQL) username else "",
                         encryptedPassword = initialProfile?.encryptedPassword ?: "",
                     )
                     onSave(newProfile, password)
