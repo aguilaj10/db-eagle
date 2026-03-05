@@ -32,14 +32,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.dbeagle.driver.DatabaseCapability
-import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.ddl.DDLDialect
 import com.dbeagle.ddl.DDLErrorMapper
 import com.dbeagle.ddl.IndexDDLBuilder
 import com.dbeagle.ddl.PostgreSQLDDLDialect
 import com.dbeagle.ddl.SQLiteDDLDialect
 import com.dbeagle.ddl.ViewDDLBuilder
+import com.dbeagle.driver.DatabaseCapability
+import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.navigation.NavigationTab
 import com.dbeagle.session.SessionViewModel

@@ -25,7 +25,7 @@ class QueryExecutor(
             val startTime = System.currentTimeMillis()
             val result = driver.executeQuery(sql, params)
             val duration = System.currentTimeMillis() - startTime
-            
+
             try {
                 QueryLogService.logQuery(
                     QueryLogEntry(
@@ -38,7 +38,7 @@ class QueryExecutor(
                     ),
                 )
             } catch (_: Exception) { /* silent */ }
-            
+
             return result
         }
 
@@ -61,7 +61,7 @@ class QueryExecutor(
             }
         }
         val duration = System.currentTimeMillis() - startTime
-        
+
         try {
             QueryLogService.logQuery(
                 QueryLogEntry(
@@ -74,7 +74,7 @@ class QueryExecutor(
                 ),
             )
         } catch (_: Exception) { /* silent */ }
-        
+
         return result
     }
 

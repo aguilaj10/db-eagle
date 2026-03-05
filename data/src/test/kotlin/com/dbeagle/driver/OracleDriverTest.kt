@@ -21,7 +21,7 @@ class OracleDriverTest {
 
         assertTrue(
             capabilities.contains(DatabaseCapability.Sequences),
-            "Expected Oracle driver to support sequences"
+            "Expected Oracle driver to support sequences",
         )
         assertTrue(capabilities.contains(DatabaseCapability.Transactions))
         assertTrue(capabilities.contains(DatabaseCapability.PreparedStatements))
@@ -48,7 +48,7 @@ class OracleDriverTest {
             maxValue = 9999999999L,
             cycle = false,
             ownedByTable = null,
-            ownedByColumn = null
+            ownedByColumn = null,
         )
 
         assertEquals("SEQ_TEST_ID", sequence.name)
@@ -73,7 +73,7 @@ class OracleDriverTest {
             maxValue = 1000L,
             cycle = true,
             ownedByTable = null,
-            ownedByColumn = null
+            ownedByColumn = null,
         )
 
         assertTrue(sequence.cycle, "Expected cycle to be true")
@@ -92,7 +92,7 @@ class OracleDriverTest {
             maxValue = Long.MAX_VALUE,
             cycle = false,
             ownedByTable = null,
-            ownedByColumn = null
+            ownedByColumn = null,
         )
 
         assertEquals(Long.MIN_VALUE, sequence.minValue)
@@ -106,7 +106,7 @@ class OracleDriverTest {
         val sequences = listOf(
             SequenceMetadata("SEQ_ORDERS_ID", "SCHEMA", 1, 1, 1, 999, false, null, null),
             SequenceMetadata("SEQ_USERS_ID", "SCHEMA", 1, 1, 1, 999, false, null, null),
-            SequenceMetadata("SEQ_AUDIT_ID", "SCHEMA", 1, 1, 1, 999, false, null, null)
+            SequenceMetadata("SEQ_AUDIT_ID", "SCHEMA", 1, 1, 1, 999, false, null, null),
         )
 
         val sorted = sequences.sortedBy { it.name }

@@ -42,11 +42,11 @@ class QueryLogServiceTest {
         try {
             val logFileField = QueryLogService::class.java.getDeclaredField("logFile\$delegate")
             logFileField.isAccessible = true
-            
+
             val dir = File(tempDir, ".dbeagle")
             dir.mkdirs()
             val newLogFile = File(dir, "query.log")
-            
+
             logFileField.set(QueryLogService, lazy { newLogFile })
         } catch (e: Exception) {
             e.printStackTrace()
@@ -61,7 +61,7 @@ class QueryLogServiceTest {
             durationMs = 42L,
             status = QueryStatus.SUCCESS,
             rowCount = 10,
-            errorMessage = null
+            errorMessage = null,
         )
 
         QueryLogService.logQuery(entry)
@@ -84,7 +84,7 @@ class QueryLogServiceTest {
             sql = "SELECT * FROM users",
             durationMs = 42L,
             status = QueryStatus.SUCCESS,
-            rowCount = 10
+            rowCount = 10,
         )
 
         val entry2 = QueryLogEntry(
@@ -92,7 +92,7 @@ class QueryLogServiceTest {
             sql = "INSERT INTO orders VALUES (1)",
             durationMs = 15L,
             status = QueryStatus.SUCCESS,
-            rowCount = 1
+            rowCount = 1,
         )
 
         QueryLogService.logQuery(entry1)
@@ -113,7 +113,7 @@ class QueryLogServiceTest {
             durationMs = 5L,
             status = QueryStatus.ERROR,
             rowCount = null,
-            errorMessage = "Table not found"
+            errorMessage = "Table not found",
         )
 
         QueryLogService.logQuery(entry)
@@ -141,7 +141,7 @@ class QueryLogServiceTest {
             sql = "SELECT * FROM users",
             durationMs = 42L,
             status = QueryStatus.SUCCESS,
-            rowCount = 10
+            rowCount = 10,
         )
 
         val entry2 = QueryLogEntry(
@@ -150,7 +150,7 @@ class QueryLogServiceTest {
             durationMs = 25L,
             status = QueryStatus.ERROR,
             rowCount = null,
-            errorMessage = "Permission denied"
+            errorMessage = "Permission denied",
         )
 
         QueryLogService.logQuery(entry1)
@@ -159,7 +159,7 @@ class QueryLogServiceTest {
         val logs = QueryLogService.getLogs()
 
         assertEquals(2, logs.size)
-        
+
         assertEquals(1640000000000L, logs[0].timestamp)
         assertEquals("SELECT * FROM users", logs[0].sql)
         assertEquals(42L, logs[0].durationMs)
@@ -182,11 +182,11 @@ class QueryLogServiceTest {
             sql = "SELECT 1",
             durationMs = 1L,
             status = QueryStatus.SUCCESS,
-            rowCount = 1
+            rowCount = 1,
         )
 
         QueryLogService.logQuery(entry)
-        
+
         val logFile = File(tempDir, ".dbeagle/query.log")
         logFile.appendText("\n")
         logFile.appendText("\n")
@@ -204,11 +204,11 @@ class QueryLogServiceTest {
             sql = "SELECT 1",
             durationMs = 1L,
             status = QueryStatus.SUCCESS,
-            rowCount = 1
+            rowCount = 1,
         )
 
         QueryLogService.logQuery(entry)
-        
+
         val logFile = File(tempDir, ".dbeagle/query.log")
         logFile.appendText("{ invalid json }\n")
         logFile.appendText("not json at all\n")
@@ -218,7 +218,7 @@ class QueryLogServiceTest {
             sql = "SELECT 2",
             durationMs = 2L,
             status = QueryStatus.SUCCESS,
-            rowCount = 1
+            rowCount = 1,
         )
         QueryLogService.logQuery(entry2)
 
@@ -238,8 +238,8 @@ class QueryLogServiceTest {
                     sql = "SELECT $i",
                     durationMs = 10L,
                     status = QueryStatus.SUCCESS,
-                    rowCount = 1
-                )
+                    rowCount = 1,
+                ),
             )
         }
 
@@ -273,14 +273,14 @@ class QueryLogServiceTest {
             durationMs = 123L,
             status = QueryStatus.SUCCESS,
             rowCount = 5,
-            errorMessage = null
+            errorMessage = null,
         )
 
         QueryLogService.logQuery(entry)
 
         val logs = QueryLogService.getLogs()
         assertEquals(1, logs.size)
-        
+
         val retrieved = logs[0]
         assertEquals(entry.timestamp, retrieved.timestamp)
         assertEquals(entry.sql, retrieved.sql)
