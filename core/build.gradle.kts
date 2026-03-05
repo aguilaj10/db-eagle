@@ -9,6 +9,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.cryptography.core)
     implementation(libs.cryptography.provider.jdk)
+    implementation(libs.multiplatform.settings)
+    implementation(libs.multiplatform.settings.coroutines)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
