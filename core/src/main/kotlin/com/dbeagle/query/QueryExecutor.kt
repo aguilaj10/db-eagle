@@ -1,6 +1,9 @@
 package com.dbeagle.query
 
 import com.dbeagle.driver.DatabaseDriver
+import com.dbeagle.logging.QueryLogEntry
+import com.dbeagle.logging.QueryLogService
+import com.dbeagle.logging.QueryStatus
 import com.dbeagle.model.QueryResult
 import com.dbeagle.settings.AppPreferences
 
@@ -19,13 +22,31 @@ class QueryExecutor(
     ): QueryResult {
         val trimmed = sql.trim()
         if (!looksLikeSelect(trimmed)) {
-            return driver.executeQuery(sql, params)
+            val startTime = System.currentTimeMillis()
+            val result = driver.executeQuery(sql, params)
+            val duration = System.currentTimeMillis() - startTime
+            
+            try {
+                QueryLogService.logQuery(
+                    QueryLogEntry(
+                        timestamp = startTime,
+                        sql = sql,
+                        durationMs = duration,
+                        status = if (result is QueryResult.Success) QueryStatus.SUCCESS else QueryStatus.ERROR,
+                        rowCount = (result as? QueryResult.Success)?.rows?.size,
+                        errorMessage = (result as? QueryResult.Error)?.message,
+                    ),
+                )
+            } catch (_: Exception) { /* silent */ }
+            
+            return result
         }
 
         require(pageSize > 0) { "pageSize must be > 0" }
 
         val baseSql = stripTrailingSemicolon(trimmed)
-        return when (val first = executePage(baseSql = baseSql, params = params, pageSize = pageSize, offset = 0)) {
+        val startTime = System.currentTimeMillis()
+        val result = when (val first = executePage(baseSql = baseSql, params = params, pageSize = pageSize, offset = 0)) {
             is PageOutcome.Err -> first.result
             is PageOutcome.Ok -> {
                 val rs =
@@ -39,6 +60,22 @@ class QueryExecutor(
                 first.page.copy(resultSet = rs)
             }
         }
+        val duration = System.currentTimeMillis() - startTime
+        
+        try {
+            QueryLogService.logQuery(
+                QueryLogEntry(
+                    timestamp = startTime,
+                    sql = sql,
+                    durationMs = duration,
+                    status = if (result is QueryResult.Success) QueryStatus.SUCCESS else QueryStatus.ERROR,
+                    rowCount = (result as? QueryResult.Success)?.rows?.size,
+                    errorMessage = (result as? QueryResult.Error)?.message,
+                ),
+            )
+        } catch (_: Exception) { /* silent */ }
+        
+        return result
     }
 
     private sealed interface PageOutcome {
