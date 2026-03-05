@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
  * Handles settings persistence, validation, and debug pool info display.
  */
 class SettingsViewModel(
-    private val themeManager: ThemeManager
+    private val themeManager: ThemeManager,
 ) : BaseViewModel() {
 
     /**

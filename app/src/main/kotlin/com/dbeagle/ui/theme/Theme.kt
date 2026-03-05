@@ -34,7 +34,7 @@ private val LightColorScheme = lightColorScheme(
     scrim = md_theme_light_scrim,
     inverseSurface = md_theme_light_inverseSurface,
     inverseOnSurface = md_theme_light_inverseOnSurface,
-    inversePrimary = md_theme_light_inversePrimary
+    inversePrimary = md_theme_light_inversePrimary,
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -65,18 +65,18 @@ private val DarkColorScheme = darkColorScheme(
     scrim = md_theme_dark_scrim,
     inverseSurface = md_theme_dark_inverseSurface,
     inverseOnSurface = md_theme_dark_inverseOnSurface,
-    inversePrimary = md_theme_dark_inversePrimary
+    inversePrimary = md_theme_dark_inversePrimary,
 )
 
 @Composable
 fun DBEagleTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    
+
     MaterialTheme(
         colorScheme = colorScheme,
-        content = content
+        content = content,
     )
 }

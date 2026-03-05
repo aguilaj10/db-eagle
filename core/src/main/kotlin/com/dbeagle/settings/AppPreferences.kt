@@ -17,7 +17,7 @@ object AppPreferences {
         } else {
             null
         }
-        
+
         return AppSettings(
             resultLimit = preferences.getInt(KEY_RESULT_LIMIT, AppSettings.DEFAULT_RESULT_LIMIT),
             queryTimeoutSeconds = preferences.getInt(KEY_QUERY_TIMEOUT, AppSettings.DEFAULT_QUERY_TIMEOUT_SECONDS),
@@ -32,13 +32,13 @@ object AppPreferences {
         preferences.putInt(KEY_QUERY_TIMEOUT, settings.queryTimeoutSeconds)
         preferences.putInt(KEY_CONNECTION_TIMEOUT, settings.connectionTimeoutSeconds)
         preferences.putInt(KEY_MAX_CONNECTIONS, settings.maxConnections)
-        
+
         if (settings.darkMode != null) {
             preferences.putBoolean(KEY_DARK_MODE, settings.darkMode)
         } else {
             preferences.remove(KEY_DARK_MODE)
         }
-        
+
         preferences.flush()
     }
 }

@@ -53,6 +53,7 @@ import com.dbeagle.di.appModule
 import com.dbeagle.navigation.NavigationTab
 import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.session.SessionViewModel
+import com.dbeagle.theme.ThemeManager
 import com.dbeagle.ui.AppBottomBar
 import com.dbeagle.ui.ConnectionManagerScreen
 import com.dbeagle.ui.FavoritesScreen
@@ -61,6 +62,7 @@ import com.dbeagle.ui.QueryEditorScreen
 import com.dbeagle.ui.SchemaBrowserScreen
 import com.dbeagle.ui.SettingsScreen
 import com.dbeagle.ui.readMemoryStats
+import com.dbeagle.ui.theme.DBEagleTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
@@ -82,9 +84,11 @@ fun main() {
         var statusText by remember { mutableStateOf("Status: Disconnected") }
 
         val sessionViewModel: SessionViewModel = GlobalContext.get().get()
+        val themeManager: ThemeManager = GlobalContext.get().get()
         val sessionOrder by sessionViewModel.sessionOrder.collectAsState()
         val sessionStates by sessionViewModel.sessionStates.collectAsState()
         val activeProfileId by sessionViewModel.activeProfileId.collectAsState()
+        val darkMode by themeManager.darkMode.collectAsState()
 
         val activeSession = activeProfileId?.let { sessionStates[it] }
         val activeDriver = activeProfileId?.let { sessionViewModel.getDriver(it) }
@@ -139,7 +143,7 @@ fun main() {
                 }
             },
         ) {
-            MaterialTheme {
+            DBEagleTheme(darkTheme = darkMode) {
                 Scaffold(
                     topBar = {
                         TopAppBar(
