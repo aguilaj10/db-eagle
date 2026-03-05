@@ -433,9 +433,43 @@ fun SchemaBrowserScreen(
             val existingTableDef = editingTable?.let { tableName ->
                 schemaMetadata?.tables?.find { it.name == tableName }?.let { tableMetadata ->
                     val tableKey = "${tableMetadata.schema}.${tableMetadata.name}"
-                    val columns = columnsCache[tableKey]?.columns ?: emptyList()
-                    // TODO: Convert TableMetadata + Columns to TableDefinition (Task 27)
-                    null
+                    val cachedColumns = columnsCache[tableKey]?.columns ?: emptyList()
+                    
+                    val columnDefs = cachedColumns.map { col ->
+                        val colType = try {
+                            com.dbeagle.ddl.ColumnType.valueOf(col.type.uppercase())
+                        } catch (e: IllegalArgumentException) {
+                            // Fallback to TEXT if type is unrecognized
+                            com.dbeagle.ddl.ColumnType.TEXT
+                        }
+                        com.dbeagle.ddl.ColumnDefinition(
+                            name = col.label,
+                            type = colType,
+                            nullable = true, // SchemaTreeNode.Column lacks nullable field
+                            defaultValue = null
+                        )
+                    }
+                    
+                    val foreignKeyDefs = schemaMetadata?.foreignKeys
+                        ?.filter { it.fromTable == tableName }
+                        ?.map { fk ->
+                            com.dbeagle.ddl.ForeignKeyDefinition(
+                                name = null, // ForeignKeyRelationship lacks constraint name
+                                columns = listOf(fk.fromColumn),
+                                refTable = fk.toTable,
+                                refColumns = listOf(fk.toColumn),
+                                onDelete = null,
+                                onUpdate = null
+                            )
+                        } ?: emptyList()
+                    
+                    com.dbeagle.ddl.TableDefinition(
+                        name = tableMetadata.name,
+                        columns = columnDefs,
+                        primaryKey = tableMetadata.primaryKey.takeIf { it.isNotEmpty() },
+                        foreignKeys = foreignKeyDefs,
+                        uniqueConstraints = emptyList() // Metadata doesn't include unique constraints
+                    )
                 }
             }
             
@@ -460,14 +494,25 @@ fun SchemaBrowserScreen(
                             val ddlResult = if (isCreateMode) {
                                 SchemaEditorViewModel.createTableDDL(driver, tableDef)
                             } else {
-                                SchemaEditorViewModel.createTableDDL(driver, tableDef)
+                                val oldTableDef = existingTableDef ?: return@launch
+                                val changes = com.dbeagle.viewmodel.TableChanges(
+                                    addedColumns = tableDef.columns.filter { newCol ->
+                                        oldTableDef.columns.none { it.name == newCol.name }
+                                    },
+                                    droppedColumns = oldTableDef.columns.filter { oldCol ->
+                                        tableDef.columns.none { it.name == oldCol.name }
+                                    }.map { it.name }
+                                )
+                                SchemaEditorViewModel.alterTableDDL(driver, editingTable!!, changes)
                             }
                             
                             ddlResult.onSuccess { ddl ->
                                 previewDDL = ddl
                                 previewIsDestructive = false
-                                pendingDDLExecution = {
-                                    SchemaEditorViewModel.executeTableCreate(driver, ddl)
+                                pendingDDLExecution = if (isCreateMode) {
+                                    { SchemaEditorViewModel.executeTableCreate(driver, ddl) }
+                                } else {
+                                    { SchemaEditorViewModel.executeTableAlter(driver, ddl) }
                                 }
                                 showDDLPreview = true
                                 showTableEditor = false
@@ -509,14 +554,23 @@ fun SchemaBrowserScreen(
                             val ddlResult = if (isCreateMode) {
                                 SchemaEditorViewModel.createSequenceDDL(driver, seqMetadata)
                             } else {
-                                SchemaEditorViewModel.createSequenceDDL(driver, seqMetadata)
+                                val oldSeq = existingSeq ?: return@launch
+                                val changes = com.dbeagle.ddl.SequenceChanges(
+                                    increment = if (seqMetadata.increment != oldSeq.increment) seqMetadata.increment else null,
+                                    minValue = if (seqMetadata.minValue != oldSeq.minValue) seqMetadata.minValue else null,
+                                    maxValue = if (seqMetadata.maxValue != oldSeq.maxValue) seqMetadata.maxValue else null,
+                                    restart = null
+                                )
+                                SchemaEditorViewModel.alterSequenceDDL(driver, editingSequence!!, changes)
                             }
                             
                             ddlResult.onSuccess { ddl ->
                                 previewDDL = ddl
                                 previewIsDestructive = false
-                                pendingDDLExecution = {
-                                    SchemaEditorViewModel.executeSequenceCreate(driver, ddl)
+                                pendingDDLExecution = if (isCreateMode) {
+                                    { SchemaEditorViewModel.executeSequenceCreate(driver, ddl) }
+                                } else {
+                                    { SchemaEditorViewModel.executeSequenceAlter(driver, ddl) }
                                 }
                                 showDDLPreview = true
                                 showSequenceEditor = false
