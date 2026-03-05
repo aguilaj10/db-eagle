@@ -1,12 +1,13 @@
 package com.dbeagle.viewmodel
 
 import com.dbeagle.pool.DatabaseConnectionPool
-import com.dbeagle.settings.AppPreferences
+import com.dbeagle.settings.AppPreferencesRepository
 import com.dbeagle.settings.AppSettings
 import com.dbeagle.theme.ThemeManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
  * Handles settings persistence, validation, and debug pool info display.
  */
 class SettingsViewModel(
+    private val repository: AppPreferencesRepository,
     private val themeManager: ThemeManager,
 ) : BaseViewModel() {
 
@@ -21,17 +23,17 @@ class SettingsViewModel(
      * UI state for the settings screen.
      */
     data class SettingsUiState(
-        val settings: AppSettings = AppPreferences.load(),
-        val resultLimitInput: String = settings.resultLimit.toString(),
-        val queryTimeoutInput: String = settings.queryTimeoutSeconds.toString(),
-        val connectionTimeoutInput: String = settings.connectionTimeoutSeconds.toString(),
-        val maxConnectionsInput: String = settings.maxConnections.toString(),
+        val settings: AppSettings,
+        val resultLimitInput: String = "",
+        val queryTimeoutInput: String = "",
+        val connectionTimeoutInput: String = "",
+        val maxConnectionsInput: String = "",
         val errorMessage: String? = null,
         val poolCount: Int = 0,
         val allPools: Map<String, DatabaseConnectionPool.PoolStats> = emptyMap(),
     )
 
-    private val _uiState = MutableStateFlow(SettingsUiState())
+    private val _uiState = MutableStateFlow(SettingsUiState(settings = AppSettings()))
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     val darkMode: StateFlow<Boolean?> = themeManager.darkModeOverride
@@ -41,6 +43,21 @@ class SettingsViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            repository.settingsFlow
+                .distinctUntilChanged()
+                .collect { settings ->
+                    updateStateFlow(_uiState) { currentState ->
+                        currentState.copy(
+                            settings = settings,
+                            resultLimitInput = settings.resultLimit.toString(),
+                            queryTimeoutInput = settings.queryTimeoutSeconds.toString(),
+                            connectionTimeoutInput = settings.connectionTimeoutSeconds.toString(),
+                            maxConnectionsInput = settings.maxConnections.toString(),
+                        )
+                    }
+                }
+        }
         refreshPoolStats()
     }
 
@@ -86,7 +103,7 @@ class SettingsViewModel(
                     connectionTimeoutSeconds = currentState.connectionTimeoutInput.toInt(),
                     maxConnections = currentState.maxConnectionsInput.toInt(),
                 )
-                AppPreferences.save(newSettings)
+                repository.saveSettings(newSettings)
                 updateStateFlow(_uiState) {
                     it.copy(
                         settings = newSettings,
@@ -114,7 +131,7 @@ class SettingsViewModel(
     fun resetToDefaults() {
         viewModelScope.launch {
             val defaultSettings = AppSettings()
-            AppPreferences.save(defaultSettings)
+            repository.saveSettings(defaultSettings)
             updateStateFlow(_uiState) {
                 it.copy(
                     settings = defaultSettings,

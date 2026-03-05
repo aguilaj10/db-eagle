@@ -1,7 +1,7 @@
 package com.dbeagle.crypto
 
 import dev.whyoleg.cryptography.CryptographyProvider
-import dev.whyoleg.cryptography.algorithms.symmetric.AES
+import dev.whyoleg.cryptography.algorithms.AES
 import dev.whyoleg.cryptography.providers.jdk.JDK
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
@@ -27,7 +27,7 @@ object CredentialEncryption {
         val derivedKey = deriveKey(masterPassword, salt)
 
         val aes = cryptoProvider.get(AES.GCM)
-        val key = aes.keyDecoder().decodeFromBlocking(AES.Key.Format.RAW, derivedKey)
+        val key = aes.keyDecoder().decodeFromByteArrayBlocking(AES.Key.Format.RAW, derivedKey)
 
         val cipher = key.cipher()
         val ciphertext = cipher.encryptBlocking(plaintext.toByteArray(Charsets.UTF_8), iv)
@@ -46,7 +46,7 @@ object CredentialEncryption {
         val derivedKey = deriveKey(masterPassword, encrypted.salt)
 
         val aes = cryptoProvider.get(AES.GCM)
-        val key = aes.keyDecoder().decodeFromBlocking(AES.Key.Format.RAW, derivedKey)
+        val key = aes.keyDecoder().decodeFromByteArrayBlocking(AES.Key.Format.RAW, derivedKey)
 
         val cipher = key.cipher()
 

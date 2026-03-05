@@ -12,8 +12,8 @@ import com.dbeagle.model.SequenceMetadata
 import com.dbeagle.model.TableMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.io.PrintWriter
 import java.lang.reflect.Proxy
 import java.sql.Connection
@@ -458,7 +458,7 @@ private class NonClosingConnectionDataSource(
     override fun getParentLogger(): Logger = Logger
         .getGlobal()
 
-    override fun <T : Any?> unwrap(iface: Class<T>?): T = throw SQLFeatureNotSupportedException()
+    override fun <T> unwrap(iface: Class<T>?): T = throw SQLFeatureNotSupportedException()
 
     override fun isWrapperFor(iface: Class<*>?): Boolean = false
 

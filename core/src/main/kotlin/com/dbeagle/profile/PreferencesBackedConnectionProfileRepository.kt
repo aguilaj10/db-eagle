@@ -4,15 +4,20 @@ import com.dbeagle.crypto.CredentialEncryption
 import com.dbeagle.crypto.EncryptedData
 import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
+import com.russhwolf.settings.Settings
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.util.prefs.Preferences
 
 class PreferencesBackedConnectionProfileRepository(
     private val masterPasswordProvider: MasterPasswordProvider,
-    private val preferences: Preferences = Preferences.userRoot().node("com.dbeagle.profiles"),
+    private val settings: Settings,
 ) : ConnectionProfileRepository {
+    private val _profilesFlow = MutableStateFlow<List<ConnectionProfile>>(emptyList())
+    val profilesFlow: Flow<List<ConnectionProfile>> = _profilesFlow.asStateFlow()
     private val json =
         Json {
             prettyPrint = false
@@ -59,12 +64,12 @@ class PreferencesBackedConnectionProfileRepository(
             )
 
         val serialized = json.encodeToString(stored)
-        preferences.put(profile.id, serialized)
-        preferences.flush()
+        settings.putString(profile.id, serialized)
+        _profilesFlow.value = loadAll()
     }
 
     override suspend fun load(id: String): ConnectionProfile? {
-        val serialized = preferences.get(id, null) ?: return null
+        val serialized = settings.getStringOrNull(id) ?: return null
         val stored = json.decodeFromString<StoredProfile>(serialized)
 
         val masterPassword = masterPasswordProvider.getMasterPassword()
@@ -91,12 +96,12 @@ class PreferencesBackedConnectionProfileRepository(
     }
 
     override suspend fun loadAll(): List<ConnectionProfile> {
-        val keys = preferences.keys()
+        val keys = settings.keys
         return keys.mapNotNull { key -> load(key) }
     }
 
     override suspend fun delete(id: String) {
-        preferences.remove(id)
-        preferences.flush()
+        settings.remove(id)
+        _profilesFlow.value = loadAll()
     }
 }

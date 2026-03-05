@@ -2,6 +2,7 @@ package com.dbeagle.settings
 
 import java.util.prefs.Preferences
 
+@Deprecated("Use AppPreferencesRepository with Flow-based API instead")
 object AppPreferences {
     private val preferences = Preferences.userRoot().node("com.dbeagle.settings")
 

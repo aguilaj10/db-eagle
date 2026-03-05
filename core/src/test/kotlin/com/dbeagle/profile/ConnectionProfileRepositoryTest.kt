@@ -2,9 +2,10 @@ package com.dbeagle.profile
 
 import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
+import com.russhwolf.settings.MapSettings
+import com.russhwolf.settings.Settings
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import java.util.prefs.Preferences
-import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,25 +17,18 @@ import kotlin.test.assertTrue
 
 class ConnectionProfileRepositoryTest {
 
-    private lateinit var preferences: Preferences
-    private lateinit var repository: ConnectionProfileRepository
+    private lateinit var settings: Settings
+    private lateinit var repository: PreferencesBackedConnectionProfileRepository
     private val testMasterPassword = "test-master-password-123"
 
     @BeforeTest
     fun setup() {
-        preferences = Preferences.userRoot().node("com.dbeagle.profiles.test")
-        preferences.clear()
+        settings = MapSettings()
 
         repository = PreferencesBackedConnectionProfileRepository(
             masterPasswordProvider = MasterPasswordProvider { testMasterPassword },
-            preferences = preferences,
+            settings = settings,
         )
-    }
-
-    @AfterTest
-    fun teardown() {
-        preferences.clear()
-        preferences.removeNode()
     }
 
     @Test
@@ -148,7 +142,7 @@ class ConnectionProfileRepositoryTest {
 
         val wrongPasswordRepo = PreferencesBackedConnectionProfileRepository(
             masterPasswordProvider = MasterPasswordProvider { "wrong-master-password" },
-            preferences = preferences,
+            settings = settings,
         )
 
         val exception = assertFailsWith<IllegalArgumentException> {
@@ -173,7 +167,7 @@ class ConnectionProfileRepositoryTest {
 
         repository.save(profile, plaintextPassword)
 
-        val rawStored = preferences.get("encryption-check", null)
+        val rawStored = settings.getStringOrNull("encryption-check")
         assertNotNull(rawStored)
         assertFalse(rawStored.contains(plaintextPassword))
         assertTrue(rawStored.contains("encryptedPassword"))
@@ -204,5 +198,68 @@ class ConnectionProfileRepositoryTest {
         assertNotNull(loaded)
         assertEquals("Updated Name", loaded.name)
         assertEquals("password2", loaded.encryptedPassword)
+    }
+
+    @Test
+    fun `profilesFlow emits updated list on save`() = runTest {
+        val profile = ConnectionProfile(
+            id = "flow-test-1",
+            name = "Flow Test DB",
+            type = DatabaseType.PostgreSQL,
+            host = "localhost",
+            port = 5432,
+            database = "testdb",
+            username = "testuser",
+            encryptedPassword = "",
+        )
+
+        repository.save(profile, "password")
+
+        val profiles = repository.profilesFlow.first()
+        assertEquals(1, profiles.size)
+        assertEquals("flow-test-1", profiles[0].id)
+        assertEquals("Flow Test DB", profiles[0].name)
+    }
+
+    @Test
+    fun `profilesFlow emits updated list on delete`() = runTest {
+        val profile1 = ConnectionProfile(
+            id = "flow-test-2",
+            name = "Flow Test DB 1",
+            type = DatabaseType.PostgreSQL,
+            host = "localhost",
+            port = 5432,
+            database = "db1",
+            username = "user1",
+            encryptedPassword = "",
+        )
+        val profile2 = ConnectionProfile(
+            id = "flow-test-3",
+            name = "Flow Test DB 2",
+            type = DatabaseType.SQLite,
+            host = "localhost",
+            port = 0,
+            database = "db2",
+            username = "user2",
+            encryptedPassword = "",
+        )
+
+        repository.save(profile1, "password1")
+        repository.save(profile2, "password2")
+
+        var profiles = repository.profilesFlow.first()
+        assertEquals(2, profiles.size)
+
+        repository.delete("flow-test-2")
+
+        profiles = repository.profilesFlow.first()
+        assertEquals(1, profiles.size)
+        assertEquals("flow-test-3", profiles[0].id)
+    }
+
+    @Test
+    fun `profilesFlow emits empty list initially`() = runTest {
+        val profiles = repository.profilesFlow.first()
+        assertTrue(profiles.isEmpty())
     }
 }

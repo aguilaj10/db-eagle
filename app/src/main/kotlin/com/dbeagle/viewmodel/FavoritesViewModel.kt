@@ -5,6 +5,8 @@ import com.dbeagle.model.FavoriteQuery
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 class FavoritesViewModel(
     private val repository: FavoritesRepository,
@@ -21,11 +23,17 @@ class FavoritesViewModel(
     val uiState: StateFlow<FavoritesUiState> = _uiState.asStateFlow()
 
     init {
-        refreshFavorites()
+        viewModelScope.launch {
+            repository.getAllFlow()
+                .distinctUntilChanged()
+                .collect { favorites ->
+                    updateStateFlow(_uiState) { it.copy(favorites = favorites) }
+                }
+        }
     }
 
     fun refreshFavorites() {
-        updateStateFlow(_uiState) { it.copy(favorites = repository.getAll()) }
+        // No-op: Flow handles reactivity automatically
     }
 
     fun getDisplayedFavorites(): List<FavoriteQuery> {
@@ -47,13 +55,11 @@ class FavoritesViewModel(
 
     fun saveFavorite(updated: FavoriteQuery) {
         repository.save(updated)
-        refreshFavorites()
         setEditingFavorite(null)
     }
 
     fun deleteFavorite(id: String) {
         repository.delete(id)
-        refreshFavorites()
         setDeletingFavorite(null)
     }
 }

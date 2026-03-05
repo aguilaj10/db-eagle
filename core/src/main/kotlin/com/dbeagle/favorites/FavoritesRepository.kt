@@ -1,6 +1,7 @@
 package com.dbeagle.favorites
 
 import com.dbeagle.model.FavoriteQuery
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository for persisting and retrieving favorite queries.
@@ -15,6 +16,11 @@ interface FavoritesRepository {
      * Returns all favorites, most recently modified first.
      */
     fun getAll(): List<FavoriteQuery>
+
+    /**
+     * Returns all favorites as a Flow, emitting updates when favorites change.
+     */
+    fun getAllFlow(): Flow<List<FavoriteQuery>>
 
     /**
      * Returns a single favorite by ID, or null if not found.
