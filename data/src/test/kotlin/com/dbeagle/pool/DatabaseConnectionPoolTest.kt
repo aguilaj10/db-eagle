@@ -3,6 +3,7 @@ package com.dbeagle.pool
 import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
 import org.testcontainers.containers.PostgreSQLContainer
+import org.testcontainers.containers.wait.strategy.Wait
 import kotlin.test.*
 
 class DatabaseConnectionPoolTest {
@@ -17,6 +18,7 @@ class DatabaseConnectionPoolTest {
                 .withUsername("testuser")
                 .withPassword("testpass")
                 .withStartupTimeoutSeconds(60)
+                .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 1))
 
             postgresContainer?.start()
             dockerAvailable = postgresContainer?.isRunning == true

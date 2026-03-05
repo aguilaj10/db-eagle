@@ -1,6 +1,7 @@
 package com.dbeagle.test
 
 import org.testcontainers.containers.PostgreSQLContainer
+import org.testcontainers.containers.wait.strategy.Wait
 import java.sql.Connection
 import java.sql.DriverManager
 
@@ -26,6 +27,7 @@ object DatabaseTestContainers {
                     .withUsername(DATABASE_USER)
                     .withPassword(DATABASE_PASSWORD)
                     .withStartupTimeoutSeconds(60)
+                    .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 1))
 
             container!!.start()
         }
