@@ -68,5 +68,14 @@ object SQLiteDDLDialect : DDLDialect {
         ColumnType.DATE -> "TEXT" // Stored as ISO8601 string: YYYY-MM-DD
         ColumnType.TIMESTAMP -> "TEXT" // Stored as ISO8601 string: YYYY-MM-DD HH:MM:SS.SSS
         ColumnType.BLOB -> "BLOB"
+        ColumnType.SMALLINT -> "INTEGER"
+        ColumnType.REAL -> "REAL"
+        ColumnType.DOUBLE_PRECISION -> "REAL"
+        ColumnType.UUID -> "TEXT"
+        ColumnType.JSON -> "TEXT"
+        ColumnType.JSONB -> "BLOB"
+        ColumnType.SERIAL -> "INTEGER"
+        ColumnType.SMALLSERIAL -> "INTEGER"
+        ColumnType.BIGSERIAL -> "INTEGER"
     }
 }

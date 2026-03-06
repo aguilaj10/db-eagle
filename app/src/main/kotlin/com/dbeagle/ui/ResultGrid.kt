@@ -2,6 +2,7 @@ package com.dbeagle.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -11,13 +12,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -58,6 +64,8 @@ fun ResultGrid(
     var localRows by remember(rows) { mutableStateOf(rows.map { it.toMutableList() }.toMutableList()) }
     var baselineRows by remember(rows) { mutableStateOf(rows.map { it.toList() }) }
     var currentPage by remember(rows) { mutableStateOf(0) }
+    var sortColumn by remember { mutableStateOf<String?>(null) }
+    var sortAscending by remember { mutableStateOf(true) }
 
     val totalPages = max(1, (localRows.size + pageSize - 1) / pageSize)
     currentPage = min(currentPage, totalPages - 1)
@@ -124,29 +132,68 @@ fun ResultGrid(
                             modifier = Modifier
                                 .width(150.dp)
                                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                .clickable {
+                                    if (sortColumn == col) {
+                                        sortAscending = !sortAscending
+                                    } else {
+                                        sortColumn = col
+                                        sortAscending = true
+                                    }
+                                    currentPage = 0
+                                }
                                 .padding(8.dp),
                         ) {
-                            Text(
-                                text = col,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = col,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (sortColumn == col) {
+                                    Icon(
+                                        imageVector = if (sortAscending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                                        contentDescription = if (sortAscending) "Sorted ascending" else "Sorted descending",
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
+                val sortedRows = if (sortColumn != null) {
+                    val colIndex = columns.indexOf(sortColumn)
+                    if (colIndex >= 0) {
+                        localRows.sortedWith(
+                            compareBy(nullsLast()) { row ->
+                                row.getOrNull(colIndex)?.takeIf { it.isNotBlank() }
+                            },
+                        ).let { if (sortAscending) it else it.reversed() }
+                    } else {
+                        localRows
+                    }
+                } else {
+                    localRows
+                }
+
                 val startIdx = currentPage * pageSize
-                val endIdx = min(startIdx + pageSize, localRows.size)
-                val visibleRows = if (localRows.isEmpty()) emptyList() else localRows.subList(startIdx, endIdx)
+                val endIdx = min(startIdx + pageSize, sortedRows.size)
+                val visibleRows = if (sortedRows.isEmpty()) emptyList() else sortedRows.subList(startIdx, endIdx)
 
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     itemsIndexed(
                         items = visibleRows,
-                        key = { rIdx, _ -> startIdx + rIdx },
+                        key = { rIdx, row -> row.hashCode() + startIdx + rIdx },
                     ) { rIdx, row ->
-                        val actualRowIdx = startIdx + rIdx
+                        val sortedRowIndex = startIdx + rIdx
+                        val actualRowIdx = if (sortColumn != null) {
+                            localRows.indexOf(row)
+                        } else {
+                            sortedRowIndex
+                        }
                         Row(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
                             row.forEachIndexed { cIdx, cellValue ->
                                 val colName = columns.getOrNull(cIdx) ?: ""

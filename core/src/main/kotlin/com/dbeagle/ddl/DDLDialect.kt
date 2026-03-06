@@ -30,6 +30,15 @@ enum class ColumnType {
 
     /** Binary large object */
     BLOB,
+    SMALLINT,
+    REAL,
+    DOUBLE_PRECISION,
+    UUID,
+    JSON,
+    JSONB,
+    SERIAL,
+    SMALLSERIAL,
+    BIGSERIAL,
 }
 
 /**
@@ -116,4 +125,6 @@ interface DDLDialect {
      * @return The database-specific SQL type name
      */
     fun getTypeName(genericType: ColumnType): String
+
+    fun getTypeName(genericType: ColumnType, autoIncrement: Boolean): String = getTypeName(genericType)
 }

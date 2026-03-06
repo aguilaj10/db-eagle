@@ -5,8 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,7 +15,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
@@ -25,6 +25,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -40,7 +41,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.rememberDialogState
 import com.dbeagle.ddl.ColumnDefinition
 import com.dbeagle.ddl.ColumnType
 import com.dbeagle.ddl.DDLValidator
@@ -48,6 +52,7 @@ import com.dbeagle.ddl.ForeignKeyDefinition
 import com.dbeagle.ddl.IndexDefinition
 import com.dbeagle.ddl.TableDefinition
 import com.dbeagle.ddl.ValidationResult
+import java.awt.Dimension
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -57,6 +62,7 @@ fun TableEditorDialog(
     allTables: List<String>,
     onDismiss: () -> Unit,
     onSave: (TableDefinition, List<IndexDefinition>) -> Unit,
+    databaseType: String? = null,
 ) {
     var tableName by remember { mutableStateOf(existingTable?.name ?: "") }
     val columns = remember {
@@ -96,89 +102,98 @@ fun TableEditorDialog(
 
     val isEditMode = existingTable != null
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (isEditMode) "Edit Table: ${existingTable.name}" else "Create Table") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .width(800.dp)
-                    .height(600.dp)
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text("Columns") },
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text("Constraints") },
-                    )
-                    Tab(
-                        selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
-                        text = { Text("Indexes") },
-                    )
-                }
+    DialogWindow(
+        onCloseRequest = onDismiss,
+        state = rememberDialogState(size = DpSize(900.dp, 700.dp)),
+        title = if (isEditMode) "Edit Table: ${existingTable?.name}" else "Create Table",
+        resizable = true,
+    ) {
+        window.minimumSize = Dimension(600, 400)
 
-                when (selectedTab) {
-                    0 -> ColumnsTab(
-                        tableName = tableName,
-                        onTableNameChange = { tableName = it },
-                        isEditMode = isEditMode,
-                        columns = columns,
-                        validationError = validationError,
-                    )
-                    1 -> ConstraintsTab(
-                        columns = columns,
-                        allTables = allTables,
-                        primaryKeyColumns = primaryKeyColumns,
-                        foreignKeys = foreignKeys,
-                        uniqueConstraints = uniqueConstraints,
-                    )
-                    2 -> IndexesTab(
-                        tableName = tableName,
-                        columns = columns,
-                        indexes = indexes,
-                    )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Columns") },
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Constraints") },
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Indexes") },
+                )
+            }
+
+            when (selectedTab) {
+                0 -> ColumnsTab(
+                    tableName = tableName,
+                    onTableNameChange = { tableName = it },
+                    isEditMode = isEditMode,
+                    columns = columns,
+                    validationError = validationError,
+                    databaseType = databaseType,
+                    modifier = Modifier.weight(1f),
+                )
+                1 -> ConstraintsTab(
+                    columns = columns,
+                    allTables = allTables,
+                    primaryKeyColumns = primaryKeyColumns,
+                    foreignKeys = foreignKeys,
+                    uniqueConstraints = uniqueConstraints,
+                    modifier = Modifier.weight(1f),
+                )
+                2 -> IndexesTab(
+                    tableName = tableName,
+                    columns = columns,
+                    indexes = indexes,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        val tableDefinition = TableDefinition(
+                            name = tableName,
+                            columns = columns.toList(),
+                            primaryKey = primaryKeyColumns.takeIf { it.isNotEmpty() },
+                            foreignKeys = foreignKeys.toList(),
+                            uniqueConstraints = uniqueConstraints.toList(),
+                        )
+
+                        when (val result = DDLValidator.validateTableDefinition(tableDefinition)) {
+                            is ValidationResult.Invalid -> {
+                                validationError = result.errors.joinToString("\n")
+                            }
+                            ValidationResult.Valid -> {
+                                validationError = null
+                                onSave(tableDefinition, indexes.toList())
+                            }
+                        }
+                    },
+                ) {
+                    Text("Save")
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val tableDefinition = TableDefinition(
-                        name = tableName,
-                        columns = columns.toList(),
-                        primaryKey = primaryKeyColumns.takeIf { it.isNotEmpty() },
-                        foreignKeys = foreignKeys.toList(),
-                        uniqueConstraints = uniqueConstraints.toList(),
-                    )
-
-                    when (val result = DDLValidator.validateTableDefinition(tableDefinition)) {
-                        is ValidationResult.Invalid -> {
-                            validationError = result.errors.joinToString("\n")
-                        }
-                        ValidationResult.Valid -> {
-                            validationError = null
-                            onSave(tableDefinition, indexes.toList())
-                        }
-                    }
-                },
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -188,9 +203,11 @@ private fun ColumnsTab(
     isEditMode: Boolean,
     columns: SnapshotStateList<ColumnDefinition>,
     validationError: String?,
+    databaseType: String?,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         OutlinedTextField(
@@ -223,6 +240,7 @@ private fun ColumnsTab(
             itemsIndexed(columns) { index, column ->
                 ColumnRow(
                     column = column,
+                    databaseType = databaseType,
                     onUpdate = { updatedColumn ->
                         columns[index] = updatedColumn
                     },
@@ -255,6 +273,7 @@ private fun ColumnsTab(
 @Composable
 private fun ColumnRow(
     column: ColumnDefinition,
+    databaseType: String?,
     onUpdate: (ColumnDefinition) -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -262,7 +281,33 @@ private fun ColumnRow(
     var columnType by remember { mutableStateOf(column.type) }
     var nullable by remember { mutableStateOf(column.nullable) }
     var defaultValue by remember { mutableStateOf(column.defaultValue ?: "") }
+    var autoIncrement by remember { mutableStateOf(column.autoIncrement) }
     var typeExpanded by remember { mutableStateOf(false) }
+
+    // Filter types based on database
+    val availableTypes = if (databaseType == "PostgreSQL") {
+        ColumnType.entries
+    } else {
+        ColumnType.entries.filter {
+            it !in listOf(
+                ColumnType.SERIAL,
+                ColumnType.SMALLSERIAL,
+                ColumnType.BIGSERIAL,
+                ColumnType.UUID,
+                ColumnType.JSON,
+                ColumnType.JSONB,
+                ColumnType.SMALLINT,
+                ColumnType.DOUBLE_PRECISION,
+            )
+        }
+    }
+
+    // Show autoIncrement only for integer types
+    val showAutoIncrement = columnType in listOf(
+        ColumnType.INTEGER,
+        ColumnType.BIGINT,
+        ColumnType.SMALLINT,
+    )
 
     fun notifyUpdate() {
         onUpdate(
@@ -271,6 +316,7 @@ private fun ColumnRow(
                 type = columnType,
                 nullable = nullable,
                 defaultValue = defaultValue.takeIf { it.isNotBlank() },
+                autoIncrement = autoIncrement && showAutoIncrement,
             ),
         )
     }
@@ -308,7 +354,7 @@ private fun ColumnRow(
                 expanded = typeExpanded,
                 onDismissRequest = { typeExpanded = false },
             ) {
-                ColumnType.entries.forEach { type ->
+                availableTypes.forEach { type ->
                     DropdownMenuItem(
                         text = { Text(type.name) },
                         onClick = {
@@ -333,6 +379,22 @@ private fun ColumnRow(
                 },
             )
             Text("Nullable")
+        }
+
+        if (showAutoIncrement) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = autoIncrement,
+                    onCheckedChange = {
+                        autoIncrement = it
+                        notifyUpdate()
+                    },
+                )
+                Text("Auto")
+            }
         }
 
         OutlinedTextField(
@@ -360,9 +422,10 @@ private fun ConstraintsTab(
     primaryKeyColumns: SnapshotStateList<String>,
     foreignKeys: SnapshotStateList<ForeignKeyDefinition>,
     uniqueConstraints: SnapshotStateList<List<String>>,
+    modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // Primary Key Section
@@ -758,9 +821,10 @@ private fun IndexesTab(
     tableName: String,
     columns: SnapshotStateList<ColumnDefinition>,
     indexes: SnapshotStateList<IndexDefinition>,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(

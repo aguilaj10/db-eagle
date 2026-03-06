@@ -2,6 +2,7 @@ package com.dbeagle.settings
 
 import com.russhwolf.settings.ExperimentalSettingsApi
 import com.russhwolf.settings.ObservableSettings
+import com.russhwolf.settings.coroutines.getBooleanFlow
 import com.russhwolf.settings.coroutines.getBooleanOrNullFlow
 import com.russhwolf.settings.coroutines.getIntFlow
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,7 @@ class AppPreferencesRepository(
         const val KEY_CONNECTION_TIMEOUT = "connectionTimeoutSeconds"
         const val KEY_MAX_CONNECTIONS = "maxConnections"
         const val KEY_DARK_MODE = "darkMode"
+        const val KEY_SIDEBAR_COLLAPSED = "sidebarCollapsed"
     }
 
     /**
@@ -60,22 +62,37 @@ class AppPreferencesRepository(
         .distinctUntilChanged()
 
     /**
+     * Flow of sidebar collapsed state (false = expanded by default).
+     */
+    val sidebarCollapsedFlow: Flow<Boolean> = settings
+        .getBooleanFlow(KEY_SIDEBAR_COLLAPSED, false)
+        .distinctUntilChanged()
+
+    /**
      * Combined flow of all settings as AppSettings data class.
      * Emits new value whenever any setting changes.
      */
     val settingsFlow: Flow<AppSettings> = combine(
-        resultLimitFlow,
-        queryTimeoutFlow,
-        connectionTimeoutFlow,
-        maxConnectionsFlow,
+        combine(
+            resultLimitFlow,
+            queryTimeoutFlow,
+            connectionTimeoutFlow,
+            maxConnectionsFlow,
+        ) { resultLimit, queryTimeout, connectionTimeout, maxConnections ->
+            arrayOf(resultLimit, queryTimeout, connectionTimeout, maxConnections)
+        },
         darkModeFlow,
-    ) { resultLimit, queryTimeout, connectionTimeout, maxConnections, darkMode ->
+        sidebarCollapsedFlow,
+    ) { timeouts: Array<out Any>, darkMode, sidebarCollapsed ->
+        @Suppress("UNCHECKED_CAST")
+        val arr = timeouts as Array<out Int>
         AppSettings(
-            resultLimit = resultLimit,
-            queryTimeoutSeconds = queryTimeout,
-            connectionTimeoutSeconds = connectionTimeout,
-            maxConnections = maxConnections,
+            resultLimit = arr[0],
+            queryTimeoutSeconds = arr[1],
+            connectionTimeoutSeconds = arr[2],
+            maxConnections = arr[3],
             darkMode = darkMode,
+            sidebarCollapsed = sidebarCollapsed,
         )
     }
 
@@ -120,6 +137,13 @@ class AppPreferencesRepository(
     }
 
     /**
+     * Updates the sidebar collapsed state.
+     */
+    fun setSidebarCollapsed(value: Boolean) {
+        settings.putBoolean(KEY_SIDEBAR_COLLAPSED, value)
+    }
+
+    /**
      * Saves all settings from AppSettings data class.
      */
     fun saveSettings(appSettings: AppSettings) {
@@ -128,5 +152,6 @@ class AppPreferencesRepository(
         setConnectionTimeout(appSettings.connectionTimeoutSeconds)
         setMaxConnections(appSettings.maxConnections)
         setDarkMode(appSettings.darkMode)
+        setSidebarCollapsed(appSettings.sidebarCollapsed)
     }
 }

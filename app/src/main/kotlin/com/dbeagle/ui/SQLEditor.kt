@@ -2,26 +2,14 @@ package com.dbeagle.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,14 +38,11 @@ import dev.snipme.kodeview.view.material3.CodeEditText
 fun SQLEditor(
     sql: String,
     onSqlChange: (String) -> Unit,
-    onRun: () -> Unit,
     isRunning: Boolean,
-    onClear: () -> Unit,
-    onSaveToFavorites: () -> Unit,
-    onCancel: () -> Unit = {},
+    onRun: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var highlights by remember {
+    var highlights by remember(sql) {
         mutableStateOf(
             Highlights.Builder()
                 .code(sql)
@@ -90,47 +75,6 @@ fun SQLEditor(
                 }
             },
     ) {
-        // Toolbar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(onClick = onRun, enabled = !isRunning) {
-                if (isRunning) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Run Query")
-                }
-                Spacer(Modifier.width(4.dp))
-                Text(if (isRunning) "Running" else "Run")
-            }
-            if (isRunning) {
-                OutlinedButton(onClick = onCancel) {
-                    Icon(Icons.Default.Clear, contentDescription = "Cancel")
-                    Spacer(Modifier.width(4.dp))
-                    Text("Cancel")
-                }
-            }
-            OutlinedButton(onClick = onClear) {
-                Icon(Icons.Default.Clear, contentDescription = "Clear")
-                Spacer(Modifier.width(4.dp))
-                Text("Clear")
-            }
-            OutlinedButton(onClick = onSaveToFavorites) {
-                Icon(Icons.Default.Favorite, contentDescription = "Save")
-                Spacer(Modifier.width(4.dp))
-                Text("Save")
-            }
-        }
-
-        HorizontalDivider()
-
         // Editor Area
         Row(modifier = Modifier.fillMaxSize()) {
             // Line numbers

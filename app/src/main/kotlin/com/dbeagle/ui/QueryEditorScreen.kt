@@ -111,6 +111,58 @@ fun QueryEditorScreen(
             )
         }
 
+        QueryEditorToolbar(
+            onRun = {
+                if (uiState.isRunning) return@QueryEditorToolbar
+                if (activeDriver == null) {
+                    onStatusTextChanged("Status: No active connection")
+                    return@QueryEditorToolbar
+                }
+
+                val pid = activeProfileId
+                if (pid == null) {
+                    onStatusTextChanged("Status: No active connection")
+                    return@QueryEditorToolbar
+                }
+
+                sessionViewModel.clearQueryResult(pid)
+
+                val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
+
+                viewModel.executeQuery(
+                    sqlToRun = sqlToRun,
+                    driver = activeDriver,
+                    profileId = pid,
+                    profileName = activeProfileName ?: "Connection",
+                    onStatusChanged = onStatusTextChanged,
+                    onQuerySuccess = { result, _ ->
+                        sessionViewModel.recordQueryResult(pid, sqlToRun, result)
+                    },
+                    onQueryError = { message, exception ->
+                        ErrorHandler.showQueryError(
+                            snackbarHostState,
+                            coroutineScope,
+                            "Query error: $message",
+                            exception,
+                        )
+                    },
+                )
+            },
+            onCancel = {
+                viewModel.cancelQuery(onStatusTextChanged)
+            },
+            onClear = {
+                val pid = activeProfileId
+                if (pid == null) onScratchSqlChange("") else sessionViewModel.updateQueryEditorSql(pid, "")
+            },
+            onSaveToFavorites = {
+                favoriteQueryDraft = sqlText
+                showSaveFavoriteDialog = true
+            },
+            isRunning = uiState.isRunning,
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+        )
+
         SQLEditor(
             sql = sqlText,
             onSqlChange = {
@@ -121,9 +173,7 @@ fun QueryEditorScreen(
                     sessionViewModel.updateQueryEditorSql(pid, it)
                 }
             },
-            onCancel = {
-                viewModel.cancelQuery(onStatusTextChanged)
-            },
+            isRunning = uiState.isRunning,
             onRun = {
                 if (uiState.isRunning) return@SQLEditor
                 if (activeDriver == null) {
@@ -159,15 +209,6 @@ fun QueryEditorScreen(
                         )
                     },
                 )
-            },
-            isRunning = uiState.isRunning,
-            onClear = {
-                val pid = activeProfileId
-                if (pid == null) onScratchSqlChange("") else sessionViewModel.updateQueryEditorSql(pid, "")
-            },
-            onSaveToFavorites = {
-                favoriteQueryDraft = sqlText
-                showSaveFavoriteDialog = true
             },
             modifier = Modifier.weight(0.4f),
         )

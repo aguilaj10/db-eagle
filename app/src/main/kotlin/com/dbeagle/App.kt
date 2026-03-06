@@ -8,15 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,15 +53,17 @@ import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.session.SessionViewModel
 import com.dbeagle.theme.ThemeManager
 import com.dbeagle.ui.AppBottomBar
-import com.dbeagle.ui.ConnectionManagerScreen
+import com.dbeagle.ui.ConnectionDialog
+import com.dbeagle.ui.ConnectionPanel
 import com.dbeagle.ui.FavoritesScreen
 import com.dbeagle.ui.HistoryScreen
 import com.dbeagle.ui.LogViewerScreen
 import com.dbeagle.ui.QueryEditorScreen
 import com.dbeagle.ui.SchemaBrowserScreen
-import com.dbeagle.ui.SettingsScreen
+import com.dbeagle.ui.dialogs.SettingsDialog
 import com.dbeagle.ui.readMemoryStats
 import com.dbeagle.ui.theme.DBEagleTheme
+import com.dbeagle.viewmodel.ConnectionListViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
@@ -82,7 +81,7 @@ fun main() {
     }
     application {
         val windowState = rememberWindowState(size = DpSize(1200.dp, 800.dp))
-        var selectedTab by remember { mutableStateOf(NavigationTab.Connections) }
+        var selectedTab by remember { mutableStateOf(NavigationTab.QueryEditor) }
         var statusText by remember { mutableStateOf("Status: Disconnected") }
 
         val sessionViewModel: SessionViewModel = GlobalContext.get().get()
@@ -114,6 +113,8 @@ fun main() {
         val snackbarHostState = remember { SnackbarHostState() }
 
         var triggerNewConnection by remember { mutableStateOf(false) }
+        var showSettingsDialog by remember { mutableStateOf(false) }
+        var sidebarCollapsed by remember { mutableStateOf(false) }
 
         Window(
             onCloseRequest = ::exitApplication,
@@ -123,7 +124,6 @@ fun main() {
                 if (event.type == KeyEventType.KeyUp && (event.isCtrlPressed || event.isMetaPressed)) {
                     when (event.key) {
                         Key.N -> {
-                            selectedTab = NavigationTab.Connections
                             triggerNewConnection = true
                             true
                         }
@@ -136,7 +136,7 @@ fun main() {
                             true
                         }
                         Key.Comma -> {
-                            selectedTab = NavigationTab.Settings
+                            showSettingsDialog = true
                             true
                         }
                         else -> false
@@ -156,7 +156,7 @@ fun main() {
                                 titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             ),
                             actions = {
-                                IconButton(onClick = { selectedTab = NavigationTab.Settings }) {
+                                IconButton(onClick = { showSettingsDialog = true }) {
                                     Icon(
                                         imageVector = Icons.Default.Settings,
                                         contentDescription = "Settings",
@@ -177,45 +177,38 @@ fun main() {
                         SnackbarHost(hostState = snackbarHostState)
                     },
                 ) { innerPadding ->
+                    if (showSettingsDialog) {
+                        SettingsDialog(onDismiss = { showSettingsDialog = false })
+                    }
+
+                    if (triggerNewConnection) {
+                        ConnectionDialog(
+                            initialProfile = null,
+                            onDismiss = { triggerNewConnection = false },
+                            onSave = { profile, plaintextPassword ->
+                                appCoroutineScope.launch {
+                                    val connectionListViewModel: ConnectionListViewModel = GlobalContext.get().get()
+                                    connectionListViewModel.saveProfile(profile, plaintextPassword)
+                                }
+                                triggerNewConnection = false
+                            },
+                        )
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding),
                     ) {
-                        // Left sidebar
-                        Box(
-                            modifier = Modifier
-                                .width(250.dp)
-                                .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.surface),
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize().padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Button(
-                                    onClick = {
-                                        selectedTab = NavigationTab.Connections
-                                        triggerNewConnection = true
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text("New Connection")
-                                }
-                                Spacer(modifier = Modifier.height(32.dp))
-                                Text(
-                                    text = "Connections",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "(Active connection list placeholder)",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                        // Left sidebar - ConnectionPanel
+                        ConnectionPanel(
+                            masterPassword = "",
+                            sessionViewModel = sessionViewModel,
+                            isCollapsed = sidebarCollapsed,
+                            onCollapseToggle = { sidebarCollapsed = !sidebarCollapsed },
+                            onNewConnection = { triggerNewConnection = true },
+                            onStatusTextChanged = { statusText = it },
+                        )
 
                         // Divider
                         Box(
@@ -285,14 +278,6 @@ fun main() {
                                 contentAlignment = Alignment.Center,
                             ) {
                                 when (selectedTab) {
-                                    NavigationTab.Connections -> {
-                                        ConnectionManagerScreen(
-                                            sessionViewModel = sessionViewModel,
-                                            onStatusTextChanged = { statusText = it },
-                                            triggerNewConnection = triggerNewConnection,
-                                            onNewConnectionTriggered = { triggerNewConnection = false },
-                                        )
-                                    }
                                     NavigationTab.QueryEditor -> {
                                         QueryEditorScreen(
                                             sessionViewModel = sessionViewModel,
@@ -340,12 +325,6 @@ fun main() {
                                     }
                                     NavigationTab.QueryLog -> {
                                         LogViewerScreen(modifier = Modifier.fillMaxSize())
-                                    }
-                                    NavigationTab.Settings -> {
-                                        SettingsScreen(
-                                            onClose = { selectedTab = NavigationTab.Connections },
-                                            modifier = Modifier.fillMaxSize(),
-                                        )
                                     }
                                 }
                             }

@@ -11,6 +11,7 @@ data class ColumnDefinition(
     val type: ColumnType,
     val nullable: Boolean = true,
     val defaultValue: String? = null,
+    val autoIncrement: Boolean = false,
 )
 
 /**
@@ -76,8 +77,8 @@ object TableDDLBuilder {
             buildString {
                 append(dialect.quoteIdentifier(col.name))
                 append(" ")
-                append(dialect.getTypeName(col.type))
-                if (!col.nullable) {
+                append(dialect.getTypeName(col.type, col.autoIncrement))
+                if (!col.nullable || col.autoIncrement) {
                     append(" NOT NULL")
                 }
                 col.defaultValue?.let { default ->
@@ -137,8 +138,8 @@ object TableDDLBuilder {
         append("ALTER TABLE ${dialect.quoteIdentifier(table)} ADD COLUMN ")
         append(dialect.quoteIdentifier(column.name))
         append(" ")
-        append(dialect.getTypeName(column.type))
-        if (!column.nullable) {
+        append(dialect.getTypeName(column.type, column.autoIncrement))
+        if (!column.nullable || column.autoIncrement) {
             append(" NOT NULL")
         }
         column.defaultValue?.let { default ->

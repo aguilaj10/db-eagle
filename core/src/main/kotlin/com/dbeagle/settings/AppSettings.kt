@@ -6,6 +6,7 @@ data class AppSettings(
     val connectionTimeoutSeconds: Int = DEFAULT_CONNECTION_TIMEOUT_SECONDS,
     val maxConnections: Int = DEFAULT_MAX_CONNECTIONS,
     val darkMode: Boolean? = null,
+    val sidebarCollapsed: Boolean = false,
 ) {
     init {
         require(resultLimit > 0) { "resultLimit must be > 0" }
