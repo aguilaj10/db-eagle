@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.dbeagle.ddl.ConstraintDefinition
 import com.dbeagle.ddl.DDLDialect
 import com.dbeagle.ddl.DDLErrorMapper
 import com.dbeagle.ddl.IndexDDLBuilder
@@ -77,8 +78,7 @@ fun SchemaBrowserScreen(
     var schemaJob by remember(activeProfileId) { mutableStateOf<Job?>(null) }
 
     val ttlMs = 5 * 60 * 1000L
-    val pid = activeProfileId
-    val schemaState = pid?.let { sessionStates[it]?.schema } ?: SessionViewModel.SchemaUiState()
+    val schemaState = activeProfileId?.let { sessionStates[it]?.schema } ?: SessionViewModel.SchemaUiState()
     val isLoadingSchema = schemaState.isLoading
     val schemaNodes = schemaState.nodes
     val schemaDialogError = schemaState.dialogError
@@ -98,8 +98,7 @@ fun SchemaBrowserScreen(
 
     suspend fun executeDDL(driver: DatabaseDriver, ddl: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val result = driver.executeQuery(ddl, emptyList())
-            when (result) {
+            when (val result = driver.executeQuery(ddl, emptyList())) {
                 is com.dbeagle.model.QueryResult.Success -> {
                     Result.success(Unit)
                 }
@@ -194,8 +193,8 @@ fun SchemaBrowserScreen(
         tableKey: String,
         newChildren: List<SchemaTreeNode.Column>,
     ) {
-        if (pid == null) return
-        sessionViewModel.updateSchemaState(pid) { s ->
+        if (activeProfileId == null) return
+        sessionViewModel.updateSchemaState(activeProfileId) { s ->
             s.copy(
                 nodes = s.nodes.map { node ->
                     if (node is SchemaTreeNode.Section && node.id == "section:tables") {
@@ -226,8 +225,8 @@ fun SchemaBrowserScreen(
     }
 
     fun forceRefresh() {
-        if (pid == null) return
-        sessionViewModel.updateSchemaState(pid) { s ->
+        if (activeProfileId == null) return
+        sessionViewModel.updateSchemaState(activeProfileId) { s ->
             s.copy(
                 loadedAtMs = null,
                 columnsCache = emptyMap(),
@@ -240,16 +239,16 @@ fun SchemaBrowserScreen(
 
     fun ensureSchemaLoaded(force: Boolean) {
         if (activeDriver == null) {
-            if (pid != null) {
-                sessionViewModel.updateSchemaState(pid) { s ->
+            if (activeProfileId != null) {
+                sessionViewModel.updateSchemaState(activeProfileId) { s ->
                     s.copy(nodes = emptyList(), loadedAtMs = null, columnsCache = emptyMap())
                 }
             }
             return
         }
 
-        if (pid == null) return
-        val current = sessionStates[pid]?.schema ?: return
+        if (activeProfileId == null) return
+        val current = sessionStates[activeProfileId]?.schema ?: return
         if (!force && !isExpired(current.loadedAtMs) && current.nodes.isNotEmpty()) return
         if (current.isLoading) return
 
@@ -257,13 +256,13 @@ fun SchemaBrowserScreen(
         schemaJob = coroutineScope.launch {
             val name = activeProfileName ?: "Connection"
             onStatusTextChanged("Status: Loading schema ($name)")
-            sessionViewModel.updateSchemaState(pid) { it.copy(isLoading = true, dialogError = null) }
+            sessionViewModel.updateSchemaState(activeProfileId) { it.copy(isLoading = true, dialogError = null) }
             try {
                 val queryExecutor = QueryExecutor(activeDriver)
                 val schema = withContext(Dispatchers.IO) { queryExecutor.getSchema() }
                 val nodes = buildTree(schema)
                 val now = System.currentTimeMillis()
-                sessionViewModel.updateSchemaState(pid) {
+                sessionViewModel.updateSchemaState(activeProfileId) {
                     it.copy(nodes = nodes, loadedAtMs = now, isLoading = false, schemaMetadata = schema)
                 }
                 onStatusTextChanged("Status: Schema loaded ($name)")
@@ -271,11 +270,11 @@ fun SchemaBrowserScreen(
                 onStatusTextChanged("Status: Schema load canceled")
             } catch (e: Exception) {
                 onStatusTextChanged("Status: Failed to load schema: ${e.message ?: "Error"}")
-                sessionViewModel.updateSchemaState(pid) {
+                sessionViewModel.updateSchemaState(activeProfileId) {
                     it.copy(isLoading = false, dialogError = e.message ?: "Failed to load schema")
                 }
             } finally {
-                sessionViewModel.updateSchemaState(pid) { it.copy(isLoading = false) }
+                sessionViewModel.updateSchemaState(activeProfileId) { it.copy(isLoading = false) }
             }
         }
     }
@@ -288,13 +287,13 @@ fun SchemaBrowserScreen(
     if (schemaDialogError != null) {
         AlertDialog(
             onDismissRequest = {
-                if (pid != null) sessionViewModel.updateSchemaState(pid) { it.copy(dialogError = null) }
+                if (activeProfileId != null) sessionViewModel.updateSchemaState(activeProfileId) { it.copy(dialogError = null) }
             },
             title = { Text("Schema Error") },
             text = { Text(schemaDialogError) },
             confirmButton = {
                 TextButton(onClick = {
-                    if (pid != null) sessionViewModel.updateSchemaState(pid) { it.copy(dialogError = null) }
+                    if (activeProfileId != null) sessionViewModel.updateSchemaState(activeProfileId) { it.copy(dialogError = null) }
                 }) {
                     Text("OK")
                 }
@@ -355,9 +354,7 @@ fun SchemaBrowserScreen(
                     if (!expanded) return@SchemaTree
                     if (node !is SchemaTreeNode.Table) return@SchemaTree
 
-                    val driver = activeDriver
-
-                    val activePid = pid ?: return@SchemaTree
+                    val activePid = activeProfileId ?: return@SchemaTree
 
                     val tableKey = node.id.removePrefix("table:")
                     val tableName = node.label
@@ -376,7 +373,7 @@ fun SchemaBrowserScreen(
                                 ?.associateBy { it.fromColumn }
                                 ?: emptyMap()
 
-                            val queryExecutor = QueryExecutor(driver)
+                            val queryExecutor = QueryExecutor(activeDriver)
                             val cols = withContext(Dispatchers.IO) { queryExecutor.getColumns(tableName) }
                                 .sortedBy { it.name }
                                 .map { c ->
@@ -416,14 +413,13 @@ fun SchemaBrowserScreen(
                     schemaBrowserViewModel.showTableEditor(tableName)
                 },
                 onDropTable = { tableName ->
-                    val driver = activeDriver ?: return@SchemaTree
                     coroutineScope.launch {
-                        val ddlResult = SchemaEditorViewModel.dropTableDDL(driver, tableName, cascade = true)
+                        val ddlResult = SchemaEditorViewModel.dropTableDDL(activeDriver, tableName, cascade = true)
                         ddlResult.onSuccess { ddl ->
                             schemaBrowserViewModel.showDDLPreview(
                                 ddl = ddl,
                                 isDestructive = true,
-                                execution = { SchemaEditorViewModel.executeTableDrop(driver, ddl) },
+                                execution = { SchemaEditorViewModel.executeTableDrop(activeDriver, ddl) },
                             )
                         }.onFailure { error ->
                             schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
@@ -437,14 +433,13 @@ fun SchemaBrowserScreen(
                     schemaBrowserViewModel.showSequenceEditor(sequenceName)
                 },
                 onDropSequence = { sequenceName ->
-                    val driver = activeDriver ?: return@SchemaTree
                     coroutineScope.launch {
-                        val ddlResult = SchemaEditorViewModel.dropSequenceDDL(driver, sequenceName, ifExists = true)
+                        val ddlResult = SchemaEditorViewModel.dropSequenceDDL(activeDriver, sequenceName, ifExists = true)
                         ddlResult.onSuccess { ddl ->
                             schemaBrowserViewModel.showDDLPreview(
                                 ddl = ddl,
                                 isDestructive = true,
-                                execution = { SchemaEditorViewModel.executeSequenceDrop(driver, ddl) },
+                                execution = { SchemaEditorViewModel.executeSequenceDrop(activeDriver, ddl) },
                             )
                         }.onFailure { error ->
                             schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
@@ -455,14 +450,13 @@ fun SchemaBrowserScreen(
                     schemaBrowserViewModel.showViewEditor()
                 },
                 onDropView = { viewName ->
-                    val driver = activeDriver ?: return@SchemaTree
                     coroutineScope.launch {
-                        val dialect = getDialectForDriver(driver)
+                        val dialect = getDialectForDriver(activeDriver)
                         val ddl = ViewDDLBuilder.buildDropView(dialect, viewName, ifExists = true)
                         schemaBrowserViewModel.showDDLPreview(
                             ddl = ddl,
                             isDestructive = true,
-                            execution = { executeDDL(driver, ddl) },
+                            execution = { executeDDL(activeDriver, ddl) },
                         )
                     }
                 },
@@ -470,14 +464,13 @@ fun SchemaBrowserScreen(
                     schemaBrowserViewModel.showIndexEditor()
                 },
                 onDropIndex = { indexName ->
-                    val driver = activeDriver ?: return@SchemaTree
                     coroutineScope.launch {
-                        val dialect = getDialectForDriver(driver)
+                        val dialect = getDialectForDriver(activeDriver)
                         val ddl = IndexDDLBuilder.buildDropIndex(dialect, indexName, ifExists = true)
                         schemaBrowserViewModel.showDDLPreview(
                             ddl = ddl,
                             isDestructive = true,
-                            execution = { executeDDL(driver, ddl) },
+                            execution = { executeDDL(activeDriver, ddl) },
                         )
                     }
                 },
@@ -509,7 +502,7 @@ fun SchemaBrowserScreen(
                     val columnDefs = cachedColumns.map { col ->
                         val colType = try {
                             com.dbeagle.ddl.ColumnType.valueOf(col.type.uppercase())
-                        } catch (e: IllegalArgumentException) {
+                        } catch (_: IllegalArgumentException) {
                             // Fallback to TEXT if type is unrecognized
                             com.dbeagle.ddl.ColumnType.TEXT
                         }
@@ -521,9 +514,9 @@ fun SchemaBrowserScreen(
                         )
                     }
 
-                    val foreignKeyDefs = schemaMetadata?.foreignKeys
-                        ?.filter { it.fromTable == tableName }
-                        ?.map { fk ->
+                    val foreignKeyDefs = schemaMetadata.foreignKeys
+                        .filter { it.fromTable == tableName }
+                        .map { fk ->
                             com.dbeagle.ddl.ForeignKeyDefinition(
                                 name = null, // ForeignKeyRelationship lacks constraint name
                                 columns = listOf(fk.fromColumn),
@@ -532,7 +525,7 @@ fun SchemaBrowserScreen(
                                 onDelete = null,
                                 onUpdate = null,
                             )
-                        } ?: emptyList()
+                        }
 
                     com.dbeagle.ddl.TableDefinition(
                         name = tableMetadata.name,
@@ -552,8 +545,7 @@ fun SchemaBrowserScreen(
                     schemaBrowserViewModel.hideTableEditor()
                 },
                 onSave = { tableDef, newIndexes ->
-                    val driver = activeDriver
-                    if (driver == null) {
+                    if (activeDriver == null) {
                         schemaBrowserViewModel.hideTableEditor()
                         return@TableEditorDialog
                     }
@@ -562,7 +554,7 @@ fun SchemaBrowserScreen(
                         try {
                             val isCreateMode = browserUiState.dialog.editingTable == null
                             val ddlResult = if (isCreateMode) {
-                                SchemaEditorViewModel.createTableDDL(driver, tableDef)
+                                SchemaEditorViewModel.createTableDDL(activeDriver, tableDef)
                             } else {
                                 val oldTableDef = existingTableDef ?: return@launch
 
@@ -575,10 +567,10 @@ fun SchemaBrowserScreen(
                                 }.map { it.name }
 
                                 // Compute constraint changes
-                                val addedConstraints = buildList<com.dbeagle.ddl.ConstraintDefinition> {
+                                val addedConstraints = buildList {
                                     // PK changes: add if new PK exists and differs from old
                                     if (tableDef.primaryKey != null && tableDef.primaryKey != oldTableDef.primaryKey) {
-                                        add(com.dbeagle.ddl.ConstraintDefinition.PrimaryKey(tableDef.primaryKey!!))
+                                        add(ConstraintDefinition.PrimaryKey(tableDef.primaryKey!!))
                                     }
 
                                     // New FKs
@@ -589,7 +581,7 @@ fun SchemaBrowserScreen(
                                                 oldFk.refColumns == newFk.refColumns
                                         }
                                         if (!exists) {
-                                            add(com.dbeagle.ddl.ConstraintDefinition.ForeignKey(newFk))
+                                            add(ConstraintDefinition.ForeignKey(newFk))
                                         }
                                     }
 
@@ -597,12 +589,12 @@ fun SchemaBrowserScreen(
                                     tableDef.uniqueConstraints.forEach { newUnique ->
                                         val exists = oldTableDef.uniqueConstraints.any { it == newUnique }
                                         if (!exists) {
-                                            add(com.dbeagle.ddl.ConstraintDefinition.Unique(null, newUnique))
+                                            add(ConstraintDefinition.Unique(null, newUnique))
                                         }
                                     }
                                 }
 
-                                val droppedConstraints = buildList<String> {
+                                val droppedConstraints = buildList {
                                     // PK drop: if old PK existed but new doesn't or differs
                                     if (oldTableDef.primaryKey != null &&
                                         (tableDef.primaryKey == null || tableDef.primaryKey != oldTableDef.primaryKey)
@@ -650,7 +642,7 @@ fun SchemaBrowserScreen(
                                     addedIndexes = addedIndexes,
                                     droppedIndexes = droppedIndexes,
                                 )
-                                SchemaEditorViewModel.alterTableDDL(driver, browserUiState.dialog.editingTable!!, changes)
+                                SchemaEditorViewModel.alterTableDDL(activeDriver, browserUiState.dialog.editingTable!!, changes)
                             }
 
                             ddlResult.onSuccess { ddl ->
@@ -658,9 +650,9 @@ fun SchemaBrowserScreen(
                                     ddl = ddl,
                                     isDestructive = false,
                                     execution = if (isCreateMode) {
-                                        { SchemaEditorViewModel.executeTableCreate(driver, ddl) }
+                                        { SchemaEditorViewModel.executeTableCreate(activeDriver, ddl) }
                                     } else {
-                                        { SchemaEditorViewModel.executeTableAlter(driver, ddl) }
+                                        { SchemaEditorViewModel.executeTableAlter(activeDriver, ddl) }
                                     },
                                 )
                                 schemaBrowserViewModel.hideTableEditor()
@@ -686,8 +678,7 @@ fun SchemaBrowserScreen(
                     schemaBrowserViewModel.hideSequenceEditor()
                 },
                 onSave = { seqMetadata ->
-                    val driver = activeDriver
-                    if (driver == null) {
+                    if (activeDriver == null) {
                         schemaBrowserViewModel.hideSequenceEditor()
                         return@SequenceEditorDialog
                     }
@@ -696,7 +687,7 @@ fun SchemaBrowserScreen(
                         try {
                             val isCreateMode = browserUiState.dialog.editingSequence == null
                             val ddlResult = if (isCreateMode) {
-                                SchemaEditorViewModel.createSequenceDDL(driver, seqMetadata)
+                                SchemaEditorViewModel.createSequenceDDL(activeDriver, seqMetadata)
                             } else {
                                 val oldSeq = existingSeq ?: return@launch
                                 val changes = com.dbeagle.ddl.SequenceChanges(
@@ -705,7 +696,7 @@ fun SchemaBrowserScreen(
                                     maxValue = if (seqMetadata.maxValue != oldSeq.maxValue) seqMetadata.maxValue else null,
                                     restart = null,
                                 )
-                                SchemaEditorViewModel.alterSequenceDDL(driver, browserUiState.dialog.editingSequence!!, changes)
+                                SchemaEditorViewModel.alterSequenceDDL(activeDriver, browserUiState.dialog.editingSequence!!, changes)
                             }
 
                             ddlResult.onSuccess { ddl ->
@@ -713,9 +704,9 @@ fun SchemaBrowserScreen(
                                     ddl = ddl,
                                     isDestructive = false,
                                     execution = if (isCreateMode) {
-                                        { SchemaEditorViewModel.executeSequenceCreate(driver, ddl) }
+                                        { SchemaEditorViewModel.executeSequenceCreate(activeDriver, ddl) }
                                     } else {
-                                        { SchemaEditorViewModel.executeSequenceAlter(driver, ddl) }
+                                        { SchemaEditorViewModel.executeSequenceAlter(activeDriver, ddl) }
                                     },
                                 )
                                 schemaBrowserViewModel.hideSequenceEditor()
@@ -731,9 +722,8 @@ fun SchemaBrowserScreen(
         }
 
         if (browserUiState.dialog.showViewEditor) {
-            val driver = activeDriver
-            if (driver != null) {
-                val dialect = getDialectForDriver(driver)
+            if (activeDriver != null) {
+                val dialect = getDialectForDriver(activeDriver)
                 ViewEditorDialog(
                     dialect = dialect,
                     onDismiss = {
@@ -743,7 +733,7 @@ fun SchemaBrowserScreen(
                         schemaBrowserViewModel.showDDLPreview(
                             ddl = ddl,
                             isDestructive = false,
-                            execution = { executeDDL(driver, ddl) },
+                            execution = { executeDDL(activeDriver, ddl) },
                         )
                         schemaBrowserViewModel.hideViewEditor()
                     },
@@ -752,9 +742,8 @@ fun SchemaBrowserScreen(
         }
 
         if (browserUiState.dialog.showIndexEditor) {
-            val driver = activeDriver
-            if (driver != null) {
-                val dialect = getDialectForDriver(driver)
+            if (activeDriver != null) {
+                val dialect = getDialectForDriver(activeDriver)
                 val allTables = schemaMetadata?.tables?.map { it.name } ?: emptyList()
 
                 IndexEditorDialog(
@@ -762,7 +751,7 @@ fun SchemaBrowserScreen(
                     tables = allTables,
                     getColumnsForTable = { tableName ->
                         withContext(Dispatchers.IO) {
-                            val queryExecutor = QueryExecutor(driver)
+                            val queryExecutor = QueryExecutor(activeDriver)
                             queryExecutor.getColumns(tableName).map { it.name }
                         }
                     },
@@ -777,7 +766,7 @@ fun SchemaBrowserScreen(
                         )
                     },
                     onCreate = { ddl ->
-                        executeDDL(driver, ddl).also {
+                        executeDDL(activeDriver, ddl).also {
                             if (it.isSuccess) {
                                 schemaBrowserViewModel.hideIndexEditor()
                             }

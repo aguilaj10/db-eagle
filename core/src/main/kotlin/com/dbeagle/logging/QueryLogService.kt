@@ -56,7 +56,17 @@ data class QueryLogEntry(
 object QueryLogService {
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val logFile: File by lazy {
+    /**
+     * Override for test environments. When set, this path is used instead of ~/.dbeagle/query.log.
+     * INTERNAL USE ONLY - for test isolation purposes.
+     */
+    @Volatile
+    internal var testLogFile: File? = null
+
+    private val logFile: File
+        get() = testLogFile ?: defaultLogFile
+
+    private val defaultLogFile: File by lazy {
         val dir = File(System.getProperty("user.home"), ".dbeagle")
         dir.mkdirs()
         File(dir, "query.log")

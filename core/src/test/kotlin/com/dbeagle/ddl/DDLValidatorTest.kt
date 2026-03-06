@@ -28,7 +28,7 @@ class DDLValidatorTest {
 
     @Test
     fun `validateIdentifier accepts name with dollar sign`() {
-        val result = DDLValidator.validateIdentifier("user\$data")
+        val result = DDLValidator.validateIdentifier($$"user$data")
 
         assertTrue(result is ValidationResult.Valid)
     }
@@ -45,7 +45,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("empty or blank") })
     }
 
@@ -54,7 +54,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("   ")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("empty or blank") })
     }
 
@@ -65,7 +65,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier(longName)
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("exceeds maximum length") })
     }
 
@@ -74,7 +74,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("users;DROP TABLE")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains(";") })
     }
 
@@ -83,7 +83,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("users--comment")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains("--") })
     }
 
@@ -92,7 +92,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("users/*comment")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains("/*") })
     }
 
@@ -101,7 +101,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("DROP_TABLE")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains("DROP") })
     }
 
@@ -110,7 +110,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("DELETE_USER")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains("DELETE") })
     }
 
@@ -119,7 +119,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("INSERT_DATA")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains("INSERT") })
     }
 
@@ -128,7 +128,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("UPDATE_TABLE")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains("UPDATE") })
     }
 
@@ -137,7 +137,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("SELECT_ALL")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains("SELECT") })
     }
 
@@ -146,7 +146,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("123table")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("invalid characters") })
     }
 
@@ -155,7 +155,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("user table")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("invalid characters") })
     }
 
@@ -164,7 +164,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("user-table")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("invalid characters") })
     }
 
@@ -173,7 +173,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("schema.table")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("invalid characters") })
     }
 
@@ -182,7 +182,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("select_data")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains("SELECT") })
     }
 
@@ -211,7 +211,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateTableDefinition(table)
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("at least one column") })
     }
 
@@ -227,7 +227,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateTableDefinition(table)
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("Invalid table name") })
     }
 
@@ -244,7 +244,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateTableDefinition(table)
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("Duplicate column names") && it.contains("id") })
     }
 
@@ -261,7 +261,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateTableDefinition(table)
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("Invalid column 'email;DROP'") })
     }
 
@@ -279,7 +279,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateTableDefinition(table)
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.size > 1)
         assertTrue(errors.any { it.contains("Invalid table name") })
         assertTrue(errors.any { it.contains("Duplicate column names") })
@@ -302,7 +302,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateColumnDefinition(column)
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("Invalid column name") })
     }
 
@@ -347,7 +347,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateIdentifier("UsErS_DeLeTe")
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("dangerous pattern") && it.contains("DELETE") })
     }
 
@@ -363,7 +363,7 @@ class DDLValidatorTest {
         val result = DDLValidator.validateTableDefinition(table)
 
         assertTrue(result is ValidationResult.Invalid)
-        val errors = (result as ValidationResult.Invalid).errors
+        val errors = (result).errors
         assertTrue(errors.any { it.contains("Invalid column '123invalid'") })
         assertTrue(errors.any { it.contains("  - ") })
     }

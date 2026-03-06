@@ -10,47 +10,35 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.File
-import java.nio.file.Files
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class QueryLogServiceTest {
 
-    private lateinit var tempDir: File
-    private var originalUserHome: String? = null
+    private val tempDir: File = File(System.getProperty("java.io.tmpdir"), "querylog-test-service")
 
     @BeforeAll
     fun setupAll() {
-        tempDir = Files.createTempDirectory("querylog-test").toFile()
-        originalUserHome = System.getProperty("user.home")
-        System.setProperty("user.home", tempDir.absolutePath)
-        resetLogFile()
+        tempDir.deleteRecursively()
+        tempDir.mkdirs()
+        setupTestLogFile()
     }
 
     @AfterAll
     fun teardownAll() {
-        originalUserHome?.let { System.setProperty("user.home", it) }
-        resetLogFile()
+        QueryLogService.testLogFile = null
         tempDir.deleteRecursively()
     }
 
     @BeforeEach
     fun setup() {
+        setupTestLogFile()
         QueryLogService.clearLogs()
     }
 
-    private fun resetLogFile() {
-        try {
-            val logFileField = QueryLogService::class.java.getDeclaredField("logFile\$delegate")
-            logFileField.isAccessible = true
-
-            val dir = File(tempDir, ".dbeagle")
-            dir.mkdirs()
-            val newLogFile = File(dir, "query.log")
-
-            logFileField.set(QueryLogService, lazy { newLogFile })
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    private fun setupTestLogFile() {
+        val dir = File(tempDir, ".dbeagle")
+        dir.mkdirs()
+        QueryLogService.testLogFile = File(dir, "query.log")
     }
 
     @Test

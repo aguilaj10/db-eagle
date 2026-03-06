@@ -13,6 +13,10 @@ import com.dbeagle.model.TableMetadata
 import com.dbeagle.settings.AppSettings
 import com.dbeagle.settings.SettingsProvider
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.TestInstance
+import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,15 +24,40 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class QueryExecutorTest {
+    private val tempDir: File = File(System.getProperty("java.io.tmpdir"), "querylog-test-executor")
+
+    @BeforeAll
+    fun setupAll() {
+        tempDir.deleteRecursively()
+        tempDir.mkdirs()
+        setupTestLogFile()
+    }
+
+    @AfterAll
+    fun teardownAll() {
+        QueryLogService.testLogFile = null
+        tempDir.deleteRecursively()
+    }
+
     @BeforeTest
     fun resetSettings() {
+        setupTestLogFile()
+        QueryLogService.clearLogs()
+
         val settings = SettingsProvider.createAppSettings()
         settings.putInt("resultLimit", AppSettings.DEFAULT_RESULT_LIMIT)
         settings.putInt("queryTimeoutSeconds", AppSettings.DEFAULT_QUERY_TIMEOUT_SECONDS)
         settings.putInt("connectionTimeoutSeconds", AppSettings.DEFAULT_CONNECTION_TIMEOUT_SECONDS)
         settings.putInt("maxConnections", AppSettings.DEFAULT_MAX_CONNECTIONS)
         settings.remove("darkMode")
+    }
+
+    private fun setupTestLogFile() {
+        val dir = File(tempDir, ".dbeagle")
+        dir.mkdirs()
+        QueryLogService.testLogFile = File(dir, "query.log")
     }
 
     @Test
