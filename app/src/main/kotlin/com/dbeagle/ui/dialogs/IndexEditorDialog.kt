@@ -154,7 +154,6 @@ fun IndexEditorDialog(
                     DropdownMenu(
                         expanded = isIndexTypeDropdownExpanded,
                         onDismissRequest = { isIndexTypeDropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         IndexType.entries.forEach { type ->
                             DropdownMenuItem(
@@ -183,7 +182,6 @@ fun IndexEditorDialog(
                     DropdownMenu(
                         expanded = isTableDropdownExpanded,
                         onDismissRequest = { isTableDropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         tables.forEach { table ->
                             DropdownMenuItem(
@@ -219,19 +217,22 @@ fun IndexEditorDialog(
                                 )
                             }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                if (selectedTable != null && !uiState.isLoadingColumns) {
-                                    isColumnsDropdownExpanded = true
-                                }
-                            },
+                        modifier = Modifier.fillMaxWidth(),
                         enabled = selectedTable != null && !uiState.isLoadingColumns,
+                    )
+                    // Transparent overlay to intercept clicks
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable(
+                                enabled = selectedTable != null && !uiState.isLoadingColumns
+                            ) {
+                                isColumnsDropdownExpanded = true
+                            }
                     )
                     DropdownMenu(
                         expanded = isColumnsDropdownExpanded,
                         onDismissRequest = { isColumnsDropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         uiState.availableColumns.forEach { column ->
                             DropdownMenuItem(

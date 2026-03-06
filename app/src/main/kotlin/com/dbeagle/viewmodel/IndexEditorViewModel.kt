@@ -67,13 +67,14 @@ class IndexEditorViewModel : BaseViewModel() {
 
             try {
                 val columns = getColumnsForTable(tableName)
-                updateStateFlow(_uiState) {
-                    it.copy(
+
+                _uiState.emit(
+                    _uiState.value.copy(
                         availableColumns = columns,
                         isLoadingColumns = false,
                         errorMessage = null,
                     )
-                }
+                )
             } catch (e: Exception) {
                 updateStateFlow(_uiState) {
                     it.copy(
