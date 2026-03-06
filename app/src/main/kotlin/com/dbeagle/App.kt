@@ -68,6 +68,7 @@ import com.dbeagle.ui.FavoritesScreen
 import com.dbeagle.ui.HistoryScreen
 import com.dbeagle.ui.LogViewerScreen
 import com.dbeagle.ui.QueryEditorScreen
+import com.dbeagle.ui.TableDataEditorScreen
 import com.dbeagle.ui.WelcomeScreen
 import com.dbeagle.ui.dialogs.MasterPasswordDialog
 import com.dbeagle.ui.dialogs.SettingsDialog
@@ -576,8 +577,22 @@ fun main() {
                                         LogViewerScreen(modifier = Modifier.fillMaxSize())
                                     }
                                     TabType.TableEditor -> {
-                                        // Will be implemented in Task 9
-                                        Text("Table Editor - Coming Soon", style = MaterialTheme.typography.headlineMedium)
+                                        val connectionId = tabManager.selectedTab?.connectionId
+                                        val tableName = tabManager.selectedTab?.tableName
+                                        if (connectionId != null && tableName != null) {
+                                            TableDataEditorScreen(
+                                                sessionViewModel = sessionViewModel,
+                                                connectionId = connectionId,
+                                                tableName = tableName,
+                                                onStatusTextChanged = { statusText = it },
+                                                onCloseRequested = {
+                                                    tabManager.selectedTab?.id?.let { id -> tabManager.closeTab(id) }
+                                                },
+                                                snackbarHostState = snackbarHostState,
+                                            )
+                                        } else {
+                                            Text("Missing connection or table", style = MaterialTheme.typography.bodyMedium)
+                                        }
                                     }
                                     null -> {
                                         WelcomeScreen(
