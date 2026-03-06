@@ -1,13 +1,18 @@
 package com.dbeagle.settings
 
+import com.dbeagle.navigation.TabItem
 import com.russhwolf.settings.ExperimentalSettingsApi
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.coroutines.getBooleanFlow
 import com.russhwolf.settings.coroutines.getBooleanOrNullFlow
 import com.russhwolf.settings.coroutines.getIntFlow
+import com.russhwolf.settings.coroutines.getStringOrNullFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /**
  * Repository providing reactive Flow-based access to application settings.
@@ -24,6 +29,13 @@ class AppPreferencesRepository(
         const val KEY_MAX_CONNECTIONS = "maxConnections"
         const val KEY_DARK_MODE = "darkMode"
         const val KEY_SIDEBAR_COLLAPSED = "sidebarCollapsed"
+        const val KEY_OPENED_TABS = "openedTabs"
+        const val KEY_SELECTED_TAB_ID = "selectedTabId"
+    }
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
     }
 
     /**
@@ -69,6 +81,31 @@ class AppPreferencesRepository(
         .distinctUntilChanged()
 
     /**
+     * Flow of opened tabs (empty list if no tabs saved).
+     */
+    val openedTabsFlow: Flow<List<TabItem>> = settings
+        .getStringOrNullFlow(KEY_OPENED_TABS)
+        .map { jsonString ->
+            if (jsonString != null) {
+                try {
+                    json.decodeFromString<List<TabItem>>(jsonString)
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+        }
+        .distinctUntilChanged()
+
+    /**
+     * Flow of selected tab ID (null if no tab selected).
+     */
+    val selectedTabIdFlow: Flow<String?> = settings
+        .getStringOrNullFlow(KEY_SELECTED_TAB_ID)
+        .distinctUntilChanged()
+
+    /**
      * Combined flow of all settings as AppSettings data class.
      * Emits new value whenever any setting changes.
      */
@@ -83,7 +120,9 @@ class AppPreferencesRepository(
         },
         darkModeFlow,
         sidebarCollapsedFlow,
-    ) { timeouts: Array<out Any>, darkMode, sidebarCollapsed ->
+        openedTabsFlow,
+        selectedTabIdFlow,
+    ) { timeouts: Array<out Any>, darkMode, sidebarCollapsed, openedTabs, selectedTabId ->
         @Suppress("UNCHECKED_CAST")
         val arr = timeouts as Array<out Int>
         AppSettings(
@@ -93,6 +132,8 @@ class AppPreferencesRepository(
             maxConnections = arr[3],
             darkMode = darkMode,
             sidebarCollapsed = sidebarCollapsed,
+            openedTabs = openedTabs,
+            selectedTabId = selectedTabId,
         )
     }
 
@@ -144,6 +185,23 @@ class AppPreferencesRepository(
     }
 
     /**
+     * Saves opened tabs and selected tab ID.
+     * Serializes tabs to JSON for persistence.
+     */
+    fun saveOpenedTabs(
+        tabs: List<TabItem>,
+        selectedId: String?,
+    ) {
+        val jsonString = json.encodeToString(tabs)
+        settings.putString(KEY_OPENED_TABS, jsonString)
+        if (selectedId != null) {
+            settings.putString(KEY_SELECTED_TAB_ID, selectedId)
+        } else {
+            settings.remove(KEY_SELECTED_TAB_ID)
+        }
+    }
+
+    /**
      * Saves all settings from AppSettings data class.
      */
     fun saveSettings(appSettings: AppSettings) {
@@ -153,5 +211,6 @@ class AppPreferencesRepository(
         setMaxConnections(appSettings.maxConnections)
         setDarkMode(appSettings.darkMode)
         setSidebarCollapsed(appSettings.sidebarCollapsed)
+        saveOpenedTabs(appSettings.openedTabs, appSettings.selectedTabId)
     }
 }

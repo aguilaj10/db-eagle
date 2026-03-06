@@ -1,5 +1,7 @@
 package com.dbeagle.settings
 
+import com.dbeagle.navigation.TabItem
+
 data class AppSettings(
     val resultLimit: Int = DEFAULT_RESULT_LIMIT,
     val queryTimeoutSeconds: Int = DEFAULT_QUERY_TIMEOUT_SECONDS,
@@ -7,6 +9,8 @@ data class AppSettings(
     val maxConnections: Int = DEFAULT_MAX_CONNECTIONS,
     val darkMode: Boolean? = null,
     val sidebarCollapsed: Boolean = false,
+    val openedTabs: List<TabItem> = emptyList(),
+    val selectedTabId: String? = null,
 ) {
     init {
         require(resultLimit > 0) { "resultLimit must be > 0" }

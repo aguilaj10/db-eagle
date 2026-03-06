@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.compose)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 dependencies {
@@ -14,12 +15,15 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.runtime)
     implementation(libs.compose.material.icons.extended)
+    implementation(libs.composeIcons.fontAwesome)
     implementation(compose.desktop.currentOs)
 
     implementation("com.github.qawaz.compose-code-editor:codeeditor-desktop:3.1.1")
 
     implementation(libs.koin.core)
     implementation(libs.coroutines.swing)
+
+    implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.slf4j.api)
     implementation(libs.logback.classic)
