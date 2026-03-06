@@ -50,7 +50,7 @@ fun SchemaToolbar(
         Box {
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                    TooltipAnchorPosition.Above
+                    TooltipAnchorPosition.Above,
                 ),
                 tooltip = {
                     PlainTooltip {

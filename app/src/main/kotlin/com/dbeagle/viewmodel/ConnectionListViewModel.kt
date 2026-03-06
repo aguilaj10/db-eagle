@@ -249,6 +249,38 @@ class ConnectionListViewModel(
     }
 
     /**
+     * Reconnect to a profile (disconnect then connect).
+     */
+    fun reconnect(
+        profile: ConnectionProfile,
+        profileName: String,
+        onStatusTextChanged: (String) -> Unit,
+        onSessionOpen: (String, String, DatabaseDriver) -> Unit,
+        onSessionClose: suspend (String) -> Unit,
+        onSetConnecting: (String?) -> Unit,
+        onUpdateStatus: () -> Unit,
+    ) {
+        viewModelScope.launch {
+            onSetConnecting(profile.id)
+            try {
+                onStatusTextChanged("Status: Disconnecting ($profileName)")
+                onSessionClose(profile.id)
+            } catch (_: Exception) {
+            } finally {
+                DatabaseConnectionPool.closePool(profile.id)
+                onUpdateStatus()
+            }
+
+            connectToProfile(
+                profile = profile,
+                onStatusTextChanged = onStatusTextChanged,
+                onSessionOpen = onSessionOpen,
+                onSetConnecting = onSetConnecting,
+            )
+        }
+    }
+
+    /**
      * Retry connection after error.
      */
     fun retryConnection(

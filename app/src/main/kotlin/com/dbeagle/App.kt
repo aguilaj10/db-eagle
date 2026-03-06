@@ -434,6 +434,16 @@ fun main() {
                                 onCollapseToggle = { sidebarCollapsed = !sidebarCollapsed },
                                 onNewConnection = { triggerNewConnection = true },
                                 onStatusTextChanged = { statusText = it },
+                                onOpenTableEditor = { connectionId, tableName ->
+                                    tabManager.addTab(
+                                        TabItem(
+                                            type = TabType.TableEditor,
+                                            title = tableName,
+                                            connectionId = connectionId,
+                                            tableName = tableName,
+                                        ),
+                                    )
+                                },
                             )
 
                             Box(
