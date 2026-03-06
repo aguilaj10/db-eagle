@@ -60,6 +60,7 @@ import com.dbeagle.ui.HistoryScreen
 import com.dbeagle.ui.LogViewerScreen
 import com.dbeagle.ui.QueryEditorScreen
 import com.dbeagle.ui.SchemaBrowserScreen
+import com.dbeagle.ui.dialogs.MasterPasswordDialog
 import com.dbeagle.ui.dialogs.SettingsDialog
 import com.dbeagle.ui.readMemoryStats
 import com.dbeagle.ui.theme.DBEagleTheme
@@ -68,6 +69,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
+import org.koin.core.parameter.parametersOf
 import org.slf4j.LoggerFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -115,6 +117,7 @@ fun main() {
         var triggerNewConnection by remember { mutableStateOf(false) }
         var showSettingsDialog by remember { mutableStateOf(false) }
         var sidebarCollapsed by remember { mutableStateOf(false) }
+        var masterPassword by remember { mutableStateOf<String?>(null) }
 
         Window(
             onCloseRequest = ::exitApplication,
@@ -181,13 +184,20 @@ fun main() {
                         SettingsDialog(onDismiss = { showSettingsDialog = false })
                     }
 
+                    if (masterPassword == null) {
+                        MasterPasswordDialog(
+                            onPasswordEntered = { masterPassword = it },
+                        )
+                    }
+
                     if (triggerNewConnection) {
                         ConnectionDialog(
                             initialProfile = null,
                             onDismiss = { triggerNewConnection = false },
                             onSave = { profile, plaintextPassword ->
                                 appCoroutineScope.launch {
-                                    val connectionListViewModel: ConnectionListViewModel = GlobalContext.get().get()
+                                    val connectionListViewModel: ConnectionListViewModel =
+                                        GlobalContext.get().get { parametersOf(masterPassword ?: "") }
                                     connectionListViewModel.saveProfile(profile, plaintextPassword)
                                 }
                                 triggerNewConnection = false
@@ -200,23 +210,23 @@ fun main() {
                             .fillMaxSize()
                             .padding(innerPadding),
                     ) {
-                        // Left sidebar - ConnectionPanel
-                        ConnectionPanel(
-                            masterPassword = "",
-                            sessionViewModel = sessionViewModel,
-                            isCollapsed = sidebarCollapsed,
-                            onCollapseToggle = { sidebarCollapsed = !sidebarCollapsed },
-                            onNewConnection = { triggerNewConnection = true },
-                            onStatusTextChanged = { statusText = it },
-                        )
+                        if (masterPassword != null) {
+                            ConnectionPanel(
+                                masterPassword = masterPassword!!,
+                                sessionViewModel = sessionViewModel,
+                                isCollapsed = sidebarCollapsed,
+                                onCollapseToggle = { sidebarCollapsed = !sidebarCollapsed },
+                                onNewConnection = { triggerNewConnection = true },
+                                onStatusTextChanged = { statusText = it },
+                            )
 
-                        // Divider
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.outlineVariant),
-                        )
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .fillMaxHeight()
+                                    .background(MaterialTheme.colorScheme.outlineVariant),
+                            )
+                        }
 
                         // Center content area
                         Column(
