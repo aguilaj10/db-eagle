@@ -63,6 +63,7 @@ import com.dbeagle.settings.AppPreferencesRepository
 import com.dbeagle.theme.ThemeManager
 import com.dbeagle.ui.AppBottomBar
 import com.dbeagle.ui.ConnectionDialog
+import com.dbeagle.ui.ConnectionDot
 import com.dbeagle.ui.ConnectionPanel
 import com.dbeagle.ui.FavoritesScreen
 import com.dbeagle.ui.HistoryScreen
@@ -462,26 +463,6 @@ fun main() {
                                 .fillMaxHeight()
                                 .background(MaterialTheme.colorScheme.background),
                         ) {
-                            if (sessionOrder.isNotEmpty()) {
-                                val selectedConnectionTabIndex = sessionOrder.indexOf(activeProfileId).let { idx ->
-                                    if (idx >= 0) idx else 0
-                                }
-
-                                PrimaryScrollableTabRow(
-                                    selectedTabIndex = selectedConnectionTabIndex,
-                                    edgePadding = 8.dp,
-                                ) {
-                                    sessionOrder.forEach { profileId ->
-                                        val label = sessionStates[profileId]?.profileName ?: profileId.take(8)
-                                        Tab(
-                                            selected = activeProfileId == profileId,
-                                            onClick = { sessionViewModel.setActiveProfile(profileId) },
-                                            text = { Text(label) },
-                                        )
-                                    }
-                                }
-                            }
-
                             // Only render tab row if tabs exist
                             if (tabManager.tabs.isNotEmpty()) {
                                 val selectedNavTabIndex = tabManager.selectedTabId?.let { id ->
@@ -495,10 +476,26 @@ fun main() {
                                     tabManager.tabs.forEach { tab ->
                                         Tab(
                                             selected = tabManager.selectedTabId == tab.id,
-                                            onClick = { tabManager.selectTab(tab.id) },
+                                            onClick = {
+                                                tab.connectionId?.let { sessionViewModel.setActiveProfile(it) }
+                                                tabManager.selectTab(tab.id)
+                                            },
                                             text = {
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Text(tab.title)
+                                                    ConnectionDot(
+                                                        connectionId = tab.connectionId,
+                                                        sessionStates = sessionStates,
+                                                    )
+                                                    Spacer(Modifier.width(6.dp))
+                                                    val connectionName = tab.connectionId?.let {
+                                                        sessionStates[it]?.profileName
+                                                    }
+                                                    val displayTitle = if (connectionName != null) {
+                                                        "${tab.title} - $connectionName"
+                                                    } else {
+                                                        tab.title
+                                                    }
+                                                    Text(displayTitle)
                                                     Spacer(Modifier.width(8.dp))
                                                     IconButton(
                                                         onClick = { tabManager.closeTab(tab.id) },
