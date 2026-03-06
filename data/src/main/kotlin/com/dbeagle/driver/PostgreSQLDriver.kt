@@ -151,7 +151,15 @@ class PostgreSQLDriver : DatabaseDriver {
         return withContext(Dispatchers.IO) {
             transaction(db) {
                 val jdbc = connection.connection as Connection
-                jdbc.metaData.getColumns(null, "public", table, "%").use { rs ->
+                // Parse schema from table name (format: "schema.table" or "table")
+                val (schema, tableName) = if (table.contains(".")) {
+                    val parts = table.split(".", limit = 2)
+                    parts[0] to parts[1]
+                } else {
+                    "public" to table
+                }
+
+                jdbc.metaData.getColumns(null, schema, tableName, "%").use { rs ->
                     buildList {
                         while (rs.next()) {
                             val name = rs.getString("COLUMN_NAME")
