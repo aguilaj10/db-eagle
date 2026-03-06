@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,13 +26,15 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import dev.snipme.highlights.Highlights
-import dev.snipme.highlights.model.SyntaxLanguage
-import dev.snipme.highlights.model.SyntaxThemes
-import dev.snipme.kodeview.view.material3.CodeEditText
+import com.wakaztahir.codeeditor.model.CodeLang
+import com.wakaztahir.codeeditor.prettify.PrettifyParser
+import com.wakaztahir.codeeditor.theme.CodeThemeType
+import com.wakaztahir.codeeditor.utils.parseCodeAsAnnotatedString
 
 @Composable
 fun SQLEditor(
@@ -42,20 +44,22 @@ fun SQLEditor(
     onRun: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var highlights by remember(sql) {
-        mutableStateOf(
-            Highlights.Builder()
-                .code(sql)
-                .language(SyntaxLanguage.DEFAULT)
-                .theme(SyntaxThemes.atom(darkMode = true))
-                .build(),
-        )
-    }
+    val parser = remember { PrettifyParser() }
+    val theme = remember { CodeThemeType.Monokai.theme }
 
-    LaunchedEffect(sql) {
-        if (highlights.getCode() != sql) {
-            highlights = highlights.getBuilder().code(sql).build()
-        }
+    fun parseSQL(code: String) = parseCodeAsAnnotatedString(
+        parser = parser,
+        theme = theme,
+        lang = CodeLang.SQL,
+        code = code,
+    )
+
+    var textFieldValue by remember(sql) {
+        mutableStateOf(
+            TextFieldValue(
+                annotatedString = parseSQL(sql),
+            ),
+        )
     }
 
     Column(
@@ -75,10 +79,8 @@ fun SQLEditor(
                 }
             },
     ) {
-        // Editor Area
         Row(modifier = Modifier.fillMaxSize()) {
-            // Line numbers
-            val lineCount = sql.lines().size
+            val lineCount = textFieldValue.text.lines().size
             Column(
                 modifier = Modifier
                     .width(48.dp)
@@ -98,7 +100,6 @@ fun SQLEditor(
                 }
             }
 
-            // Code Editor
             var isFocused by remember { mutableStateOf(false) }
             Box(
                 modifier = Modifier
@@ -110,12 +111,18 @@ fun SQLEditor(
                         shape = MaterialTheme.shapes.small,
                     ),
             ) {
-                CodeEditText(
-                    highlights = highlights,
-                    onValueChange = { newSql ->
-                        highlights = highlights.getBuilder().code(newSql).build()
-                        onSqlChange(newSql)
+                BasicTextField(
+                    value = textFieldValue,
+                    onValueChange = { newValue ->
+                        textFieldValue = newValue.copy(
+                            annotatedString = parseSQL(newValue.text),
+                        )
+                        onSqlChange(newValue.text)
                     },
+                    textStyle = TextStyle(
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(8.dp)

@@ -313,9 +313,19 @@ fun SchemaBrowserScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.End,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             val hasConnection = activeDriver != null
+
+            SchemaToolbar(
+                onNewTable = { schemaBrowserViewModel.showTableEditor() },
+                onNewSequence = { schemaBrowserViewModel.showSequenceEditor() },
+                onNewView = { schemaBrowserViewModel.showViewEditor() },
+                onNewIndex = { schemaBrowserViewModel.showIndexEditor() },
+                modifier = Modifier.weight(1f, fill = false),
+            )
+
             if (isLoadingSchema) {
                 Button(
                     onClick = { schemaJob?.cancel() },
@@ -388,13 +398,6 @@ fun SchemaBrowserScreen(
                         }
                     },
             ) {
-                SchemaToolbar(
-                    onNewTable = { schemaBrowserViewModel.showTableEditor() },
-                    onNewSequence = { schemaBrowserViewModel.showSequenceEditor() },
-                    onNewView = { schemaBrowserViewModel.showViewEditor() },
-                    onNewIndex = { schemaBrowserViewModel.showIndexEditor() },
-                )
-
                 SchemaTree(
                     nodes = schemaNodes,
                     modifier = Modifier.fillMaxSize(),

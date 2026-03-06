@@ -16,7 +16,7 @@ dependencies {
     implementation(libs.compose.material.icons.extended)
     implementation(compose.desktop.currentOs)
 
-    implementation(libs.kodeview)
+    implementation("com.github.qawaz.compose-code-editor:codeeditor-desktop:3.1.1")
 
     implementation(libs.koin.core)
     implementation(libs.coroutines.swing)

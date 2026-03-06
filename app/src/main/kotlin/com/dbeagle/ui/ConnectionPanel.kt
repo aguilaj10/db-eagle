@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -98,11 +99,12 @@ fun ConnectionPanel(
             ) {
                 Button(
                     onClick = onNewConnection,
-                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().height(32.dp),
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("New Connection")
+                    Text("New Connection", style = MaterialTheme.typography.labelMedium)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

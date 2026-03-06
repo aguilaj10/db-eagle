@@ -15,15 +15,14 @@ postgresql = "42.7.3"
 sqlite-jdbc = "3.46.1.3"
 spotless = "7.0.2"
 detekt = "1.23.7"
-
-kodeview = "0.9.0"
+compose-code-editor = "3.1.1"
 
 [libraries]
 # Kotlin
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test" }
 
-# Kodeview
-kodeview = { module = "dev.snipme:kodeview", version.ref = "kodeview" }
+# Compose Code Editor
+compose-code-editor = { module = "com.github.qawaz:compose-code-editor", version.ref = "compose-code-editor" }
 
 # Compose
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose" }

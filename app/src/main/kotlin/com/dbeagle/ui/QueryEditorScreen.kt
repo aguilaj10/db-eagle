@@ -166,11 +166,10 @@ fun QueryEditorScreen(
         SQLEditor(
             sql = sqlText,
             onSqlChange = {
-                val pid = activeProfileId
-                if (pid == null) {
+                if (activeProfileId == null) {
                     onScratchSqlChange(it)
                 } else {
-                    sessionViewModel.updateQueryEditorSql(pid, it)
+                    sessionViewModel.updateQueryEditorSql(activeProfileId, it)
                 }
             },
             isRunning = uiState.isRunning,
@@ -181,24 +180,23 @@ fun QueryEditorScreen(
                     return@SQLEditor
                 }
 
-                val pid = activeProfileId
-                if (pid == null) {
+                if (activeProfileId == null) {
                     onStatusTextChanged("Status: No active connection")
                     return@SQLEditor
                 }
 
-                sessionViewModel.clearQueryResult(pid)
+                sessionViewModel.clearQueryResult(activeProfileId)
 
-                val sqlToRun = sessionStates[pid]?.queryEditorSql ?: ""
+                val sqlToRun = sessionStates[activeProfileId]?.queryEditorSql ?: ""
 
                 viewModel.executeQuery(
                     sqlToRun = sqlToRun,
                     driver = activeDriver,
-                    profileId = pid,
+                    profileId = activeProfileId,
                     profileName = activeProfileName ?: "Connection",
                     onStatusChanged = onStatusTextChanged,
                     onQuerySuccess = { result, _ ->
-                        sessionViewModel.recordQueryResult(pid, sqlToRun, result)
+                        sessionViewModel.recordQueryResult(activeProfileId, sqlToRun, result)
                     },
                     onQueryError = { message, exception ->
                         ErrorHandler.showQueryError(

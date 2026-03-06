@@ -2,9 +2,9 @@ package com.dbeagle.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -42,14 +42,10 @@ fun SchemaToolbar(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(Modifier.weight(1f))
-
         val scope = rememberCoroutineScope()
         var expanded by remember { mutableStateOf(false) }
         Box {
@@ -64,9 +60,11 @@ fun SchemaToolbar(
             ) {
                 Button(
                     onClick = { expanded = true },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp),
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
-                    Text("New", modifier = Modifier.padding(start = 4.dp))
+                    Text("New", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start = 4.dp))
                     Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                 }
             }
