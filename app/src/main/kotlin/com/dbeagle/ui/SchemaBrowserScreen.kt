@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,12 +50,14 @@ import com.dbeagle.ui.dialogs.SequenceEditorDialog
 import com.dbeagle.ui.dialogs.TableEditorDialog
 import com.dbeagle.ui.dialogs.ViewEditorDialog
 import com.dbeagle.viewmodel.DDLExecutionException
+import com.dbeagle.viewmodel.SchemaBrowserViewModel
 import com.dbeagle.viewmodel.SchemaEditorViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.core.context.GlobalContext
 
 @Composable
 fun SchemaBrowserScreen(
@@ -66,21 +69,11 @@ fun SchemaBrowserScreen(
     onStatusTextChanged: (String) -> Unit,
     selectedTab: NavigationTab,
 ) {
+    val schemaBrowserViewModel = remember { GlobalContext.get().get<SchemaBrowserViewModel>() }
+    val browserUiState by schemaBrowserViewModel.uiState.collectAsState()
+
     val coroutineScope = rememberCoroutineScope()
     var schemaJob by remember(activeProfileId) { mutableStateOf<Job?>(null) }
-
-    var showTableEditor by remember { mutableStateOf(false) }
-    var showSequenceEditor by remember { mutableStateOf(false) }
-    var showViewEditor by remember { mutableStateOf(false) }
-    var showIndexEditor by remember { mutableStateOf(false) }
-    var editingTable by remember { mutableStateOf<String?>(null) }
-    var editingSequence by remember { mutableStateOf<String?>(null) }
-    var showDDLPreview by remember { mutableStateOf(false) }
-    var previewDDL by remember { mutableStateOf("") }
-    var previewIsDestructive by remember { mutableStateOf(false) }
-    var pendingDDLExecution by remember { mutableStateOf<suspend () -> Result<Unit>>({ Result.success(Unit) }) }
-    var showDDLError by remember { mutableStateOf(false) }
-    var ddlErrorMessage by remember { mutableStateOf("") }
 
     val ttlMs = 5 * 60 * 1000L
     val pid = activeProfileId
@@ -414,95 +407,85 @@ fun SchemaBrowserScreen(
                 onCopyName = { name -> println("App: Copy Name -> $name") },
                 onViewData = { name -> println("App: View Data -> $name") },
                 onNewTable = {
-                    editingTable = null
-                    showTableEditor = true
+                    schemaBrowserViewModel.showTableEditor()
                 },
                 onEditTable = { tableName ->
-                    editingTable = tableName
-                    showTableEditor = true
+                    schemaBrowserViewModel.showTableEditor(tableName)
                 },
                 onDropTable = { tableName ->
                     val driver = activeDriver ?: return@SchemaTree
                     coroutineScope.launch {
                         val ddlResult = SchemaEditorViewModel.dropTableDDL(driver, tableName, cascade = true)
                         ddlResult.onSuccess { ddl ->
-                            previewDDL = ddl
-                            previewIsDestructive = true
-                            pendingDDLExecution = {
-                                SchemaEditorViewModel.executeTableDrop(driver, ddl)
-                            }
-                            showDDLPreview = true
+                            schemaBrowserViewModel.showDDLPreview(
+                                ddl = ddl,
+                                isDestructive = true,
+                                execution = { SchemaEditorViewModel.executeTableDrop(driver, ddl) },
+                            )
                         }.onFailure { error ->
-                            ddlErrorMessage = error.message ?: "Failed to generate DROP DDL"
-                            showDDLError = true
+                            schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
                         }
                     }
                 },
                 onNewSequence = {
-                    editingSequence = null
-                    showSequenceEditor = true
+                    schemaBrowserViewModel.showSequenceEditor()
                 },
                 onEditSequence = { sequenceName ->
-                    editingSequence = sequenceName
-                    showSequenceEditor = true
+                    schemaBrowserViewModel.showSequenceEditor(sequenceName)
                 },
                 onDropSequence = { sequenceName ->
                     val driver = activeDriver ?: return@SchemaTree
                     coroutineScope.launch {
                         val ddlResult = SchemaEditorViewModel.dropSequenceDDL(driver, sequenceName, ifExists = true)
                         ddlResult.onSuccess { ddl ->
-                            previewDDL = ddl
-                            previewIsDestructive = true
-                            pendingDDLExecution = {
-                                SchemaEditorViewModel.executeSequenceDrop(driver, ddl)
-                            }
-                            showDDLPreview = true
+                            schemaBrowserViewModel.showDDLPreview(
+                                ddl = ddl,
+                                isDestructive = true,
+                                execution = { SchemaEditorViewModel.executeSequenceDrop(driver, ddl) },
+                            )
                         }.onFailure { error ->
-                            ddlErrorMessage = error.message ?: "Failed to generate DROP DDL"
-                            showDDLError = true
+                            schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
                         }
                     }
                 },
                 onNewView = {
-                    showViewEditor = true
+                    schemaBrowserViewModel.showViewEditor()
                 },
                 onDropView = { viewName ->
                     val driver = activeDriver ?: return@SchemaTree
                     coroutineScope.launch {
                         val dialect = getDialectForDriver(driver)
                         val ddl = ViewDDLBuilder.buildDropView(dialect, viewName, ifExists = true)
-                        previewDDL = ddl
-                        previewIsDestructive = true
-                        pendingDDLExecution = {
-                            executeDDL(driver, ddl)
-                        }
-                        showDDLPreview = true
+                        schemaBrowserViewModel.showDDLPreview(
+                            ddl = ddl,
+                            isDestructive = true,
+                            execution = { executeDDL(driver, ddl) },
+                        )
                     }
                 },
                 onNewIndex = {
-                    showIndexEditor = true
+                    schemaBrowserViewModel.showIndexEditor()
                 },
                 onDropIndex = { indexName ->
                     val driver = activeDriver ?: return@SchemaTree
                     coroutineScope.launch {
                         val dialect = getDialectForDriver(driver)
                         val ddl = IndexDDLBuilder.buildDropIndex(dialect, indexName, ifExists = true)
-                        previewDDL = ddl
-                        previewIsDestructive = true
-                        pendingDDLExecution = {
-                            executeDDL(driver, ddl)
-                        }
-                        showDDLPreview = true
+                        schemaBrowserViewModel.showDDLPreview(
+                            ddl = ddl,
+                            isDestructive = true,
+                            execution = { executeDDL(driver, ddl) },
+                        )
                     }
                 },
             )
         }
 
-        if (showTableEditor) {
+        if (browserUiState.dialog.showTableEditor) {
             val allTables = schemaMetadata?.tables?.map { it.name } ?: emptyList()
 
             // Load existing indexes for the table being edited
-            val existingIndexes = editingTable?.let { tableName ->
+            val existingIndexes = browserUiState.dialog.editingTable?.let { tableName ->
                 schemaMetadata?.indexDetails
                     ?.filter { it.tableName == tableName }
                     ?.map { idxMeta ->
@@ -515,7 +498,7 @@ fun SchemaBrowserScreen(
                     } ?: emptyList()
             } ?: emptyList()
 
-            val existingTableDef = editingTable?.let { tableName ->
+            val existingTableDef = browserUiState.dialog.editingTable?.let { tableName ->
                 schemaMetadata?.tables?.find { it.name == tableName }?.let { tableMetadata ->
                     val tableKey = "${tableMetadata.schema}.${tableMetadata.name}"
                     val cachedColumns = columnsCache[tableKey]?.columns ?: emptyList()
@@ -563,20 +546,18 @@ fun SchemaBrowserScreen(
                 existingIndexes = existingIndexes,
                 allTables = allTables,
                 onDismiss = {
-                    showTableEditor = false
-                    editingTable = null
+                    schemaBrowserViewModel.hideTableEditor()
                 },
                 onSave = { tableDef, newIndexes ->
                     val driver = activeDriver
                     if (driver == null) {
-                        showTableEditor = false
-                        editingTable = null
+                        schemaBrowserViewModel.hideTableEditor()
                         return@TableEditorDialog
                     }
 
                     coroutineScope.launch {
                         try {
-                            val isCreateMode = editingTable == null
+                            val isCreateMode = browserUiState.dialog.editingTable == null
                             val ddlResult = if (isCreateMode) {
                                 SchemaEditorViewModel.createTableDDL(driver, tableDef)
                             } else {
@@ -624,7 +605,7 @@ fun SchemaBrowserScreen(
                                         (tableDef.primaryKey == null || tableDef.primaryKey != oldTableDef.primaryKey)
                                     ) {
                                         // Convention: {table}_pkey for PK constraint name
-                                        add("${editingTable}_pkey")
+                                        add("${browserUiState.dialog.editingTable}_pkey")
                                     }
 
                                     // Dropped FKs - Note: requires constraint names which may not be available
@@ -645,7 +626,7 @@ fun SchemaBrowserScreen(
                                         val stillExists = tableDef.uniqueConstraints.any { it == oldUnique }
                                         if (!stillExists) {
                                             // Convention fallback if name not available
-                                            add("${editingTable}_unique_$idx")
+                                            add("${browserUiState.dialog.editingTable}_unique_$idx")
                                         }
                                     }
                                 }
@@ -666,54 +647,51 @@ fun SchemaBrowserScreen(
                                     addedIndexes = addedIndexes,
                                     droppedIndexes = droppedIndexes,
                                 )
-                                SchemaEditorViewModel.alterTableDDL(driver, editingTable!!, changes)
+                                SchemaEditorViewModel.alterTableDDL(driver, browserUiState.dialog.editingTable!!, changes)
                             }
 
                             ddlResult.onSuccess { ddl ->
-                                previewDDL = ddl
-                                previewIsDestructive = false
-                                pendingDDLExecution = if (isCreateMode) {
-                                    { SchemaEditorViewModel.executeTableCreate(driver, ddl) }
-                                } else {
-                                    { SchemaEditorViewModel.executeTableAlter(driver, ddl) }
-                                }
-                                showDDLPreview = true
-                                showTableEditor = false
+                                schemaBrowserViewModel.showDDLPreview(
+                                    ddl = ddl,
+                                    isDestructive = false,
+                                    execution = if (isCreateMode) {
+                                        { SchemaEditorViewModel.executeTableCreate(driver, ddl) }
+                                    } else {
+                                        { SchemaEditorViewModel.executeTableAlter(driver, ddl) }
+                                    },
+                                )
+                                schemaBrowserViewModel.hideTableEditor()
                             }.onFailure { error ->
-                                ddlErrorMessage = error.message ?: "Failed to generate DDL"
-                                showDDLError = true
+                                schemaBrowserViewModel.showError(error.message ?: "Failed to generate DDL")
                             }
                         } catch (e: Exception) {
-                            ddlErrorMessage = e.message ?: "Unknown error"
-                            showDDLError = true
+                            schemaBrowserViewModel.showError(e.message ?: "Unknown error")
                         }
                     }
                 },
             )
         }
 
-        if (showSequenceEditor) {
-            val existingSeq = editingSequence?.let { seqName ->
+        if (browserUiState.dialog.showSequenceEditor) {
+            val existingSeq = browserUiState.dialog.editingSequence?.let { seqName ->
                 schemaMetadata?.sequences?.find { it.name == seqName }
             }
 
             SequenceEditorDialog(
                 existingSequence = existingSeq,
                 onDismiss = {
-                    showSequenceEditor = false
-                    editingSequence = null
+                    schemaBrowserViewModel.hideSequenceEditor()
                 },
                 onSave = { seqMetadata ->
                     val driver = activeDriver
                     if (driver == null) {
-                        showSequenceEditor = false
-                        editingSequence = null
+                        schemaBrowserViewModel.hideSequenceEditor()
                         return@SequenceEditorDialog
                     }
 
                     coroutineScope.launch {
                         try {
-                            val isCreateMode = editingSequence == null
+                            val isCreateMode = browserUiState.dialog.editingSequence == null
                             val ddlResult = if (isCreateMode) {
                                 SchemaEditorViewModel.createSequenceDDL(driver, seqMetadata)
                             } else {
@@ -724,55 +702,53 @@ fun SchemaBrowserScreen(
                                     maxValue = if (seqMetadata.maxValue != oldSeq.maxValue) seqMetadata.maxValue else null,
                                     restart = null,
                                 )
-                                SchemaEditorViewModel.alterSequenceDDL(driver, editingSequence!!, changes)
+                                SchemaEditorViewModel.alterSequenceDDL(driver, browserUiState.dialog.editingSequence!!, changes)
                             }
 
                             ddlResult.onSuccess { ddl ->
-                                previewDDL = ddl
-                                previewIsDestructive = false
-                                pendingDDLExecution = if (isCreateMode) {
-                                    { SchemaEditorViewModel.executeSequenceCreate(driver, ddl) }
-                                } else {
-                                    { SchemaEditorViewModel.executeSequenceAlter(driver, ddl) }
-                                }
-                                showDDLPreview = true
-                                showSequenceEditor = false
+                                schemaBrowserViewModel.showDDLPreview(
+                                    ddl = ddl,
+                                    isDestructive = false,
+                                    execution = if (isCreateMode) {
+                                        { SchemaEditorViewModel.executeSequenceCreate(driver, ddl) }
+                                    } else {
+                                        { SchemaEditorViewModel.executeSequenceAlter(driver, ddl) }
+                                    },
+                                )
+                                schemaBrowserViewModel.hideSequenceEditor()
                             }.onFailure { error ->
-                                ddlErrorMessage = error.message ?: "Failed to generate DDL"
-                                showDDLError = true
+                                schemaBrowserViewModel.showError(error.message ?: "Failed to generate DDL")
                             }
                         } catch (e: Exception) {
-                            ddlErrorMessage = e.message ?: "Unknown error"
-                            showDDLError = true
+                            schemaBrowserViewModel.showError(e.message ?: "Unknown error")
                         }
                     }
                 },
             )
         }
 
-        if (showViewEditor) {
+        if (browserUiState.dialog.showViewEditor) {
             val driver = activeDriver
             if (driver != null) {
                 val dialect = getDialectForDriver(driver)
                 ViewEditorDialog(
                     dialect = dialect,
                     onDismiss = {
-                        showViewEditor = false
+                        schemaBrowserViewModel.hideViewEditor()
                     },
                     onSave = { ddl ->
-                        previewDDL = ddl
-                        previewIsDestructive = false
-                        pendingDDLExecution = {
-                            executeDDL(driver, ddl)
-                        }
-                        showDDLPreview = true
-                        showViewEditor = false
+                        schemaBrowserViewModel.showDDLPreview(
+                            ddl = ddl,
+                            isDestructive = false,
+                            execution = { executeDDL(driver, ddl) },
+                        )
+                        schemaBrowserViewModel.hideViewEditor()
                     },
                 )
             }
         }
 
-        if (showIndexEditor) {
+        if (browserUiState.dialog.showIndexEditor) {
             val driver = activeDriver
             if (driver != null) {
                 val dialect = getDialectForDriver(driver)
@@ -787,17 +763,19 @@ fun SchemaBrowserScreen(
                         }
                     },
                     onDismiss = {
-                        showIndexEditor = false
+                        schemaBrowserViewModel.hideIndexEditor()
                     },
                     onPreview = { ddl ->
-                        previewDDL = ddl
-                        previewIsDestructive = false
-                        showDDLPreview = true
+                        schemaBrowserViewModel.showDDLPreview(
+                            ddl = ddl,
+                            isDestructive = false,
+                            execution = { Result.success(Unit) },
+                        )
                     },
                     onCreate = { ddl ->
                         executeDDL(driver, ddl).also {
                             if (it.isSuccess) {
-                                showIndexEditor = false
+                                schemaBrowserViewModel.hideIndexEditor()
                             }
                         }
                     },
@@ -805,59 +783,40 @@ fun SchemaBrowserScreen(
             }
         }
 
-        if (showDDLPreview) {
+        if (browserUiState.ddlPreview.isVisible) {
             DDLPreviewDialog(
-                ddlSql = previewDDL,
-                isDestructive = previewIsDestructive,
+                ddlSql = browserUiState.ddlPreview.ddlSql,
+                isDestructive = browserUiState.ddlPreview.isDestructive,
                 onDismiss = {
-                    showDDLPreview = false
+                    schemaBrowserViewModel.hideDDLPreview()
                 },
                 onExecute = {
-                    coroutineScope.launch {
-                        val name = activeProfileName ?: "Connection"
-                        onStatusTextChanged("Status: Executing DDL ($name)")
-                        try {
-                            val result = pendingDDLExecution()
-                            result.onSuccess {
-                                onStatusTextChanged("Status: DDL executed successfully ($name)")
-                                showDDLPreview = false
-                                editingSequence = null
-                                editingTable = null
-                                forceRefresh()
-                                ensureSchemaLoaded(force = true)
-                            }.onFailure { error ->
-                                onStatusTextChanged("Status: DDL execution failed")
-                                showDDLPreview = false
-                                ddlErrorMessage = if (error is DDLExecutionException) {
-                                    "${error.userError.title}: ${error.userError.description}\n${error.userError.suggestion}"
-                                } else {
-                                    error.message ?: "Unknown error"
-                                }
-                                showDDLError = true
-                            }
-                        } catch (e: Exception) {
-                            onStatusTextChanged("Status: DDL execution failed")
-                            showDDLPreview = false
-                            ddlErrorMessage = e.message ?: "Unknown error"
-                            showDDLError = true
-                        }
-                    }
+                    schemaBrowserViewModel.executePendingDDL(
+                        onStatusUpdate = { status ->
+                            val name = activeProfileName ?: "Connection"
+                            onStatusTextChanged("Status: $status ($name)")
+                        },
+                        onSuccess = {
+                            val name = activeProfileName ?: "Connection"
+                            onStatusTextChanged("Status: DDL executed successfully ($name)")
+                            forceRefresh()
+                            ensureSchemaLoaded(force = true)
+                        },
+                    )
                 },
             )
         }
 
-        if (showDDLError) {
+        if (browserUiState.error.isVisible) {
             AlertDialog(
                 onDismissRequest = {
-                    showDDLError = false
-                    ddlErrorMessage = ""
+                    schemaBrowserViewModel.hideError()
                 },
                 title = { Text("DDL Error") },
-                text = { Text(ddlErrorMessage) },
+                text = { Text(browserUiState.error.message) },
                 confirmButton = {
                     TextButton(onClick = {
-                        showDDLError = false
-                        ddlErrorMessage = ""
+                        schemaBrowserViewModel.hideError()
                     }) {
                         Text("OK")
                     }
