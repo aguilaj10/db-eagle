@@ -220,6 +220,35 @@ class PostgreSQLDriverTest {
 
         driver.disconnect()
     }
+
+    @Test
+    fun testGetSchemaIncludesSequences() = kotlinx.coroutines.runBlocking {
+        if (!dockerAvailable) return@runBlocking
+
+        val container = postgresContainer!!
+        val driver = PostgreSQLDriver()
+        driver.connect(connectionConfig(container))
+
+        val schema = driver.getSchema()
+
+        assertTrue(schema.sequences.isNotEmpty(), "Expected sequences in schema from SERIAL columns")
+
+        val usersIdSeq = schema.sequences.find { it.name == "users_id_seq" }
+        assertTrue(usersIdSeq != null, "Expected users_id_seq in schema.sequences")
+
+        if (usersIdSeq != null) {
+            assertEquals("public", usersIdSeq.schema)
+            assertEquals(1L, usersIdSeq.startValue)
+            assertEquals(1L, usersIdSeq.increment)
+            assertEquals("users", usersIdSeq.ownedByTable)
+            assertEquals("id", usersIdSeq.ownedByColumn)
+        }
+
+        val ordersIdSeq = schema.sequences.find { it.name == "orders_id_seq" }
+        assertTrue(ordersIdSeq != null, "Expected orders_id_seq in schema.sequences")
+
+        driver.disconnect()
+    }
 }
 
 private fun connectionConfig(container: PostgreSQLContainer<*>): ConnectionConfig {

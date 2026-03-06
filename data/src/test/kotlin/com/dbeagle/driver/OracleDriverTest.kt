@@ -115,4 +115,13 @@ class OracleDriverTest {
         assertEquals("SEQ_ORDERS_ID", sorted[1].name)
         assertEquals("SEQ_USERS_ID", sorted[2].name)
     }
+
+    @Test
+    fun testGetSchemaReturnsSequencesFieldWhenNotConnected() = runBlocking {
+        val schema = driver.getSchema()
+
+        assertTrue(schema.sequences.isEmpty(), "Expected empty sequences list when not connected")
+        assertTrue(schema.tables.isEmpty(), "Expected empty tables list when not connected")
+        assertTrue(schema.foreignKeys.isEmpty(), "Expected empty foreign keys list when not connected")
+    }
 }
