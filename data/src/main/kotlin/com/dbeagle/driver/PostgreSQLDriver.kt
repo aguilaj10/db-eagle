@@ -125,6 +125,7 @@ class PostgreSQLDriver : DatabaseDriver {
             views = views,
             indexes = indexes,
             foreignKeys = foreignKeys,
+            sequences = getSequences(),
         )
     }
 

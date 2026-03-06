@@ -4,7 +4,9 @@ import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.logging.QueryLogEntry
 import com.dbeagle.logging.QueryLogService
 import com.dbeagle.logging.QueryStatus
+import com.dbeagle.model.ColumnMetadata
 import com.dbeagle.model.QueryResult
+import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.settings.AppPreferences
 
 class QueryExecutor(
@@ -76,6 +78,126 @@ class QueryExecutor(
         } catch (_: Exception) { /* silent */ }
 
         return result
+    }
+
+    suspend fun getSchema(): SchemaMetadata {
+        val startTime = System.currentTimeMillis()
+        return try {
+            val schema = driver.getSchema()
+            val duration = System.currentTimeMillis() - startTime
+
+            try {
+                QueryLogService.logQuery(
+                    QueryLogEntry(
+                        timestamp = startTime,
+                        sql = "SCHEMA_METADATA",
+                        durationMs = duration,
+                        status = QueryStatus.SUCCESS,
+                        rowCount = schema.tables.size,
+                        errorMessage = null,
+                    ),
+                )
+            } catch (_: Exception) { /* silent */ }
+
+            schema
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - startTime
+
+            try {
+                QueryLogService.logQuery(
+                    QueryLogEntry(
+                        timestamp = startTime,
+                        sql = "SCHEMA_METADATA",
+                        durationMs = duration,
+                        status = QueryStatus.ERROR,
+                        rowCount = null,
+                        errorMessage = e.message,
+                    ),
+                )
+            } catch (_: Exception) { /* silent */ }
+
+            throw e
+        }
+    }
+
+    suspend fun getColumns(tableName: String): List<ColumnMetadata> {
+        val startTime = System.currentTimeMillis()
+        return try {
+            val columns = driver.getColumns(tableName)
+            val duration = System.currentTimeMillis() - startTime
+
+            try {
+                QueryLogService.logQuery(
+                    QueryLogEntry(
+                        timestamp = startTime,
+                        sql = "GET_COLUMNS($tableName)",
+                        durationMs = duration,
+                        status = QueryStatus.SUCCESS,
+                        rowCount = columns.size,
+                        errorMessage = null,
+                    ),
+                )
+            } catch (_: Exception) { /* silent */ }
+
+            columns
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - startTime
+
+            try {
+                QueryLogService.logQuery(
+                    QueryLogEntry(
+                        timestamp = startTime,
+                        sql = "GET_COLUMNS($tableName)",
+                        durationMs = duration,
+                        status = QueryStatus.ERROR,
+                        rowCount = null,
+                        errorMessage = e.message,
+                    ),
+                )
+            } catch (_: Exception) { /* silent */ }
+
+            throw e
+        }
+    }
+
+    suspend fun getTables(): List<String> {
+        val startTime = System.currentTimeMillis()
+        return try {
+            val tables = driver.getTables()
+            val duration = System.currentTimeMillis() - startTime
+
+            try {
+                QueryLogService.logQuery(
+                    QueryLogEntry(
+                        timestamp = startTime,
+                        sql = "GET_TABLES",
+                        durationMs = duration,
+                        status = QueryStatus.SUCCESS,
+                        rowCount = tables.size,
+                        errorMessage = null,
+                    ),
+                )
+            } catch (_: Exception) { /* silent */ }
+
+            tables
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - startTime
+
+            try {
+                QueryLogService.logQuery(
+                    QueryLogEntry(
+                        timestamp = startTime,
+                        sql = "GET_TABLES",
+                        durationMs = duration,
+                        status = QueryStatus.ERROR,
+                        rowCount = null,
+                        errorMessage = e.message,
+                    ),
+                )
+            } catch (_: Exception) { /* silent */ }
+
+            throw e
+        }
     }
 
     private sealed interface PageOutcome {

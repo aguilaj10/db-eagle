@@ -126,6 +126,7 @@ class OracleDriver : DatabaseDriver {
             views = views,
             indexes = indexes,
             foreignKeys = foreignKeys,
+            sequences = getSequences(),
         )
     }
 

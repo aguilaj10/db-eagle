@@ -43,6 +43,7 @@ import com.dbeagle.driver.DatabaseCapability
 import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.navigation.NavigationTab
+import com.dbeagle.query.QueryExecutor
 import com.dbeagle.session.SessionViewModel
 import com.dbeagle.ui.dialogs.DDLPreviewDialog
 import com.dbeagle.ui.dialogs.IndexEditorDialog
@@ -258,7 +259,8 @@ fun SchemaBrowserScreen(
             onStatusTextChanged("Status: Loading schema ($name)")
             sessionViewModel.updateSchemaState(pid) { it.copy(isLoading = true, dialogError = null) }
             try {
-                val schema = withContext(Dispatchers.IO) { activeDriver.getSchema() }
+                val queryExecutor = QueryExecutor(activeDriver)
+                val schema = withContext(Dispatchers.IO) { queryExecutor.getSchema() }
                 val nodes = buildTree(schema)
                 val now = System.currentTimeMillis()
                 sessionViewModel.updateSchemaState(pid) {
@@ -374,7 +376,8 @@ fun SchemaBrowserScreen(
                                 ?.associateBy { it.fromColumn }
                                 ?: emptyMap()
 
-                            val cols = withContext(Dispatchers.IO) { driver.getColumns(tableName) }
+                            val queryExecutor = QueryExecutor(driver)
+                            val cols = withContext(Dispatchers.IO) { queryExecutor.getColumns(tableName) }
                                 .sortedBy { it.name }
                                 .map { c ->
                                     val fk = fkMap[c.name]
@@ -759,7 +762,8 @@ fun SchemaBrowserScreen(
                     tables = allTables,
                     getColumnsForTable = { tableName ->
                         withContext(Dispatchers.IO) {
-                            driver.getColumns(tableName).map { it.name }
+                            val queryExecutor = QueryExecutor(driver)
+                            queryExecutor.getColumns(tableName).map { it.name }
                         }
                     },
                     onDismiss = {
