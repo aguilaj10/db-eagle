@@ -2,8 +2,8 @@ package com.dbeagle.query
 
 import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.QueryResult
-import com.dbeagle.settings.AppPreferences
 import com.dbeagle.settings.AppSettings
+import com.dbeagle.settings.SettingsProvider
 import com.dbeagle.test.BaseTest
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -39,8 +39,8 @@ class QueryExecutorSettingsIntegrationTest : BaseTest() {
 
     @Test
     fun `query executor respects settings result limit`() = runBlocking {
-        val settings = AppSettings(resultLimit = 500)
-        AppPreferences.save(settings)
+        val settings = SettingsProvider.createAppSettings()
+        settings.putInt("resultLimit", 500)
 
         val driver = FakeDriver()
         val executor = QueryExecutor(driver)
@@ -58,19 +58,16 @@ class QueryExecutorSettingsIntegrationTest : BaseTest() {
 
     @Test
     fun `settings roundtrip with non-default values`() {
-        val custom = AppSettings(
-            resultLimit = 250,
-            queryTimeoutSeconds = 90,
-            connectionTimeoutSeconds = 45,
-            maxConnections = 15,
-        )
-        AppPreferences.save(custom)
+        val settings = SettingsProvider.createAppSettings()
+        settings.putInt("resultLimit", 250)
+        settings.putInt("queryTimeoutSeconds", 90)
+        settings.putInt("connectionTimeoutSeconds", 45)
+        settings.putInt("maxConnections", 15)
 
-        val loaded = AppPreferences.load()
-        assertEquals(250, loaded.resultLimit)
-        assertEquals(90, loaded.queryTimeoutSeconds)
-        assertEquals(45, loaded.connectionTimeoutSeconds)
-        assertEquals(15, loaded.maxConnections)
+        assertEquals(250, settings.getInt("resultLimit", AppSettings.DEFAULT_RESULT_LIMIT))
+        assertEquals(90, settings.getInt("queryTimeoutSeconds", AppSettings.DEFAULT_QUERY_TIMEOUT_SECONDS))
+        assertEquals(45, settings.getInt("connectionTimeoutSeconds", AppSettings.DEFAULT_CONNECTION_TIMEOUT_SECONDS))
+        assertEquals(15, settings.getInt("maxConnections", AppSettings.DEFAULT_MAX_CONNECTIONS))
     }
 
     @Test
@@ -91,21 +88,22 @@ class QueryExecutorSettingsIntegrationTest : BaseTest() {
 
         // Test 1: Save custom settings
         output.appendLine("Step 1: Save custom settings with resultLimit=500")
-        val settings = AppSettings(
-            resultLimit = 500,
-            queryTimeoutSeconds = 75,
-            connectionTimeoutSeconds = 40,
-            maxConnections = 12,
-        )
-        AppPreferences.save(settings)
-        output.appendLine("Saved: resultLimit=${settings.resultLimit}, queryTimeout=${settings.queryTimeoutSeconds}, connectionTimeout=${settings.connectionTimeoutSeconds}, maxConnections=${settings.maxConnections}")
+        val settings = SettingsProvider.createAppSettings()
+        settings.putInt("resultLimit", 500)
+        settings.putInt("queryTimeoutSeconds", 75)
+        settings.putInt("connectionTimeoutSeconds", 40)
+        settings.putInt("maxConnections", 12)
+        output.appendLine("Saved: resultLimit=500, queryTimeout=75, connectionTimeout=40, maxConnections=12")
         output.appendLine()
 
         // Test 2: Load settings and verify
         output.appendLine("Step 2: Load settings from persistence")
-        val loaded = AppPreferences.load()
-        output.appendLine("Loaded: resultLimit=${loaded.resultLimit}, queryTimeout=${loaded.queryTimeoutSeconds}, connectionTimeout=${loaded.connectionTimeoutSeconds}, maxConnections=${loaded.maxConnections}")
-        output.appendLine("Verification: resultLimit matches = ${loaded.resultLimit == 500}")
+        val resultLimit = settings.getInt("resultLimit", AppSettings.DEFAULT_RESULT_LIMIT)
+        val queryTimeout = settings.getInt("queryTimeoutSeconds", AppSettings.DEFAULT_QUERY_TIMEOUT_SECONDS)
+        val connectionTimeout = settings.getInt("connectionTimeoutSeconds", AppSettings.DEFAULT_CONNECTION_TIMEOUT_SECONDS)
+        val maxConnections = settings.getInt("maxConnections", AppSettings.DEFAULT_MAX_CONNECTIONS)
+        output.appendLine("Loaded: resultLimit=$resultLimit, queryTimeout=$queryTimeout, connectionTimeout=$connectionTimeout, maxConnections=$maxConnections")
+        output.appendLine("Verification: resultLimit matches = ${resultLimit == 500}")
         output.appendLine()
 
         // Test 3: Execute query and verify result limit is applied

@@ -7,7 +7,8 @@ import com.dbeagle.logging.QueryStatus
 import com.dbeagle.model.ColumnMetadata
 import com.dbeagle.model.QueryResult
 import com.dbeagle.model.SchemaMetadata
-import com.dbeagle.settings.AppPreferences
+import com.dbeagle.settings.AppSettings
+import com.dbeagle.settings.SettingsProvider
 
 class QueryExecutor(
     private val driver: DatabaseDriver,
@@ -272,7 +273,8 @@ class QueryExecutor(
         const val DEFAULT_PAGE_SIZE: Int = 1000
 
         private fun getDefaultPageSize(): Int = try {
-            AppPreferences.load().resultLimit
+            val settings = SettingsProvider.createAppSettings()
+            settings.getInt("resultLimit", AppSettings.DEFAULT_RESULT_LIMIT)
         } catch (_: Exception) {
             DEFAULT_PAGE_SIZE
         }
