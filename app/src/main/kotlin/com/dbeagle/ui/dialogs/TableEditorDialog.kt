@@ -333,7 +333,7 @@ private fun ColumnRow(
             },
             label = { Text("Name") },
             singleLine = true,
-            modifier = Modifier.weight(2f),
+            modifier = Modifier.weight(2f).fillMaxWidth(),
         )
 
         ExposedDropdownMenuBox(
@@ -404,7 +404,7 @@ private fun ColumnRow(
             },
             label = { Text("Default") },
             singleLine = true,
-            modifier = Modifier.weight(1.5f),
+            modifier = Modifier.weight(1.5f).fillMaxWidth(),
         )
 
         IconButton(onClick = onDelete) {

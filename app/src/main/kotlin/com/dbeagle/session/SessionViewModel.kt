@@ -41,7 +41,7 @@ class SessionViewModel(
 
     private val drivers = LinkedHashMap<String, DatabaseDriver>()
 
-    private val _sessionOrder = MutableStateFlow<List<String>>(emptyList())
+    private val sessionOrderState = MutableStateFlow<List<String>>(emptyList())
 
     private val _sessionStates = MutableStateFlow<Map<String, SessionUiState>>(emptyMap())
     val sessionStates: StateFlow<Map<String, SessionUiState>> = _sessionStates.asStateFlow()
@@ -77,8 +77,8 @@ class SessionViewModel(
             )
         _sessionStates.value += (profileId to next)
 
-        if (!_sessionOrder.value.contains(profileId)) {
-            _sessionOrder.value += profileId
+        if (!sessionOrderState.value.contains(profileId)) {
+            sessionOrderState.value += profileId
         }
         _connectedProfileIds.value = drivers.keys.toSet()
 
@@ -112,11 +112,11 @@ class SessionViewModel(
         }
 
         _sessionStates.value -= profileId
-        _sessionOrder.value = _sessionOrder.value.filterNot { it == profileId }
+        sessionOrderState.value = sessionOrderState.value.filterNot { it == profileId }
         _connectedProfileIds.value = drivers.keys.toSet()
 
         if (_activeProfileId.value == profileId) {
-            _activeProfileId.value = _sessionOrder.value.firstOrNull()
+            _activeProfileId.value = sessionOrderState.value.firstOrNull()
         }
     }
 

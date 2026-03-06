@@ -1,5 +1,6 @@
 package com.dbeagle.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import compose.icons.FontAwesomeIcons
 import compose.icons.fontawesomeicons.Solid
@@ -33,6 +35,14 @@ fun WelcomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
+            Image(
+                painter = painterResource("icons/icon_128x128.png"),
+                contentDescription = "DB Eagle Logo",
+                modifier = Modifier.size(128.dp),
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             Text(
                 text = "DB Eagle",
                 style = MaterialTheme.typography.displayLarge,

@@ -107,7 +107,6 @@ fun main() {
         val sessionViewModel: SessionViewModel = GlobalContext.get().get()
         val themeManager: ThemeManager = GlobalContext.get().get()
         val tabManager = remember { TabManager() }
-        val sessionOrder by sessionViewModel.sessionOrder.collectAsState()
         val sessionStates by sessionViewModel.sessionStates.collectAsState()
         val activeProfileId by sessionViewModel.activeProfileId.collectAsState()
         val darkModeOverride by themeManager.darkModeOverride.collectAsState()
@@ -137,10 +136,8 @@ fun main() {
             if (savedTabs.isNotEmpty()) {
                 savedTabs.forEach { tabManager.addTab(it) }
                 savedSelectedId?.let { tabManager.selectTab(it) }
-            } else {
-                // Create default QueryEditor tab
-                tabManager.addTab(TabItem(type = TabType.QueryEditor, title = "Query Editor"))
             }
+            // No default tab - show welcome screen when no tabs exist
         }
 
         // Save tabs on change (debounced)
@@ -226,7 +223,7 @@ fun main() {
                                             tabManager.addTab(
                                                 TabItem(
                                                     type = TabType.QueryEditor,
-                                                    title = "Query Editor${activeProfileName?.let { " - $it" } ?: ""}",
+                                                    title = "Query Editor",
                                                     connectionId = activeProfileId,
                                                 ),
                                             )
@@ -542,7 +539,7 @@ fun main() {
                                                     tabManager.addTab(
                                                         TabItem(
                                                             type = TabType.QueryEditor,
-                                                            title = "Query Editor${activeProfileName?.let { " - $it" } ?: ""}",
+                                                            title = "Query Editor",
                                                             connectionId = activeProfileId,
                                                         ),
                                                     )
@@ -564,7 +561,7 @@ fun main() {
                                                     tabManager.addTab(
                                                         TabItem(
                                                             type = TabType.QueryEditor,
-                                                            title = "Query Editor${activeProfileName?.let { " - $it" } ?: ""}",
+                                                            title = "Query Editor",
                                                             connectionId = activeProfileId,
                                                         ),
                                                     )
@@ -601,6 +598,7 @@ fun main() {
                                                     TabItem(
                                                         type = TabType.QueryEditor,
                                                         title = "Query Editor",
+                                                        connectionId = activeProfileId,
                                                     ),
                                                 )
                                             },

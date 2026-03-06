@@ -33,6 +33,13 @@ import com.dbeagle.ddl.IndexDefinition
 import com.dbeagle.ddl.ValidationResult
 import kotlinx.coroutines.launch
 
+enum class IndexType(val displayName: String) {
+    REGULAR("Regular Index"),
+    UNIQUE("Unique Index"),
+    PRIMARY_KEY("Primary Key"),
+    FOREIGN_KEY("Foreign Key"),
+}
+
 @Composable
 fun IndexEditorDialog(
     dialect: DDLDialect,
@@ -47,10 +54,12 @@ fun IndexEditorDialog(
     var indexName by remember { mutableStateOf("") }
     var selectedTable by remember { mutableStateOf<String?>(null) }
     val selectedColumns = remember { mutableStateListOf<String>() }
+    var indexType by remember { mutableStateOf(IndexType.REGULAR) }
     var unique by remember { mutableStateOf(false) }
     var showPreview by remember { mutableStateOf(false) }
     var isTableDropdownExpanded by remember { mutableStateOf(false) }
     var isColumnsDropdownExpanded by remember { mutableStateOf(false) }
+    var isIndexTypeDropdownExpanded by remember { mutableStateOf(false) }
 
     var availableColumns by remember { mutableStateOf<List<String>>(emptyList()) }
 
@@ -59,6 +68,14 @@ fun IndexEditorDialog(
         if (selectedTable != null) {
             availableColumns = getColumnsForTable(selectedTable!!)
             selectedColumns.clear()
+        }
+    }
+
+    // Sync indexType changes with unique flag for backward compatibility
+    LaunchedEffect(indexType) {
+        unique = when (indexType) {
+            IndexType.UNIQUE, IndexType.PRIMARY_KEY -> true
+            else -> false
         }
     }
 
@@ -111,6 +128,42 @@ fun IndexEditorDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = indexType.displayName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Index Type") },
+                        supportingText = {
+                            when (indexType) {
+                                IndexType.PRIMARY_KEY -> Text("Uniquely identifies each row. Typically one column.")
+                                IndexType.UNIQUE -> Text("Ensures column values are unique across rows.")
+                                IndexType.FOREIGN_KEY -> Text("References another table's primary key.")
+                                IndexType.REGULAR -> Text("Improves query performance for selected columns.")
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isIndexTypeDropdownExpanded = true },
+                        enabled = false,
+                    )
+                    DropdownMenu(
+                        expanded = isIndexTypeDropdownExpanded,
+                        onDismissRequest = { isIndexTypeDropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        IndexType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type.displayName) },
+                                onClick = {
+                                    indexType = type
+                                    isIndexTypeDropdownExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
 
                 // Table dropdown
                 Box(modifier = Modifier.fillMaxWidth()) {
@@ -187,17 +240,6 @@ fun IndexEditorDialog(
                             )
                         }
                     }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Checkbox(
-                        checked = unique,
-                        onCheckedChange = { unique = it },
-                    )
-                    Text("Unique")
                 }
             }
         },
