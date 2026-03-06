@@ -1,5 +1,6 @@
 package com.dbeagle.settings
 
+import com.russhwolf.settings.ExperimentalSettingsApi
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.coroutines.getBooleanOrNullFlow
 import com.russhwolf.settings.coroutines.getIntFlow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  * Repository providing reactive Flow-based access to application settings.
  * Wraps multiplatform-settings ObservableSettings with Flow API for reactive updates.
  */
+@OptIn(ExperimentalSettingsApi::class)
 class AppPreferencesRepository(
     private val settings: ObservableSettings,
 ) {
@@ -80,28 +82,28 @@ class AppPreferencesRepository(
     /**
      * Updates the result limit setting.
      */
-    suspend fun setResultLimit(value: Int) {
+    fun setResultLimit(value: Int) {
         settings.putInt(KEY_RESULT_LIMIT, value)
     }
 
     /**
      * Updates the query timeout setting (in seconds).
      */
-    suspend fun setQueryTimeout(value: Int) {
+    fun setQueryTimeout(value: Int) {
         settings.putInt(KEY_QUERY_TIMEOUT, value)
     }
 
     /**
      * Updates the connection timeout setting (in seconds).
      */
-    suspend fun setConnectionTimeout(value: Int) {
+    fun setConnectionTimeout(value: Int) {
         settings.putInt(KEY_CONNECTION_TIMEOUT, value)
     }
 
     /**
      * Updates the max connections setting.
      */
-    suspend fun setMaxConnections(value: Int) {
+    fun setMaxConnections(value: Int) {
         settings.putInt(KEY_MAX_CONNECTIONS, value)
     }
 
@@ -109,7 +111,7 @@ class AppPreferencesRepository(
      * Updates the dark mode setting.
      * Pass null to use system default.
      */
-    suspend fun setDarkMode(value: Boolean?) {
+    fun setDarkMode(value: Boolean?) {
         if (value != null) {
             settings.putBoolean(KEY_DARK_MODE, value)
         } else {
@@ -120,7 +122,7 @@ class AppPreferencesRepository(
     /**
      * Saves all settings from AppSettings data class.
      */
-    suspend fun saveSettings(appSettings: AppSettings) {
+    fun saveSettings(appSettings: AppSettings) {
         setResultLimit(appSettings.resultLimit)
         setQueryTimeout(appSettings.queryTimeoutSeconds)
         setConnectionTimeout(appSettings.connectionTimeoutSeconds)

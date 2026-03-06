@@ -79,3 +79,5 @@ local.properties
 /.sisyphus/notepads/settings-flow-migration/learnings.md
 /.sisyphus/plans/bugfixes-and-features.md
 /.sisyphus/plans/settings-and-flow-optimization.md
+/.sisyphus/plans/viewmodel-refactoring.md
+/.sisyphus/notepads/viewmodel-refactoring/atlas-rules.md
