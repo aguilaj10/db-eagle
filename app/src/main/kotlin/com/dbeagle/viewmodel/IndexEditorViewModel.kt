@@ -85,17 +85,4 @@ class IndexEditorViewModel : BaseViewModel() {
             }
         }
     }
-
-    /**
-     * Clears the current column list and resets error state.
-     * Called when table selection is cleared or changed.
-     */
-    fun clearColumns() {
-        updateStateFlow(_uiState) {
-            it.copy(
-                availableColumns = emptyList(),
-                errorMessage = null,
-            )
-        }
-    }
 }

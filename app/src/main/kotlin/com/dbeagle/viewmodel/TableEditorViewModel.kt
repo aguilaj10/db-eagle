@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * Architecture:
  * - Immutable state (List instead of SnapshotStateList)
- * - Event-driven updates (29 event handler functions)
+ * - Event-driven updates using bulk object update pattern
  * - Centralized validation logic
  * - Database-specific column type filtering
  *
@@ -37,9 +37,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * )
  * val uiState by viewModel.uiState.collectAsState()
  *
- * // User adds a column
+ * // User adds and updates a column
  * viewModel.addColumn()
- * viewModel.updateColumnName(0, "id")
+ * viewModel.updateColumn(0, ColumnDefinition(name = "id", type = ColumnType.INTEGER))
  *
  * // User saves
  * viewModel.validateAndSave { tableDef, indexes ->
@@ -205,78 +205,6 @@ class TableEditorViewModel(
         }
     }
 
-    /**
-     * Updates the name of a column at the specified index.
-     *
-     * @param index Index of the column
-     * @param newName The new column name
-     */
-    fun updateColumnName(index: Int, newName: String) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.columns[index].copy(name = newName)
-            val newColumns = state.columns.toMutableList().apply { set(index, updated) }
-            state.copy(columns = newColumns)
-        }
-    }
-
-    /**
-     * Updates the type of a column at the specified index.
-     *
-     * @param index Index of the column
-     * @param newType The new column type
-     */
-    fun updateColumnType(index: Int, newType: ColumnType) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.columns[index].copy(type = newType)
-            val newColumns = state.columns.toMutableList().apply { set(index, updated) }
-            state.copy(columns = newColumns)
-        }
-    }
-
-    /**
-     * Updates the nullable property of a column at the specified index.
-     *
-     * @param index Index of the column
-     * @param nullable Whether the column allows NULL values
-     */
-    fun updateColumnNullable(index: Int, nullable: Boolean) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.columns[index].copy(nullable = nullable)
-            val newColumns = state.columns.toMutableList().apply { set(index, updated) }
-            state.copy(columns = newColumns)
-        }
-    }
-
-    /**
-     * Updates the default value of a column at the specified index.
-     *
-     * @param index Index of the column
-     * @param defaultValue The default value (empty string treated as null)
-     */
-    fun updateColumnDefaultValue(index: Int, defaultValue: String) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.columns[index].copy(
-                defaultValue = defaultValue.takeIf { it.isNotBlank() },
-            )
-            val newColumns = state.columns.toMutableList().apply { set(index, updated) }
-            state.copy(columns = newColumns)
-        }
-    }
-
-    /**
-     * Updates the auto-increment property of a column at the specified index.
-     *
-     * @param index Index of the column
-     * @param autoIncrement Whether the column is auto-incrementing
-     */
-    fun updateColumnAutoIncrement(index: Int, autoIncrement: Boolean) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.columns[index].copy(autoIncrement = autoIncrement)
-            val newColumns = state.columns.toMutableList().apply { set(index, updated) }
-            state.copy(columns = newColumns)
-        }
-    }
-
     // ========================================
     // PRIMARY KEY EVENTS
     // ========================================
@@ -341,96 +269,6 @@ class TableEditorViewModel(
     fun updateForeignKey(index: Int, updatedFk: ForeignKeyDefinition) {
         updateStateFlow(_uiState) { state ->
             val newFks = state.foreignKeys.toMutableList().apply { set(index, updatedFk) }
-            state.copy(foreignKeys = newFks)
-        }
-    }
-
-    /**
-     * Updates the name of a foreign key at the specified index.
-     *
-     * @param index Index of the foreign key
-     * @param name The new foreign key name (empty string treated as null)
-     */
-    fun updateForeignKeyName(index: Int, name: String) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.foreignKeys[index].copy(name = name.takeIf { it.isNotBlank() })
-            val newFks = state.foreignKeys.toMutableList().apply { set(index, updated) }
-            state.copy(foreignKeys = newFks)
-        }
-    }
-
-    /**
-     * Updates the reference table of a foreign key at the specified index.
-     *
-     * @param index Index of the foreign key
-     * @param refTable The name of the reference table
-     */
-    fun updateForeignKeyRefTable(index: Int, refTable: String) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.foreignKeys[index].copy(refTable = refTable)
-            val newFks = state.foreignKeys.toMutableList().apply { set(index, updated) }
-            state.copy(foreignKeys = newFks)
-        }
-    }
-
-    /**
-     * Updates the local columns of a foreign key at the specified index.
-     *
-     * @param index Index of the foreign key
-     * @param columns Set of column names
-     */
-    fun updateForeignKeyLocalColumns(index: Int, columns: Set<String>) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.foreignKeys[index].copy(columns = columns.toList())
-            val newFks = state.foreignKeys.toMutableList().apply { set(index, updated) }
-            state.copy(foreignKeys = newFks)
-        }
-    }
-
-    /**
-     * Updates the reference columns of a foreign key at the specified index.
-     * Parses a comma-separated string into a list of column names.
-     *
-     * @param index Index of the foreign key
-     * @param refColumnsCSV Comma-separated list of column names
-     */
-    fun updateForeignKeyRefColumns(index: Int, refColumnsCSV: String) {
-        val parsedColumns = refColumnsCSV
-            .split(",")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-
-        updateStateFlow(_uiState) { state ->
-            val updated = state.foreignKeys[index].copy(refColumns = parsedColumns)
-            val newFks = state.foreignKeys.toMutableList().apply { set(index, updated) }
-            state.copy(foreignKeys = newFks)
-        }
-    }
-
-    /**
-     * Updates the ON DELETE action of a foreign key at the specified index.
-     *
-     * @param index Index of the foreign key
-     * @param action The referential action (CASCADE, SET NULL, RESTRICT, NO ACTION, or empty)
-     */
-    fun updateForeignKeyOnDelete(index: Int, action: String) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.foreignKeys[index].copy(onDelete = action.takeIf { it.isNotBlank() })
-            val newFks = state.foreignKeys.toMutableList().apply { set(index, updated) }
-            state.copy(foreignKeys = newFks)
-        }
-    }
-
-    /**
-     * Updates the ON UPDATE action of a foreign key at the specified index.
-     *
-     * @param index Index of the foreign key
-     * @param action The referential action (CASCADE, SET NULL, RESTRICT, NO ACTION, or empty)
-     */
-    fun updateForeignKeyOnUpdate(index: Int, action: String) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.foreignKeys[index].copy(onUpdate = action.takeIf { it.isNotBlank() })
-            val newFks = state.foreignKeys.toMutableList().apply { set(index, updated) }
             state.copy(foreignKeys = newFks)
         }
     }
@@ -518,48 +356,6 @@ class TableEditorViewModel(
     }
 
     /**
-     * Updates the name of an index at the specified index.
-     *
-     * @param index Index of the index definition
-     * @param name The new index name
-     */
-    fun updateIndexName(index: Int, name: String) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.indexes[index].copy(name = name)
-            val newIndexes = state.indexes.toMutableList().apply { set(index, updated) }
-            state.copy(indexes = newIndexes)
-        }
-    }
-
-    /**
-     * Updates the unique property of an index at the specified index.
-     *
-     * @param index Index of the index definition
-     * @param unique Whether the index enforces uniqueness
-     */
-    fun updateIndexUnique(index: Int, unique: Boolean) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.indexes[index].copy(unique = unique)
-            val newIndexes = state.indexes.toMutableList().apply { set(index, updated) }
-            state.copy(indexes = newIndexes)
-        }
-    }
-
-    /**
-     * Updates the columns of an index at the specified index.
-     *
-     * @param index Index of the index definition
-     * @param columns Set of column names in the index
-     */
-    fun updateIndexColumns(index: Int, columns: Set<String>) {
-        updateStateFlow(_uiState) { state ->
-            val updated = state.indexes[index].copy(columns = columns.toList())
-            val newIndexes = state.indexes.toMutableList().apply { set(index, updated) }
-            state.copy(indexes = newIndexes)
-        }
-    }
-
-    /**
      * Generates a conventional index name based on table name and selected columns.
      * Format: idx_tablename_col1_col2_...
      *
@@ -571,7 +367,7 @@ class TableEditorViewModel(
 
         if (idx.columns.isNotEmpty()) {
             val generatedName = "idx_${state.tableName}_${idx.columns.joinToString("_")}"
-            updateIndexName(index, generatedName)
+            updateIndex(index, idx.copy(name = generatedName))
         }
     }
 
