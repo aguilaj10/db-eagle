@@ -39,12 +39,12 @@ class TableDataEditorViewModel : BaseViewModel() {
             try {
                 val pageSize = _uiState.value.pageSize
                 val offset = page * pageSize
-                val sql = "SELECT * FROM $tableName LIMIT $pageSize OFFSET $offset"
+                val sql = "SELECT * FROM ${quoteIdentifier(tableName)} LIMIT $pageSize OFFSET $offset"
                 val result = withContext(Dispatchers.IO) { driver.executeQuery(sql) }
 
                 when (result) {
                     is QueryResult.Success -> {
-                        val countSql = "SELECT COUNT(*) FROM $tableName"
+                        val countSql = "SELECT COUNT(*) FROM ${quoteIdentifier(tableName)}"
                         val countResult = withContext(Dispatchers.IO) { driver.executeQuery(countSql) }
                         val totalRows = when (countResult) {
                             is QueryResult.Success -> countResult.rows.firstOrNull()?.values?.firstOrNull()?.toIntOrNull() ?: 0
@@ -122,9 +122,9 @@ class TableDataEditorViewModel : BaseViewModel() {
 
             val columns = _uiState.value.columns
             pendingNewRows.forEach { row ->
-                val colNames = columns.joinToString(", ")
+                val colNames = columns.joinToString(", ") { quoteIdentifier(it) }
                 val values = columns.map { col -> "'${row[col]?.replace("'", "''")}'" }.joinToString(", ")
-                statements.add("INSERT INTO $tableName ($colNames) VALUES ($values)")
+                statements.add("INSERT INTO ${quoteIdentifier(tableName)} ($colNames) VALUES ($values)")
             }
 
             val currentRows = _uiState.value.rows
@@ -135,7 +135,7 @@ class TableDataEditorViewModel : BaseViewModel() {
                     val idValue = row.firstOrNull() ?: return@forEach
 
                     changes.forEach { (colName, newValue) ->
-                        val rawSql = "UPDATE $tableName SET $colName = '${newValue.replace("'", "''")}' WHERE $idColumn = '$idValue'"
+                        val rawSql = "UPDATE ${quoteIdentifier(tableName)} SET ${quoteIdentifier(colName)} = '${newValue.replace("'", "''")}' WHERE ${quoteIdentifier(idColumn)} = '$idValue'"
                         statements.add(rawSql)
                     }
                 }
@@ -146,7 +146,7 @@ class TableDataEditorViewModel : BaseViewModel() {
                     val row = currentRows[rowIdx]
                     val idColumn = columns.firstOrNull() ?: return@forEach
                     val idValue = row.firstOrNull() ?: return@forEach
-                    statements.add("DELETE FROM $tableName WHERE $idColumn = '$idValue'")
+                    statements.add("DELETE FROM ${quoteIdentifier(tableName)} WHERE ${quoteIdentifier(idColumn)} = '$idValue'")
                 }
             }
 
@@ -212,4 +212,10 @@ class TableDataEditorViewModel : BaseViewModel() {
         val hasPending = pendingNewRows.isNotEmpty() || pendingDeletes.isNotEmpty() || pendingUpdates.isNotEmpty()
         updateStateFlow(_uiState) { it.copy(hasPendingChanges = hasPending) }
     }
+
+    /**
+     * Quotes an SQL identifier (table name, column name) to prevent SQL injection.
+     * Doubles any existing double quotes and wraps in double quotes per SQL standard.
+     */
+    private fun quoteIdentifier(name: String): String = "\"${name.replace("\"", "\"\"")}\""
 }
