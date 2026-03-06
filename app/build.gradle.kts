@@ -21,6 +21,7 @@ dependencies {
     implementation("com.github.qawaz.compose-code-editor:codeeditor-desktop:3.1.1")
 
     implementation(libs.koin.core)
+    implementation(libs.koin.compose)
     implementation(libs.coroutines.swing)
 
     implementation(libs.kotlinx.serialization.json)

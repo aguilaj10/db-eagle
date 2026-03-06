@@ -86,6 +86,7 @@ import compose.icons.fontawesomeicons.solid.Terminal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 import org.koin.core.parameter.parametersOf
@@ -104,8 +105,8 @@ fun main() {
         val windowState = rememberWindowState(size = DpSize(1200.dp, 800.dp))
         var statusText by remember { mutableStateOf("Status: Disconnected") }
 
-        val sessionViewModel: SessionViewModel = GlobalContext.get().get()
-        val themeManager: ThemeManager = GlobalContext.get().get()
+        val sessionViewModel: SessionViewModel = koinInject()
+        val themeManager: ThemeManager = koinInject()
         val tabManager = remember { TabManager() }
         val sessionStates by sessionViewModel.sessionStates.collectAsState()
         val activeProfileId by sessionViewModel.activeProfileId.collectAsState()
@@ -127,9 +128,10 @@ fun main() {
             }
         }
 
+        val preferencesRepository: AppPreferencesRepository = koinInject()
+
         // Load persisted tabs on startup
         LaunchedEffect(Unit) {
-            val preferencesRepository: AppPreferencesRepository = GlobalContext.get().get()
             val savedTabs = preferencesRepository.openedTabsFlow.first()
             val savedSelectedId = preferencesRepository.selectedTabIdFlow.first()
 
@@ -143,7 +145,6 @@ fun main() {
         // Save tabs on change (debounced)
         LaunchedEffect(tabManager.tabs.toList(), tabManager.selectedTabId) {
             delay(300) // debounce
-            val preferencesRepository: AppPreferencesRepository = GlobalContext.get().get()
             preferencesRepository.saveOpenedTabs(tabManager.tabs.toList(), tabManager.selectedTabId)
         }
 
@@ -411,6 +412,7 @@ fun main() {
                             onDismiss = { triggerNewConnection = false },
                             onSave = { profile, plaintextPassword ->
                                 appCoroutineScope.launch {
+                                    // Non-Composable context: must use GlobalContext for parameterized injection
                                     val connectionListViewModel: ConnectionListViewModel =
                                         GlobalContext.get().get { parametersOf(masterPassword ?: "") }
                                     connectionListViewModel.saveProfile(profile, plaintextPassword)

@@ -52,7 +52,7 @@ fun FavoritesScreen(
     onLoadQuery: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel = remember { GlobalContext.get().get<FavoritesViewModel>() }
+    val viewModel = GlobalContext.get().get<FavoritesViewModel>()
     val uiState by viewModel.uiState.collectAsState()
 
     val displayedFavorites = viewModel.getDisplayedFavorites()

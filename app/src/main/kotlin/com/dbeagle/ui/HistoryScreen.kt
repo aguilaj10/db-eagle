@@ -42,7 +42,7 @@ fun HistoryScreen(
     onLoadQuery: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel = remember { GlobalContext.get().get<HistoryViewModel>() }
+    val viewModel = GlobalContext.get().get<HistoryViewModel>()
     val uiState by viewModel.uiState.collectAsState()
 
     if (uiState.showClearDialog) {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
@@ -17,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,7 +33,9 @@ import com.dbeagle.ddl.DDLValidator
 import com.dbeagle.ddl.IndexDDLBuilder
 import com.dbeagle.ddl.IndexDefinition
 import com.dbeagle.ddl.ValidationResult
+import com.dbeagle.viewmodel.IndexEditorViewModel
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 enum class IndexType(val displayName: String) {
     REGULAR("Regular Index"),
@@ -48,6 +52,8 @@ fun IndexEditorDialog(
     onDismiss: () -> Unit,
     onCreate: suspend (ddl: String) -> Result<Unit>,
 ) {
+    val viewModel: IndexEditorViewModel = koinInject()
+    val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
 
     var indexName by remember { mutableStateOf("") }
@@ -59,16 +65,6 @@ fun IndexEditorDialog(
     var isTableDropdownExpanded by remember { mutableStateOf(false) }
     var isColumnsDropdownExpanded by remember { mutableStateOf(false) }
     var isIndexTypeDropdownExpanded by remember { mutableStateOf(false) }
-
-    var availableColumns by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    // Load columns when table selection changes
-    LaunchedEffect(selectedTable) {
-        if (selectedTable != null) {
-            availableColumns = getColumnsForTable(selectedTable!!)
-            selectedColumns.clear()
-        }
-    }
 
     // Sync indexType changes with unique flag for backward compatibility
     LaunchedEffect(indexType) {
@@ -186,6 +182,8 @@ fun IndexEditorDialog(
                                 text = { Text(table) },
                                 onClick = {
                                     selectedTable = table
+                                    selectedColumns.clear()
+                                    viewModel.loadColumnsForTable(table, getColumnsForTable)
                                     isTableDropdownExpanded = false
                                 },
                             )
@@ -201,21 +199,35 @@ fun IndexEditorDialog(
                         readOnly = true,
                         label = { Text("Columns") },
                         placeholder = { Text("Select columns...") },
+                        isError = uiState.errorMessage != null,
+                        supportingText = {
+                            when {
+                                uiState.errorMessage != null -> Text(uiState.errorMessage!!)
+                                uiState.isLoadingColumns -> Text("Loading columns...")
+                            }
+                        },
+                        trailingIcon = {
+                            if (uiState.isLoadingColumns) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(8.dp),
+                                )
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                if (selectedTable != null) {
+                                if (selectedTable != null && !uiState.isLoadingColumns) {
                                     isColumnsDropdownExpanded = true
                                 }
                             },
-                        enabled = selectedTable != null,
+                        enabled = selectedTable != null && !uiState.isLoadingColumns,
                     )
                     DropdownMenu(
                         expanded = isColumnsDropdownExpanded,
                         onDismissRequest = { isColumnsDropdownExpanded = false },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        availableColumns.forEach { column ->
+                        uiState.availableColumns.forEach { column ->
                             DropdownMenuItem(
                                 text = {
                                     Row(

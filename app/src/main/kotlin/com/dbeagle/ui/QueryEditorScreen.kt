@@ -34,7 +34,7 @@ import com.dbeagle.session.SessionViewModel
 import com.dbeagle.viewmodel.FavoritesViewModel
 import com.dbeagle.viewmodel.QueryEditorViewModel
 import kotlinx.coroutines.launch
-import org.koin.core.context.GlobalContext
+import org.koin.compose.koinInject
 
 @Composable
 fun QueryEditorScreen(
@@ -49,8 +49,8 @@ fun QueryEditorScreen(
     snackbarHostState: SnackbarHostState,
     sessionStates: Map<String, SessionViewModel.SessionUiState>,
 ) {
-    val viewModel: QueryEditorViewModel = remember { GlobalContext.get().get() }
-    val favoritesViewModel: FavoritesViewModel = remember { GlobalContext.get().get() }
+    val viewModel: QueryEditorViewModel = koinInject()
+    val favoritesViewModel: FavoritesViewModel = koinInject()
     val coroutineScope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
 

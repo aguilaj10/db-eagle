@@ -41,7 +41,7 @@ import java.util.Locale
 
 @Composable
 fun LogViewerScreen(modifier: Modifier = Modifier) {
-    val viewModel = remember { GlobalContext.get().get<LogViewerViewModel>() }
+    val viewModel = GlobalContext.get().get<LogViewerViewModel>()
     val uiState by viewModel.uiState.collectAsState()
     val filteredLogs = viewModel.filteredLogs
 

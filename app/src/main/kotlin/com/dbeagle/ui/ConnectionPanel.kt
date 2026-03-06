@@ -954,7 +954,7 @@ private fun InlineSchemaSection(
 
     if (currentDialogState.showIndexEditor && driver != null) {
         val dialect = getDialectForDriver(driver)
-        val allTables = schemaMetadata?.tables?.map { it.name } ?: emptyList()
+        val allTables = schemaMetadata?.tables?.map { "${it.schema}.${it.name}" } ?: emptyList()
 
         IndexEditorDialog(
             dialect = dialect,

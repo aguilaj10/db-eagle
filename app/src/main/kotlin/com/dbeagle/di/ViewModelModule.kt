@@ -5,6 +5,7 @@ import com.dbeagle.theme.ThemeManager
 import com.dbeagle.viewmodel.ConnectionListViewModel
 import com.dbeagle.viewmodel.FavoritesViewModel
 import com.dbeagle.viewmodel.HistoryViewModel
+import com.dbeagle.viewmodel.IndexEditorViewModel
 import com.dbeagle.viewmodel.LogViewerViewModel
 import com.dbeagle.viewmodel.QueryEditorViewModel
 import com.dbeagle.viewmodel.SchemaBrowserViewModel
@@ -27,4 +28,5 @@ val viewModelModule =
         factory { SchemaBrowserViewModel() }
         factory { LogViewerViewModel() }
         factory { TableDataEditorViewModel() }
+        factory { IndexEditorViewModel() }
     }

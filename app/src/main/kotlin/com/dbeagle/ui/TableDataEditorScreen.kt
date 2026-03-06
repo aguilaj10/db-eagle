@@ -36,7 +36,7 @@ import compose.icons.fontawesomeicons.solid.Save
 import compose.icons.fontawesomeicons.solid.Sync
 import compose.icons.fontawesomeicons.solid.Trash
 import kotlinx.coroutines.launch
-import org.koin.core.context.GlobalContext
+import org.koin.compose.koinInject
 
 @Composable
 fun TableDataEditorScreen(
@@ -47,7 +47,7 @@ fun TableDataEditorScreen(
     onCloseRequested: () -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
-    val viewModel: TableDataEditorViewModel = remember { GlobalContext.get().get() }
+    val viewModel: TableDataEditorViewModel = koinInject()
     val driver = sessionViewModel.getDriver(connectionId)
     val uiState by viewModel.uiState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
