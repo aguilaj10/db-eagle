@@ -63,7 +63,6 @@ class SessionViewModelTest {
         vm.openSession(profileId = "p2", profileName = "Two", driver = d2)
         vm.openSession(profileId = "p3", profileName = "Three", driver = d3)
 
-        assertEquals(listOf("p1", "p2", "p3"), vm.sessionOrder.value)
         assertEquals(setOf("p1", "p2", "p3"), vm.connectedProfileIds.value)
         assertEquals("p1", vm.activeProfileId.value)
 
@@ -129,7 +128,6 @@ class SessionViewModelTest {
 
         assertEquals(1, d2.disconnectedCount)
         assertEquals(listOf("p2"), closedPools)
-        assertEquals(listOf("p1", "p3"), vm.sessionOrder.value)
         assertEquals("p1", vm.activeProfileId.value)
     }
 }

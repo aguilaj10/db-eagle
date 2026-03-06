@@ -42,7 +42,6 @@ class SessionViewModel(
     private val drivers = LinkedHashMap<String, DatabaseDriver>()
 
     private val _sessionOrder = MutableStateFlow<List<String>>(emptyList())
-    val sessionOrder: StateFlow<List<String>> = _sessionOrder.asStateFlow()
 
     private val _sessionStates = MutableStateFlow<Map<String, SessionUiState>>(emptyMap())
     val sessionStates: StateFlow<Map<String, SessionUiState>> = _sessionStates.asStateFlow()
@@ -57,8 +56,6 @@ class SessionViewModel(
     val activeProfileId: StateFlow<String?> = _activeProfileId.asStateFlow()
 
     fun getDriver(profileId: String): DatabaseDriver? = drivers[profileId]
-
-    fun getActiveDriver(): DatabaseDriver? = _activeProfileId.value?.let(drivers::get)
 
     fun setConnecting(profileId: String?) {
         _connectingProfileId.value = profileId
@@ -78,10 +75,10 @@ class SessionViewModel(
                 profileId = profileId,
                 profileName = profileName,
             )
-        _sessionStates.value = _sessionStates.value + (profileId to next)
+        _sessionStates.value += (profileId to next)
 
         if (!_sessionOrder.value.contains(profileId)) {
-            _sessionOrder.value = _sessionOrder.value + profileId
+            _sessionOrder.value += profileId
         }
         _connectedProfileIds.value = drivers.keys.toSet()
 
@@ -114,7 +111,7 @@ class SessionViewModel(
         } catch (_: Exception) {
         }
 
-        _sessionStates.value = _sessionStates.value - profileId
+        _sessionStates.value -= profileId
         _sessionOrder.value = _sessionOrder.value.filterNot { it == profileId }
         _connectedProfileIds.value = drivers.keys.toSet()
 
@@ -176,7 +173,7 @@ class SessionViewModel(
         transform: (SessionUiState) -> SessionUiState,
     ) {
         val current = _sessionStates.value[profileId] ?: return
-        _sessionStates.value = _sessionStates.value + (profileId to transform(current))
+        _sessionStates.value += (profileId to transform(current))
     }
 
     private fun truncateCell(value: String): String = if (value.length > 500) value.substring(0, 500) else value
