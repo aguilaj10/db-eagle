@@ -25,7 +25,6 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -105,7 +104,7 @@ fun TableEditorDialog(
     DialogWindow(
         onCloseRequest = onDismiss,
         state = rememberDialogState(size = DpSize(900.dp, 700.dp)),
-        title = if (isEditMode) "Edit Table: ${existingTable?.name}" else "Create Table",
+        title = if (isEditMode) "Edit Table: ${existingTable.name}" else "Create Table",
         resizable = true,
     ) {
         window.minimumSize = Dimension(600, 400)
@@ -710,7 +709,7 @@ private fun ForeignKeyRow(
                 modifier = Modifier.weight(1f),
             ) {
                 OutlinedTextField(
-                    value = if (onDeleteAction.isEmpty()) "None" else onDeleteAction,
+                    value = onDeleteAction.ifEmpty { "None" },
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("ON DELETE") },
@@ -723,7 +722,7 @@ private fun ForeignKeyRow(
                 ) {
                     referentialActions.forEach { action ->
                         DropdownMenuItem(
-                            text = { Text(if (action.isEmpty()) "None" else action) },
+                            text = { Text(action.ifEmpty { "None" }) },
                             onClick = {
                                 onDeleteAction = action
                                 onDeleteExpanded = false
@@ -740,7 +739,7 @@ private fun ForeignKeyRow(
                 modifier = Modifier.weight(1f),
             ) {
                 OutlinedTextField(
-                    value = if (onUpdateAction.isEmpty()) "None" else onUpdateAction,
+                    value = onUpdateAction.ifEmpty { "None" },
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("ON UPDATE") },
@@ -753,7 +752,7 @@ private fun ForeignKeyRow(
                 ) {
                     referentialActions.forEach { action ->
                         DropdownMenuItem(
-                            text = { Text(if (action.isEmpty()) "None" else action) },
+                            text = { Text(action.ifEmpty { "None" }) },
                             onClick = {
                                 onUpdateAction = action
                                 onUpdateExpanded = false
