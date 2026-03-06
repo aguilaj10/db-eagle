@@ -143,15 +143,13 @@ class PostgreSQLDriverTest {
         val usersIdSeq = sequences.find { it.name == "users_id_seq" }
         assertTrue(usersIdSeq != null, "Expected users_id_seq sequence from SERIAL column")
 
-        if (usersIdSeq != null) {
-            assertEquals("public", usersIdSeq.schema)
-            assertEquals(1L, usersIdSeq.startValue)
-            assertEquals(1L, usersIdSeq.increment)
-            assertTrue(usersIdSeq.minValue > 0)
-            assertTrue(usersIdSeq.maxValue > usersIdSeq.minValue)
-            assertEquals("users", usersIdSeq.ownedByTable)
-            assertEquals("id", usersIdSeq.ownedByColumn)
-        }
+        assertEquals("public", usersIdSeq.schema)
+        assertEquals(1L, usersIdSeq.startValue)
+        assertEquals(1L, usersIdSeq.increment)
+        assertTrue(usersIdSeq.minValue > 0)
+        assertTrue(usersIdSeq.maxValue > usersIdSeq.minValue)
+        assertEquals("users", usersIdSeq.ownedByTable)
+        assertEquals("id", usersIdSeq.ownedByColumn)
 
         driver.disconnect()
     }
@@ -171,11 +169,9 @@ class PostgreSQLDriverTest {
         val pkIndex = usersIndexes.find { it.name == "users_pkey" }
         assertTrue(pkIndex != null, "Expected users_pkey index")
 
-        if (pkIndex != null) {
-            assertEquals("users", pkIndex.tableName)
-            assertEquals(listOf("id"), pkIndex.columns)
-            assertTrue(pkIndex.unique, "Primary key index should be unique")
-        }
+        assertEquals("users", pkIndex.tableName)
+        assertEquals(listOf("id"), pkIndex.columns)
+        assertTrue(pkIndex.unique, "Primary key index should be unique")
 
         // Test indexes for orders table
         val ordersIndexes = driver.getIndexDetails("orders")
@@ -184,11 +180,9 @@ class PostgreSQLDriverTest {
         val ordersPkIndex = ordersIndexes.find { it.name == "orders_pkey" }
         assertTrue(ordersPkIndex != null, "Expected orders_pkey index")
 
-        if (ordersPkIndex != null) {
-            assertEquals("orders", ordersPkIndex.tableName)
-            assertEquals(listOf("id"), ordersPkIndex.columns)
-            assertTrue(ordersPkIndex.unique, "Primary key index should be unique")
-        }
+        assertEquals("orders", ordersPkIndex.tableName)
+        assertEquals(listOf("id"), ordersPkIndex.columns)
+        assertTrue(ordersPkIndex.unique, "Primary key index should be unique")
 
         driver.disconnect()
     }
@@ -205,18 +199,14 @@ class PostgreSQLDriverTest {
         val usersTable = schema.tables.find { it.name == "users" }
         assertTrue(usersTable != null, "Expected users table in schema")
 
-        if (usersTable != null) {
-            assertTrue(usersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
-            assertEquals(listOf("id"), usersTable.primaryKey)
-        }
+        assertTrue(usersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+        assertEquals(listOf("id"), usersTable.primaryKey)
 
         val ordersTable = schema.tables.find { it.name == "orders" }
         assertTrue(ordersTable != null, "Expected orders table in schema")
 
-        if (ordersTable != null) {
-            assertTrue(ordersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
-            assertEquals(listOf("id"), ordersTable.primaryKey)
-        }
+        assertTrue(ordersTable.primaryKey.isNotEmpty(), "Expected primary key to be populated")
+        assertEquals(listOf("id"), ordersTable.primaryKey)
 
         driver.disconnect()
     }
@@ -236,13 +226,11 @@ class PostgreSQLDriverTest {
         val usersIdSeq = schema.sequences.find { it.name == "users_id_seq" }
         assertTrue(usersIdSeq != null, "Expected users_id_seq in schema.sequences")
 
-        if (usersIdSeq != null) {
-            assertEquals("public", usersIdSeq.schema)
-            assertEquals(1L, usersIdSeq.startValue)
-            assertEquals(1L, usersIdSeq.increment)
-            assertEquals("users", usersIdSeq.ownedByTable)
-            assertEquals("id", usersIdSeq.ownedByColumn)
-        }
+        assertEquals("public", usersIdSeq.schema)
+        assertEquals(1L, usersIdSeq.startValue)
+        assertEquals(1L, usersIdSeq.increment)
+        assertEquals("users", usersIdSeq.ownedByTable)
+        assertEquals("id", usersIdSeq.ownedByColumn)
 
         val ordersIdSeq = schema.sequences.find { it.name == "orders_id_seq" }
         assertTrue(ordersIdSeq != null, "Expected orders_id_seq in schema.sequences")
