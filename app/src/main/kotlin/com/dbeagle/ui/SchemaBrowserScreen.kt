@@ -31,7 +31,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import com.dbeagle.ddl.ConstraintDefinition
 import com.dbeagle.ddl.DDLDialect
@@ -61,6 +69,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.context.GlobalContext
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SchemaBrowserScreen(
     sessionViewModel: SessionViewModel,
@@ -347,134 +356,174 @@ fun SchemaBrowserScreen(
                 CircularProgressIndicator()
             }
         } else {
-            SchemaTree(
-                nodes = schemaNodes,
-                modifier = Modifier.fillMaxSize(),
-                onNodeExpansionChanged = { node, expanded ->
-                    if (!expanded) return@SchemaTree
-                    if (node !is SchemaTreeNode.Table) return@SchemaTree
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown &&
+                            keyEvent.isCtrlPressed &&
+                            keyEvent.isShiftPressed
+                        ) {
+                            when (keyEvent.key) {
+                                Key.T -> {
+                                    schemaBrowserViewModel.showTableEditor()
+                                    true
+                                }
+                                Key.S -> {
+                                    schemaBrowserViewModel.showSequenceEditor()
+                                    true
+                                }
+                                Key.V -> {
+                                    schemaBrowserViewModel.showViewEditor()
+                                    true
+                                }
+                                Key.I -> {
+                                    schemaBrowserViewModel.showIndexEditor()
+                                    true
+                                }
+                                else -> false
+                            }
+                        } else {
+                            false
+                        }
+                    },
+            ) {
+                SchemaToolbar(
+                    onNewTable = { schemaBrowserViewModel.showTableEditor() },
+                    onNewSequence = { schemaBrowserViewModel.showSequenceEditor() },
+                    onNewView = { schemaBrowserViewModel.showViewEditor() },
+                    onNewIndex = { schemaBrowserViewModel.showIndexEditor() },
+                )
 
-                    val activePid = activeProfileId ?: return@SchemaTree
+                SchemaTree(
+                    nodes = schemaNodes,
+                    modifier = Modifier.fillMaxSize(),
+                    onNodeExpansionChanged = { node, expanded ->
+                        if (!expanded) return@SchemaTree
+                        if (node !is SchemaTreeNode.Table) return@SchemaTree
 
-                    val tableKey = node.id.removePrefix("table:")
-                    val tableName = node.label
-                    val cached = columnsCache[tableKey]
-                    if (cached != null && !isExpired(cached.loadedAtMs)) {
-                        updateTableChildren(tableKey, cached.columns)
-                        return@SchemaTree
-                    }
+                        val activePid = activeProfileId ?: return@SchemaTree
 
-                    coroutineScope.launch {
-                        val name = activeProfileName ?: "Connection"
-                        onStatusTextChanged("Status: Loading columns ($name: $tableName)")
-                        try {
-                            val fkMap = schemaMetadata?.foreignKeys
-                                ?.filter { it.fromTable == tableName }
-                                ?.associateBy { it.fromColumn }
-                                ?: emptyMap()
+                        val tableKey = node.id.removePrefix("table:")
+                        val tableName = node.label
+                        val cached = columnsCache[tableKey]
+                        if (cached != null && !isExpired(cached.loadedAtMs)) {
+                            updateTableChildren(tableKey, cached.columns)
+                            return@SchemaTree
+                        }
 
-                            val queryExecutor = QueryExecutor(activeDriver)
-                            val cols = withContext(Dispatchers.IO) { queryExecutor.getColumns(tableName) }
-                                .sortedBy { it.name }
-                                .map { c ->
-                                    val fk = fkMap[c.name]
-                                    val fkTarget = fk?.let { "${it.toTable}.${it.toColumn}" }
-                                    SchemaTreeNode.Column(
-                                        id = "col:$tableKey.${c.name}",
-                                        label = c.name,
-                                        type = c.type,
-                                        foreignKeyTarget = fkTarget,
+                        coroutineScope.launch {
+                            val name = activeProfileName ?: "Connection"
+                            onStatusTextChanged("Status: Loading columns ($name: $tableName)")
+                            try {
+                                val fkMap = schemaMetadata?.foreignKeys
+                                    ?.filter { it.fromTable == tableName }
+                                    ?.associateBy { it.fromColumn }
+                                    ?: emptyMap()
+
+                                val queryExecutor = QueryExecutor(activeDriver)
+                                val cols = withContext(Dispatchers.IO) { queryExecutor.getColumns(tableName) }
+                                    .sortedBy { it.name }
+                                    .map { c ->
+                                        val fk = fkMap[c.name]
+                                        val fkTarget = fk?.let { "${it.toTable}.${it.toColumn}" }
+                                        SchemaTreeNode.Column(
+                                            id = "col:$tableKey.${c.name}",
+                                            label = c.name,
+                                            type = c.type,
+                                            foreignKeyTarget = fkTarget,
+                                        )
+                                    }
+                                val now = System.currentTimeMillis()
+                                sessionViewModel.updateSchemaState(activePid) { s ->
+                                    s.copy(
+                                        columnsCache = s.columnsCache + (tableKey to SessionViewModel.ColumnCacheEntry(now, cols)),
                                     )
                                 }
-                            val now = System.currentTimeMillis()
-                            sessionViewModel.updateSchemaState(activePid) { s ->
-                                s.copy(
-                                    columnsCache = s.columnsCache + (tableKey to SessionViewModel.ColumnCacheEntry(now, cols)),
+                                updateTableChildren(tableKey, cols)
+                                onStatusTextChanged("Status: Columns loaded ($name: $tableName)")
+                            } catch (_: CancellationException) {
+                                onStatusTextChanged("Status: Query canceled")
+                            } catch (e: Exception) {
+                                onStatusTextChanged("Status: Failed to load columns: ${e.message ?: "Error"}")
+                                sessionViewModel.updateSchemaState(activePid) {
+                                    it.copy(dialogError = e.message ?: "Failed to load columns")
+                                }
+                            }
+                        }
+                    },
+                    onCopyName = { name -> println("App: Copy Name -> $name") },
+                    onViewData = { name -> println("App: View Data -> $name") },
+                    onNewTable = {
+                        schemaBrowserViewModel.showTableEditor()
+                    },
+                    onEditTable = { tableName ->
+                        schemaBrowserViewModel.showTableEditor(tableName)
+                    },
+                    onDropTable = { tableName ->
+                        coroutineScope.launch {
+                            val ddlResult = SchemaEditorViewModel.dropTableDDL(activeDriver, tableName, cascade = true)
+                            ddlResult.onSuccess { ddl ->
+                                schemaBrowserViewModel.showDDLPreview(
+                                    ddl = ddl,
+                                    isDestructive = true,
+                                    execution = { SchemaEditorViewModel.executeTableDrop(activeDriver, ddl) },
                                 )
-                            }
-                            updateTableChildren(tableKey, cols)
-                            onStatusTextChanged("Status: Columns loaded ($name: $tableName)")
-                        } catch (_: CancellationException) {
-                            onStatusTextChanged("Status: Query canceled")
-                        } catch (e: Exception) {
-                            onStatusTextChanged("Status: Failed to load columns: ${e.message ?: "Error"}")
-                            sessionViewModel.updateSchemaState(activePid) {
-                                it.copy(dialogError = e.message ?: "Failed to load columns")
+                            }.onFailure { error ->
+                                schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
                             }
                         }
-                    }
-                },
-                onCopyName = { name -> println("App: Copy Name -> $name") },
-                onViewData = { name -> println("App: View Data -> $name") },
-                onNewTable = {
-                    schemaBrowserViewModel.showTableEditor()
-                },
-                onEditTable = { tableName ->
-                    schemaBrowserViewModel.showTableEditor(tableName)
-                },
-                onDropTable = { tableName ->
-                    coroutineScope.launch {
-                        val ddlResult = SchemaEditorViewModel.dropTableDDL(activeDriver, tableName, cascade = true)
-                        ddlResult.onSuccess { ddl ->
+                    },
+                    onNewSequence = {
+                        schemaBrowserViewModel.showSequenceEditor()
+                    },
+                    onEditSequence = { sequenceName ->
+                        schemaBrowserViewModel.showSequenceEditor(sequenceName)
+                    },
+                    onDropSequence = { sequenceName ->
+                        coroutineScope.launch {
+                            val ddlResult = SchemaEditorViewModel.dropSequenceDDL(activeDriver, sequenceName, ifExists = true)
+                            ddlResult.onSuccess { ddl ->
+                                schemaBrowserViewModel.showDDLPreview(
+                                    ddl = ddl,
+                                    isDestructive = true,
+                                    execution = { SchemaEditorViewModel.executeSequenceDrop(activeDriver, ddl) },
+                                )
+                            }.onFailure { error ->
+                                schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
+                            }
+                        }
+                    },
+                    onNewView = {
+                        schemaBrowserViewModel.showViewEditor()
+                    },
+                    onDropView = { viewName ->
+                        coroutineScope.launch {
+                            val dialect = getDialectForDriver(activeDriver)
+                            val ddl = ViewDDLBuilder.buildDropView(dialect, viewName, ifExists = true)
                             schemaBrowserViewModel.showDDLPreview(
                                 ddl = ddl,
                                 isDestructive = true,
-                                execution = { SchemaEditorViewModel.executeTableDrop(activeDriver, ddl) },
+                                execution = { executeDDL(activeDriver, ddl) },
                             )
-                        }.onFailure { error ->
-                            schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
                         }
-                    }
-                },
-                onNewSequence = {
-                    schemaBrowserViewModel.showSequenceEditor()
-                },
-                onEditSequence = { sequenceName ->
-                    schemaBrowserViewModel.showSequenceEditor(sequenceName)
-                },
-                onDropSequence = { sequenceName ->
-                    coroutineScope.launch {
-                        val ddlResult = SchemaEditorViewModel.dropSequenceDDL(activeDriver, sequenceName, ifExists = true)
-                        ddlResult.onSuccess { ddl ->
+                    },
+                    onNewIndex = {
+                        schemaBrowserViewModel.showIndexEditor()
+                    },
+                    onDropIndex = { indexName ->
+                        coroutineScope.launch {
+                            val dialect = getDialectForDriver(activeDriver)
+                            val ddl = IndexDDLBuilder.buildDropIndex(dialect, indexName, ifExists = true)
                             schemaBrowserViewModel.showDDLPreview(
                                 ddl = ddl,
                                 isDestructive = true,
-                                execution = { SchemaEditorViewModel.executeSequenceDrop(activeDriver, ddl) },
+                                execution = { executeDDL(activeDriver, ddl) },
                             )
-                        }.onFailure { error ->
-                            schemaBrowserViewModel.showError(error.message ?: "Failed to generate DROP DDL")
                         }
-                    }
-                },
-                onNewView = {
-                    schemaBrowserViewModel.showViewEditor()
-                },
-                onDropView = { viewName ->
-                    coroutineScope.launch {
-                        val dialect = getDialectForDriver(activeDriver)
-                        val ddl = ViewDDLBuilder.buildDropView(dialect, viewName, ifExists = true)
-                        schemaBrowserViewModel.showDDLPreview(
-                            ddl = ddl,
-                            isDestructive = true,
-                            execution = { executeDDL(activeDriver, ddl) },
-                        )
-                    }
-                },
-                onNewIndex = {
-                    schemaBrowserViewModel.showIndexEditor()
-                },
-                onDropIndex = { indexName ->
-                    coroutineScope.launch {
-                        val dialect = getDialectForDriver(activeDriver)
-                        val ddl = IndexDDLBuilder.buildDropIndex(dialect, indexName, ifExists = true)
-                        schemaBrowserViewModel.showDDLPreview(
-                            ddl = ddl,
-                            isDestructive = true,
-                            execution = { executeDDL(activeDriver, ddl) },
-                        )
-                    }
-                },
-            )
+                    },
+                )
+            }
         }
 
         if (browserUiState.dialog.showTableEditor) {
