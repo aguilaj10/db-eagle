@@ -829,7 +829,7 @@ private fun InlineSchemaSection(
                                 addedIndexes = addedIndexes,
                                 droppedIndexes = droppedIndexes,
                             )
-                            SchemaEditorViewModel.alterTableDDL(driver, currentDialogState.editingTable!!, changes)
+                            SchemaEditorViewModel.alterTableDDL(driver, currentDialogState.editingTable, changes)
                         }
 
                         ddlResult.onSuccess { ddl ->
@@ -892,7 +892,7 @@ private fun InlineSchemaSection(
                                 maxValue = if (seqMetadata.maxValue != oldSeq.maxValue) seqMetadata.maxValue else null,
                                 restart = null,
                             )
-                            SchemaEditorViewModel.alterSequenceDDL(driver, currentDialogState.editingSequence!!, changes)
+                            SchemaEditorViewModel.alterSequenceDDL(driver, currentDialogState.editingSequence, changes)
                         }
 
                         ddlResult.onSuccess { ddl ->
@@ -967,16 +967,6 @@ private fun InlineSchemaSection(
             },
             onDismiss = {
                 updateDialogState { copy(showIndexEditor = false) }
-            },
-            onPreview = { ddl ->
-                updateDialogState {
-                    copy(
-                        showDDLPreview = true,
-                        ddlSql = ddl,
-                        isDestructive = false,
-                        pendingExecution = { Result.success(Unit) },
-                    )
-                }
             },
             onCreate = { ddl ->
                 executeDDL(driver, ddl).also {

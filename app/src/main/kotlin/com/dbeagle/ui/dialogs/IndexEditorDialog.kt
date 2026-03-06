@@ -46,7 +46,6 @@ fun IndexEditorDialog(
     tables: List<String>,
     getColumnsForTable: suspend (tableName: String) -> List<String>,
     onDismiss: () -> Unit,
-    onPreview: (ddl: String) -> Unit,
     onCreate: suspend (ddl: String) -> Result<Unit>,
 ) {
     val scope = rememberCoroutineScope()
