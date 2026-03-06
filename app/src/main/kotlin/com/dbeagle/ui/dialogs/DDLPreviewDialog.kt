@@ -22,10 +22,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 
 @Composable
 fun DDLPreviewDialog(
@@ -34,8 +34,6 @@ fun DDLPreviewDialog(
     onDismiss: () -> Unit,
     onExecute: () -> Unit,
 ) {
-    val clipboardManager = LocalClipboardManager.current
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (isDestructive) "Confirm DDL Execution" else "Review DDL") },
@@ -86,7 +84,9 @@ fun DDLPreviewDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(
                     onClick = {
-                        clipboardManager.setText(AnnotatedString(ddlSql))
+                        val clipboard = Toolkit.getDefaultToolkit().systemClipboard
+                        val selection = StringSelection(ddlSql)
+                        clipboard.setContents(selection, selection)
                     },
                 ) {
                     Text("Copy")

@@ -21,8 +21,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -467,7 +467,7 @@ fun main() {
                                     if (idx >= 0) idx else 0
                                 }
 
-                                ScrollableTabRow(
+                                PrimaryScrollableTabRow(
                                     selectedTabIndex = selectedConnectionTabIndex,
                                     edgePadding = 8.dp,
                                 ) {
@@ -482,31 +482,34 @@ fun main() {
                                 }
                             }
 
-                            val selectedNavTabIndex = tabManager.selectedTabId?.let { id ->
-                                tabManager.tabs.indexOfFirst { it.id == id }
-                            }?.let { if (it >= 0) it else 0 } ?: 0
+                            // Only render tab row if tabs exist
+                            if (tabManager.tabs.isNotEmpty()) {
+                                val selectedNavTabIndex = tabManager.selectedTabId?.let { id ->
+                                    tabManager.tabs.indexOfFirst { it.id == id }
+                                }?.let { if (it >= 0) it else 0 } ?: 0
 
-                            ScrollableTabRow(
-                                selectedTabIndex = selectedNavTabIndex,
-                                edgePadding = 8.dp,
-                            ) {
-                                tabManager.tabs.forEach { tab ->
-                                    Tab(
-                                        selected = tabManager.selectedTabId == tab.id,
-                                        onClick = { tabManager.selectTab(tab.id) },
-                                        text = {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(tab.title)
-                                                Spacer(Modifier.width(8.dp))
-                                                IconButton(
-                                                    onClick = { tabManager.closeTab(tab.id) },
-                                                    modifier = Modifier.size(28.dp),
-                                                ) {
-                                                    Icon(Icons.Default.Close, contentDescription = "Close tab")
+                                PrimaryScrollableTabRow(
+                                    selectedTabIndex = selectedNavTabIndex,
+                                    edgePadding = 8.dp,
+                                ) {
+                                    tabManager.tabs.forEach { tab ->
+                                        Tab(
+                                            selected = tabManager.selectedTabId == tab.id,
+                                            onClick = { tabManager.selectTab(tab.id) },
+                                            text = {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(tab.title)
+                                                    Spacer(Modifier.width(8.dp))
+                                                    IconButton(
+                                                        onClick = { tabManager.closeTab(tab.id) },
+                                                        modifier = Modifier.size(28.dp),
+                                                    ) {
+                                                        Icon(Icons.Default.Close, contentDescription = "Close tab")
+                                                    }
                                                 }
-                                            }
-                                        },
-                                    )
+                                            },
+                                        )
+                                    }
                                 }
                             }
 
