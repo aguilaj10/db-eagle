@@ -31,13 +31,11 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
@@ -46,11 +44,12 @@ import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
 import com.dbeagle.ddl.ColumnDefinition
 import com.dbeagle.ddl.ColumnType
-import com.dbeagle.ddl.DDLValidator
 import com.dbeagle.ddl.ForeignKeyDefinition
 import com.dbeagle.ddl.IndexDefinition
 import com.dbeagle.ddl.TableDefinition
-import com.dbeagle.ddl.ValidationResult
+import com.dbeagle.viewmodel.TableEditorViewModel
+import org.koin.compose.koinInject
+import org.koin.core.parameter.parametersOf
 import java.awt.Dimension
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -63,48 +62,15 @@ fun TableEditorDialog(
     onSave: (TableDefinition, List<IndexDefinition>) -> Unit,
     databaseType: String? = null,
 ) {
-    var tableName by remember { mutableStateOf(existingTable?.name ?: "") }
-    val columns = remember {
-        mutableStateListOf<ColumnDefinition>().apply {
-            if (existingTable != null) {
-                addAll(existingTable.columns)
-            }
-        }
+    val viewModel: TableEditorViewModel = koinInject {
+        parametersOf(existingTable, existingIndexes, allTables, databaseType)
     }
-    val primaryKeyColumns = remember {
-        mutableStateListOf<String>().apply {
-            existingTable?.primaryKey?.let { addAll(it) }
-        }
-    }
-    val foreignKeys = remember {
-        mutableStateListOf<ForeignKeyDefinition>().apply {
-            if (existingTable != null) {
-                addAll(existingTable.foreignKeys)
-            }
-        }
-    }
-    val uniqueConstraints = remember {
-        mutableStateListOf<List<String>>().apply {
-            if (existingTable != null) {
-                addAll(existingTable.uniqueConstraints)
-            }
-        }
-    }
-    val indexes = remember {
-        mutableStateListOf<IndexDefinition>().apply {
-            addAll(existingIndexes)
-        }
-    }
-
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var validationError by remember { mutableStateOf<String?>(null) }
-
-    val isEditMode = existingTable != null
+    val uiState by viewModel.uiState.collectAsState()
 
     DialogWindow(
         onCloseRequest = onDismiss,
         state = rememberDialogState(size = DpSize(900.dp, 700.dp)),
-        title = if (isEditMode) "Edit Table: ${existingTable.name}" else "Create Table",
+        title = if (uiState.isEditMode) "Edit Table: ${uiState.originalTableName}" else "Create Table",
         resizable = true,
     ) {
         window.minimumSize = Dimension(600, 400)
@@ -115,46 +81,60 @@ fun TableEditorDialog(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            PrimaryTabRow(selectedTabIndex = selectedTab) {
+            PrimaryTabRow(selectedTabIndex = uiState.selectedTab) {
                 Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    selected = uiState.selectedTab == 0,
+                    onClick = { viewModel.selectTab(0) },
                     text = { Text("Columns") },
                 )
                 Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
+                    selected = uiState.selectedTab == 1,
+                    onClick = { viewModel.selectTab(1) },
                     text = { Text("Constraints") },
                 )
                 Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
+                    selected = uiState.selectedTab == 2,
+                    onClick = { viewModel.selectTab(2) },
                     text = { Text("Indexes") },
                 )
             }
 
-            when (selectedTab) {
+            when (uiState.selectedTab) {
                 0 -> ColumnsTab(
-                    tableName = tableName,
-                    onTableNameChange = { tableName = it },
-                    isEditMode = isEditMode,
-                    columns = columns,
-                    validationError = validationError,
-                    databaseType = databaseType,
+                    tableName = uiState.tableName,
+                    onTableNameChange = { viewModel.updateTableName(it) },
+                    isEditMode = uiState.isEditMode,
+                    columns = uiState.columns,
+                    availableColumnTypes = uiState.availableColumnTypes,
+                    validationError = uiState.validationError,
+                    onAddColumn = { viewModel.addColumn() },
+                    onUpdateColumn = { index, column -> viewModel.updateColumn(index, column) },
+                    onDeleteColumn = { index -> viewModel.removeColumn(index) },
                     modifier = Modifier.weight(1f),
                 )
                 1 -> ConstraintsTab(
-                    columns = columns,
-                    allTables = allTables,
-                    primaryKeyColumns = primaryKeyColumns,
-                    foreignKeys = foreignKeys,
-                    uniqueConstraints = uniqueConstraints,
+                    columns = uiState.columns,
+                    allTables = uiState.allTables,
+                    primaryKeyColumns = uiState.primaryKeyColumns,
+                    foreignKeys = uiState.foreignKeys,
+                    uniqueConstraints = uiState.uniqueConstraints,
+                    onTogglePrimaryKey = { columnName -> viewModel.togglePrimaryKeyColumn(columnName) },
+                    onAddForeignKey = { viewModel.addForeignKey() },
+                    onUpdateForeignKey = { index, fk -> viewModel.updateForeignKey(index, fk) },
+                    onDeleteForeignKey = { index -> viewModel.removeForeignKey(index) },
+                    onAddUniqueConstraint = { viewModel.addUniqueConstraint() },
+                    onUpdateUniqueConstraint = { index, columns -> viewModel.updateUniqueConstraintColumns(index, columns) },
+                    onDeleteUniqueConstraint = { index -> viewModel.removeUniqueConstraint(index) },
                     modifier = Modifier.weight(1f),
                 )
                 2 -> IndexesTab(
-                    tableName = tableName,
-                    columns = columns,
-                    indexes = indexes,
+                    tableName = uiState.tableName,
+                    columns = uiState.columns,
+                    indexes = uiState.indexes,
+                    onAddIndex = { viewModel.addIndex() },
+                    onUpdateIndex = { index, indexDef -> viewModel.updateIndex(index, indexDef) },
+                    onDeleteIndex = { index -> viewModel.removeIndex(index) },
+                    onGenerateIndexName = { index -> viewModel.generateIndexName(index) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -169,22 +149,8 @@ fun TableEditorDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = {
-                        val tableDefinition = TableDefinition(
-                            name = tableName,
-                            columns = columns.toList(),
-                            primaryKey = primaryKeyColumns.takeIf { it.isNotEmpty() },
-                            foreignKeys = foreignKeys.toList(),
-                            uniqueConstraints = uniqueConstraints.toList(),
-                        )
-
-                        when (val result = DDLValidator.validateTableDefinition(tableDefinition)) {
-                            is ValidationResult.Invalid -> {
-                                validationError = result.errors.joinToString("\n")
-                            }
-                            ValidationResult.Valid -> {
-                                validationError = null
-                                onSave(tableDefinition, indexes.toList())
-                            }
+                        viewModel.validateAndSave { tableDef, indexes ->
+                            onSave(tableDef, indexes)
                         }
                     },
                 ) {
@@ -200,9 +166,12 @@ private fun ColumnsTab(
     tableName: String,
     onTableNameChange: (String) -> Unit,
     isEditMode: Boolean,
-    columns: SnapshotStateList<ColumnDefinition>,
+    columns: List<ColumnDefinition>,
+    availableColumnTypes: List<ColumnType>,
     validationError: String?,
-    databaseType: String?,
+    onAddColumn: () -> Unit,
+    onUpdateColumn: (Int, ColumnDefinition) -> Unit,
+    onDeleteColumn: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -236,31 +205,22 @@ private fun ColumnsTab(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            itemsIndexed(columns) { index, column ->
+            itemsIndexed(columns, key = { index, _ -> index }) { index, column ->
                 ColumnRow(
                     column = column,
-                    databaseType = databaseType,
+                    availableTypes = availableColumnTypes,
                     onUpdate = { updatedColumn ->
-                        columns[index] = updatedColumn
+                        onUpdateColumn(index, updatedColumn)
                     },
                     onDelete = {
-                        columns.removeAt(index)
+                        onDeleteColumn(index)
                     },
                 )
             }
         }
 
         Button(
-            onClick = {
-                columns.add(
-                    ColumnDefinition(
-                        name = "",
-                        type = ColumnType.TEXT,
-                        nullable = true,
-                        defaultValue = null,
-                    ),
-                )
-            },
+            onClick = onAddColumn,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Add Column")
@@ -272,7 +232,7 @@ private fun ColumnsTab(
 @Composable
 private fun ColumnRow(
     column: ColumnDefinition,
-    databaseType: String?,
+    availableTypes: List<ColumnType>,
     onUpdate: (ColumnDefinition) -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -282,24 +242,6 @@ private fun ColumnRow(
     var defaultValue by remember { mutableStateOf(column.defaultValue ?: "") }
     var autoIncrement by remember { mutableStateOf(column.autoIncrement) }
     var typeExpanded by remember { mutableStateOf(false) }
-
-    // Filter types based on database
-    val availableTypes = if (databaseType == "PostgreSQL") {
-        ColumnType.entries
-    } else {
-        ColumnType.entries.filter {
-            it !in listOf(
-                ColumnType.SERIAL,
-                ColumnType.SMALLSERIAL,
-                ColumnType.BIGSERIAL,
-                ColumnType.UUID,
-                ColumnType.JSON,
-                ColumnType.JSONB,
-                ColumnType.SMALLINT,
-                ColumnType.DOUBLE_PRECISION,
-            )
-        }
-    }
 
     // Show autoIncrement only for integer types
     val showAutoIncrement = columnType in listOf(
@@ -416,11 +358,18 @@ private fun ColumnRow(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ConstraintsTab(
-    columns: SnapshotStateList<ColumnDefinition>,
+    columns: List<ColumnDefinition>,
     allTables: List<String>,
-    primaryKeyColumns: SnapshotStateList<String>,
-    foreignKeys: SnapshotStateList<ForeignKeyDefinition>,
-    uniqueConstraints: SnapshotStateList<List<String>>,
+    primaryKeyColumns: List<String>,
+    foreignKeys: List<ForeignKeyDefinition>,
+    uniqueConstraints: List<List<String>>,
+    onTogglePrimaryKey: (String) -> Unit,
+    onAddForeignKey: () -> Unit,
+    onUpdateForeignKey: (Int, ForeignKeyDefinition) -> Unit,
+    onDeleteForeignKey: (Int) -> Unit,
+    onAddUniqueConstraint: () -> Unit,
+    onUpdateUniqueConstraint: (Int, List<String>) -> Unit,
+    onDeleteUniqueConstraint: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -449,11 +398,7 @@ private fun ConstraintsTab(
                             FilterChip(
                                 selected = column.name in primaryKeyColumns,
                                 onClick = {
-                                    if (column.name in primaryKeyColumns) {
-                                        primaryKeyColumns.remove(column.name)
-                                    } else {
-                                        primaryKeyColumns.add(column.name)
-                                    }
+                                    onTogglePrimaryKey(column.name)
                                 },
                                 label = { Text(column.name) },
                             )
@@ -480,34 +425,23 @@ private fun ConstraintsTab(
             }
         }
 
-        itemsIndexed(foreignKeys) { index, fk ->
+        itemsIndexed(foreignKeys, key = { index, _ -> index }) { index, fk ->
             ForeignKeyRow(
                 fk = fk,
                 columns = columns,
                 allTables = allTables,
                 onUpdate = { updatedFk ->
-                    foreignKeys[index] = updatedFk
+                    onUpdateForeignKey(index, updatedFk)
                 },
                 onDelete = {
-                    foreignKeys.removeAt(index)
+                    onDeleteForeignKey(index)
                 },
             )
         }
 
         item {
             Button(
-                onClick = {
-                    foreignKeys.add(
-                        ForeignKeyDefinition(
-                            name = null,
-                            columns = emptyList(),
-                            refTable = "",
-                            refColumns = emptyList(),
-                            onDelete = null,
-                            onUpdate = null,
-                        ),
-                    )
-                },
+                onClick = onAddForeignKey,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
@@ -534,10 +468,10 @@ private fun ConstraintsTab(
                             columns = columns,
                             selectedColumns = constraint,
                             onUpdate = { updated ->
-                                uniqueConstraints[index] = updated
+                                onUpdateUniqueConstraint(index, updated)
                             },
                             onDelete = {
-                                uniqueConstraints.removeAt(index)
+                                onDeleteUniqueConstraint(index)
                             },
                         )
                     }
@@ -547,9 +481,7 @@ private fun ConstraintsTab(
 
         item {
             Button(
-                onClick = {
-                    uniqueConstraints.add(emptyList())
-                },
+                onClick = onAddUniqueConstraint,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
@@ -563,7 +495,7 @@ private fun ConstraintsTab(
 @Composable
 private fun ForeignKeyRow(
     fk: ForeignKeyDefinition,
-    columns: SnapshotStateList<ColumnDefinition>,
+    columns: List<ColumnDefinition>,
     allTables: List<String>,
     onUpdate: (ForeignKeyDefinition) -> Unit,
     onDelete: () -> Unit,
@@ -769,7 +701,7 @@ private fun ForeignKeyRow(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun UniqueConstraintRow(
-    columns: SnapshotStateList<ColumnDefinition>,
+    columns: List<ColumnDefinition>,
     selectedColumns: List<String>,
     onUpdate: (List<String>) -> Unit,
     onDelete: () -> Unit,
@@ -818,8 +750,12 @@ private fun UniqueConstraintRow(
 @Composable
 private fun IndexesTab(
     tableName: String,
-    columns: SnapshotStateList<ColumnDefinition>,
-    indexes: SnapshotStateList<IndexDefinition>,
+    columns: List<ColumnDefinition>,
+    indexes: List<IndexDefinition>,
+    onAddIndex: () -> Unit,
+    onUpdateIndex: (Int, IndexDefinition) -> Unit,
+    onDeleteIndex: (Int) -> Unit,
+    onGenerateIndexName: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -835,32 +771,26 @@ private fun IndexesTab(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            itemsIndexed(indexes) { index, indexDef ->
+            itemsIndexed(indexes, key = { index, _ -> index }) { index, indexDef ->
                 IndexRow(
                     tableName = tableName,
                     index = indexDef,
                     columns = columns,
                     onUpdate = { updatedIndex ->
-                        indexes[index] = updatedIndex
+                        onUpdateIndex(index, updatedIndex)
                     },
                     onDelete = {
-                        indexes.removeAt(index)
+                        onDeleteIndex(index)
+                    },
+                    onGenerateIndexName = {
+                        onGenerateIndexName(index)
                     },
                 )
             }
         }
 
         Button(
-            onClick = {
-                indexes.add(
-                    IndexDefinition(
-                        name = "",
-                        tableName = tableName,
-                        columns = emptyList(),
-                        unique = false,
-                    ),
-                )
-            },
+            onClick = onAddIndex,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(Icons.Default.Add, contentDescription = null)
@@ -877,6 +807,7 @@ private fun IndexRow(
     columns: List<ColumnDefinition>,
     onUpdate: (IndexDefinition) -> Unit,
     onDelete: () -> Unit,
+    onGenerateIndexName: () -> Unit,
 ) {
     var indexName by remember { mutableStateOf(index.name) }
     var unique by remember { mutableStateOf(index.unique) }
@@ -891,13 +822,6 @@ private fun IndexRow(
                 unique = unique,
             ),
         )
-    }
-
-    fun generateIndexName() {
-        if (selectedColumns.isNotEmpty()) {
-            indexName = "idx_${tableName}_${selectedColumns.joinToString("_")}"
-            notifyUpdate()
-        }
     }
 
     Column(
@@ -934,7 +858,7 @@ private fun IndexRow(
                 Text("Unique")
             }
 
-            IconButton(onClick = { generateIndexName() }) {
+            IconButton(onClick = onGenerateIndexName) {
                 Icon(Icons.Default.Add, contentDescription = "Generate index name")
             }
 
