@@ -74,6 +74,14 @@ fun IndexEditorDialog(
         }
     }
 
+    // Load columns when table selection changes
+    LaunchedEffect(selectedTable) {
+        if (selectedTable != null) {
+            viewModel.loadColumnsForTable(selectedTable!!, getColumnsForTable)
+            selectedColumns.clear()
+        }
+    }
+
     val nameValidation = if (indexName.isNotBlank()) {
         DDLValidator.validateIdentifier(indexName)
     } else {
@@ -182,8 +190,6 @@ fun IndexEditorDialog(
                                 text = { Text(table) },
                                 onClick = {
                                     selectedTable = table
-                                    selectedColumns.clear()
-                                    viewModel.loadColumnsForTable(table, getColumnsForTable)
                                     isTableDropdownExpanded = false
                                 },
                             )
