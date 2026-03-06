@@ -9,6 +9,7 @@ import com.dbeagle.viewmodel.LogViewerViewModel
 import com.dbeagle.viewmodel.QueryEditorViewModel
 import com.dbeagle.viewmodel.SchemaBrowserViewModel
 import com.dbeagle.viewmodel.SettingsViewModel
+import com.dbeagle.viewmodel.TableDataEditorViewModel
 import org.koin.core.parameter.parametersOf
 import org.koin.dsl.module
 
@@ -25,4 +26,5 @@ val viewModelModule =
         factory { FavoritesViewModel(get()) }
         factory { SchemaBrowserViewModel() }
         factory { LogViewerViewModel() }
+        factory { TableDataEditorViewModel() }
     }

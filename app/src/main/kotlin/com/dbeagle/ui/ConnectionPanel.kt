@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -34,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -46,11 +48,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.dbeagle.ddl.ConstraintDefinition
+import com.dbeagle.ddl.DDLDialect
+import com.dbeagle.ddl.IndexDDLBuilder
+import com.dbeagle.ddl.PostgreSQLDDLDialect
+import com.dbeagle.ddl.SQLiteDDLDialect
+import com.dbeagle.ddl.ViewDDLBuilder
 import com.dbeagle.driver.DataDrivers
+import com.dbeagle.driver.DatabaseDriver
 import com.dbeagle.model.SchemaMetadata
 import com.dbeagle.query.QueryExecutor
 import com.dbeagle.session.SessionViewModel
+import com.dbeagle.ui.dialogs.DDLPreviewDialog
+import com.dbeagle.ui.dialogs.IndexEditorDialog
+import com.dbeagle.ui.dialogs.SequenceEditorDialog
+import com.dbeagle.ui.dialogs.TableEditorDialog
+import com.dbeagle.ui.dialogs.ViewEditorDialog
 import com.dbeagle.viewmodel.ConnectionListViewModel
+import com.dbeagle.viewmodel.SchemaEditorViewModel
 import compose.icons.FontAwesomeIcons
 import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.solid.ChevronDown
@@ -62,6 +77,23 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.context.GlobalContext
 import org.koin.core.parameter.parametersOf
+
+// Dialog state management
+data class DialogState(
+    val profileId: String,
+    val showTableEditor: Boolean = false,
+    val editingTable: String? = null,
+    val showSequenceEditor: Boolean = false,
+    val editingSequence: String? = null,
+    val showViewEditor: Boolean = false,
+    val showIndexEditor: Boolean = false,
+    val showDDLPreview: Boolean = false,
+    val ddlSql: String = "",
+    val isDestructive: Boolean = false,
+    val pendingExecution: (suspend () -> Result<Unit>)? = null,
+    val showError: Boolean = false,
+    val errorMessage: String = "",
+)
 
 @Composable
 fun ConnectionPanel(
@@ -85,6 +117,22 @@ fun ConnectionPanel(
 
     val coroutineScope = rememberCoroutineScope()
     var expandedSchemas by remember { mutableStateOf(setOf<String>()) }
+    var dialogStates by remember { mutableStateOf<Map<String, DialogState>>(emptyMap()) }
+
+    fun getDialectForDriver(driver: DatabaseDriver): DDLDialect = when (driver.getName()) {
+        "PostgreSQL" -> PostgreSQLDDLDialect
+        "SQLite" -> SQLiteDDLDialect
+        else -> PostgreSQLDDLDialect
+    }
+
+    suspend fun executeDDL(driver: DatabaseDriver, ddl: String): Result<Unit> = try {
+        withContext(Dispatchers.IO) {
+            QueryExecutor(driver).execute(ddl)
+        }
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     fun buildTree(schema: SchemaMetadata): List<SchemaTreeNode> {
         val tables = schema.tables
@@ -322,9 +370,18 @@ fun ConnectionPanel(
                                             val isExpanded = expandedSchemas.contains(profile.id)
 
                                             InlineSchemaSection(
+                                                profileId = profile.id,
+                                                profileName = profile.name,
                                                 isExpanded = isExpanded,
                                                 isLoading = schemaState?.isLoading ?: false,
                                                 nodes = schemaState?.nodes ?: emptyList(),
+                                                schemaMetadata = schemaState?.schemaMetadata,
+                                                columnsCache = schemaState?.columnsCache ?: emptyMap(),
+                                                sessionViewModel = sessionViewModel,
+                                                dialogState = dialogStates[profile.id],
+                                                onDialogStateChanged = { newState ->
+                                                    dialogStates = dialogStates + (profile.id to newState)
+                                                },
                                                 onToggle = {
                                                     expandedSchemas = if (isExpanded) {
                                                         expandedSchemas - profile.id
@@ -338,6 +395,9 @@ fun ConnectionPanel(
                                                 onDoubleClickTable = { tableName ->
                                                     onOpenTableEditor(profile.id, tableName)
                                                 },
+                                                onStatusTextChanged = onStatusTextChanged,
+                                                getDialectForDriver = ::getDialectForDriver,
+                                                executeDDL = ::executeDDL,
                                             )
                                         }
                                     }
@@ -391,13 +451,31 @@ private fun ConnectionPanelRow(
 
 @Composable
 private fun InlineSchemaSection(
+    profileId: String,
+    profileName: String,
     isExpanded: Boolean,
     isLoading: Boolean,
     nodes: List<SchemaTreeNode>,
+    schemaMetadata: SchemaMetadata?,
+    columnsCache: Map<String, SessionViewModel.ColumnCacheEntry>,
+    sessionViewModel: SessionViewModel,
+    dialogState: DialogState?,
+    onDialogStateChanged: (DialogState) -> Unit,
     onToggle: () -> Unit,
     onRefresh: () -> Unit,
     onDoubleClickTable: (String) -> Unit,
+    onStatusTextChanged: (String) -> Unit,
+    getDialectForDriver: (DatabaseDriver) -> DDLDialect,
+    executeDDL: suspend (DatabaseDriver, String) -> Result<Unit>,
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    val driver = sessionViewModel.getDriver(profileId)
+    val currentDialogState = dialogState ?: DialogState(profileId)
+
+    fun updateDialogState(update: DialogState.() -> DialogState) {
+        onDialogStateChanged(currentDialogState.update())
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -490,10 +568,504 @@ private fun InlineSchemaSection(
                             onViewData = { tableName ->
                                 onDoubleClickTable(tableName)
                             },
+                            onNewTable = {
+                                updateDialogState {
+                                    copy(showTableEditor = true, editingTable = null)
+                                }
+                            },
+                            onEditTable = { tableName ->
+                                updateDialogState {
+                                    copy(showTableEditor = true, editingTable = tableName)
+                                }
+                            },
+                            onDropTable = { tableName ->
+                                if (driver == null) return@SchemaTree
+                                coroutineScope.launch {
+                                    val ddlResult = SchemaEditorViewModel.dropTableDDL(driver, tableName, cascade = true)
+                                    ddlResult.onSuccess { ddl ->
+                                        updateDialogState {
+                                            copy(
+                                                showDDLPreview = true,
+                                                ddlSql = ddl,
+                                                isDestructive = true,
+                                                pendingExecution = { SchemaEditorViewModel.executeTableDrop(driver, ddl) },
+                                            )
+                                        }
+                                    }.onFailure { error ->
+                                        updateDialogState {
+                                            copy(
+                                                showError = true,
+                                                errorMessage = error.message ?: "Failed to generate DROP DDL",
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            onNewSequence = {
+                                updateDialogState {
+                                    copy(showSequenceEditor = true, editingSequence = null)
+                                }
+                            },
+                            onEditSequence = { sequenceName ->
+                                updateDialogState {
+                                    copy(showSequenceEditor = true, editingSequence = sequenceName)
+                                }
+                            },
+                            onDropSequence = { sequenceName ->
+                                if (driver == null) return@SchemaTree
+                                coroutineScope.launch {
+                                    val ddlResult = SchemaEditorViewModel.dropSequenceDDL(driver, sequenceName, ifExists = true)
+                                    ddlResult.onSuccess { ddl ->
+                                        updateDialogState {
+                                            copy(
+                                                showDDLPreview = true,
+                                                ddlSql = ddl,
+                                                isDestructive = true,
+                                                pendingExecution = { SchemaEditorViewModel.executeSequenceDrop(driver, ddl) },
+                                            )
+                                        }
+                                    }.onFailure { error ->
+                                        updateDialogState {
+                                            copy(
+                                                showError = true,
+                                                errorMessage = error.message ?: "Failed to generate DROP DDL",
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            onNewView = {
+                                updateDialogState {
+                                    copy(showViewEditor = true)
+                                }
+                            },
+                            onDropView = { viewName ->
+                                if (driver == null) return@SchemaTree
+                                coroutineScope.launch {
+                                    val dialect = getDialectForDriver(driver)
+                                    val ddl = ViewDDLBuilder.buildDropView(dialect, viewName, ifExists = true)
+                                    updateDialogState {
+                                        copy(
+                                            showDDLPreview = true,
+                                            ddlSql = ddl,
+                                            isDestructive = true,
+                                            pendingExecution = { executeDDL(driver, ddl) },
+                                        )
+                                    }
+                                }
+                            },
+                            onNewIndex = {
+                                updateDialogState {
+                                    copy(showIndexEditor = true)
+                                }
+                            },
+                            onDropIndex = { indexName ->
+                                if (driver == null) return@SchemaTree
+                                coroutineScope.launch {
+                                    val dialect = getDialectForDriver(driver)
+                                    val ddl = IndexDDLBuilder.buildDropIndex(dialect, indexName, ifExists = true)
+                                    updateDialogState {
+                                        copy(
+                                            showDDLPreview = true,
+                                            ddlSql = ddl,
+                                            isDestructive = true,
+                                            pendingExecution = { executeDDL(driver, ddl) },
+                                        )
+                                    }
+                                }
+                            },
                         )
                     }
                 }
             }
         }
+    }
+
+    // Dialogs for this connection
+    if (currentDialogState.showTableEditor && driver != null) {
+        val allTables = schemaMetadata?.tables?.map { it.name } ?: emptyList()
+
+        val existingIndexes = currentDialogState.editingTable?.let { tableName ->
+            schemaMetadata?.indexDetails
+                ?.filter { it.tableName == tableName }
+                ?.map { idxMeta ->
+                    com.dbeagle.ddl.IndexDefinition(
+                        name = idxMeta.name,
+                        tableName = idxMeta.tableName,
+                        columns = idxMeta.columns,
+                        unique = idxMeta.unique,
+                    )
+                } ?: emptyList()
+        } ?: emptyList()
+
+        val existingTableDef = currentDialogState.editingTable?.let { tableName ->
+            schemaMetadata?.tables?.find { it.name == tableName }?.let { tableMetadata ->
+                val tableKey = "${tableMetadata.schema}.${tableMetadata.name}"
+                val cachedColumns = columnsCache[tableKey]?.columns ?: emptyList()
+
+                val columnDefs = cachedColumns.map { col ->
+                    val colType = try {
+                        com.dbeagle.ddl.ColumnType.valueOf(col.type.uppercase())
+                    } catch (_: IllegalArgumentException) {
+                        com.dbeagle.ddl.ColumnType.TEXT
+                    }
+                    com.dbeagle.ddl.ColumnDefinition(
+                        name = col.label,
+                        type = colType,
+                        nullable = true,
+                        defaultValue = null,
+                    )
+                }
+
+                val foreignKeyDefs = schemaMetadata.foreignKeys
+                    .filter { it.fromTable == tableName }
+                    .map { fk ->
+                        com.dbeagle.ddl.ForeignKeyDefinition(
+                            name = null,
+                            columns = listOf(fk.fromColumn),
+                            refTable = fk.toTable,
+                            refColumns = listOf(fk.toColumn),
+                            onDelete = null,
+                            onUpdate = null,
+                        )
+                    }
+
+                com.dbeagle.ddl.TableDefinition(
+                    name = tableMetadata.name,
+                    columns = columnDefs,
+                    primaryKey = tableMetadata.primaryKey.takeIf { it.isNotEmpty() },
+                    foreignKeys = foreignKeyDefs,
+                    uniqueConstraints = emptyList(),
+                )
+            }
+        }
+
+        TableEditorDialog(
+            existingTable = existingTableDef,
+            existingIndexes = existingIndexes,
+            allTables = allTables,
+            onDismiss = {
+                updateDialogState { copy(showTableEditor = false, editingTable = null) }
+            },
+            onSave = { tableDef, newIndexes ->
+                coroutineScope.launch {
+                    try {
+                        val isCreateMode = currentDialogState.editingTable == null
+                        val ddlResult = if (isCreateMode) {
+                            SchemaEditorViewModel.createTableDDL(driver, tableDef)
+                        } else {
+                            val oldTableDef = existingTableDef ?: return@launch
+
+                            val addedColumns = tableDef.columns.filter { newCol ->
+                                oldTableDef.columns.none { it.name == newCol.name }
+                            }
+                            val droppedColumns = oldTableDef.columns.filter { oldCol ->
+                                tableDef.columns.none { it.name == oldCol.name }
+                            }.map { it.name }
+
+                            val addedConstraints = buildList {
+                                if (tableDef.primaryKey != null && tableDef.primaryKey != oldTableDef.primaryKey) {
+                                    add(ConstraintDefinition.PrimaryKey(tableDef.primaryKey!!))
+                                }
+
+                                tableDef.foreignKeys.forEach { newFk ->
+                                    val exists = oldTableDef.foreignKeys.any { oldFk ->
+                                        oldFk.columns == newFk.columns &&
+                                            oldFk.refTable == newFk.refTable &&
+                                            oldFk.refColumns == newFk.refColumns
+                                    }
+                                    if (!exists) {
+                                        add(ConstraintDefinition.ForeignKey(newFk))
+                                    }
+                                }
+
+                                tableDef.uniqueConstraints.forEach { newUnique ->
+                                    val exists = oldTableDef.uniqueConstraints.any { it == newUnique }
+                                    if (!exists) {
+                                        add(ConstraintDefinition.Unique(null, newUnique))
+                                    }
+                                }
+                            }
+
+                            val droppedConstraints = buildList {
+                                if (oldTableDef.primaryKey != null &&
+                                    (tableDef.primaryKey == null || tableDef.primaryKey != oldTableDef.primaryKey)
+                                ) {
+                                    add("${currentDialogState.editingTable}_pkey")
+                                }
+
+                                oldTableDef.foreignKeys.forEach { oldFk ->
+                                    val stillExists = tableDef.foreignKeys.any { newFk ->
+                                        newFk.columns == oldFk.columns &&
+                                            newFk.refTable == oldFk.refTable &&
+                                            newFk.refColumns == oldFk.refColumns
+                                    }
+                                    if (!stillExists && oldFk.name != null) {
+                                        add(oldFk.name!!)
+                                    }
+                                }
+
+                                oldTableDef.uniqueConstraints.forEachIndexed { idx, oldUnique ->
+                                    val stillExists = tableDef.uniqueConstraints.any { it == oldUnique }
+                                    if (!stillExists) {
+                                        add("${currentDialogState.editingTable}_unique_$idx")
+                                    }
+                                }
+                            }
+
+                            val addedIndexes = newIndexes.filter { newIdx ->
+                                existingIndexes.none { it.name == newIdx.name }
+                            }
+                            val droppedIndexes = existingIndexes.filter { oldIdx ->
+                                newIndexes.none { it.name == oldIdx.name }
+                            }.map { it.name }
+
+                            val changes = com.dbeagle.viewmodel.TableChanges(
+                                addedColumns = addedColumns,
+                                droppedColumns = droppedColumns,
+                                addedConstraints = addedConstraints,
+                                droppedConstraints = droppedConstraints,
+                                addedIndexes = addedIndexes,
+                                droppedIndexes = droppedIndexes,
+                            )
+                            SchemaEditorViewModel.alterTableDDL(driver, currentDialogState.editingTable!!, changes)
+                        }
+
+                        ddlResult.onSuccess { ddl ->
+                            updateDialogState {
+                                copy(
+                                    showTableEditor = false,
+                                    editingTable = null,
+                                    showDDLPreview = true,
+                                    ddlSql = ddl,
+                                    isDestructive = false,
+                                    pendingExecution = if (isCreateMode) {
+                                        { SchemaEditorViewModel.executeTableCreate(driver, ddl) }
+                                    } else {
+                                        { SchemaEditorViewModel.executeTableAlter(driver, ddl) }
+                                    },
+                                )
+                            }
+                        }.onFailure { error ->
+                            updateDialogState {
+                                copy(
+                                    showError = true,
+                                    errorMessage = error.message ?: "Failed to generate DDL",
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        updateDialogState {
+                            copy(
+                                showError = true,
+                                errorMessage = e.message ?: "Unknown error",
+                            )
+                        }
+                    }
+                }
+            },
+        )
+    }
+
+    if (currentDialogState.showSequenceEditor && driver != null) {
+        val existingSeq = currentDialogState.editingSequence?.let { seqName ->
+            schemaMetadata?.sequences?.find { it.name == seqName }
+        }
+
+        SequenceEditorDialog(
+            existingSequence = existingSeq,
+            onDismiss = {
+                updateDialogState { copy(showSequenceEditor = false, editingSequence = null) }
+            },
+            onSave = { seqMetadata ->
+                coroutineScope.launch {
+                    try {
+                        val isCreateMode = currentDialogState.editingSequence == null
+                        val ddlResult = if (isCreateMode) {
+                            SchemaEditorViewModel.createSequenceDDL(driver, seqMetadata)
+                        } else {
+                            val oldSeq = existingSeq ?: return@launch
+                            val changes = com.dbeagle.ddl.SequenceChanges(
+                                increment = if (seqMetadata.increment != oldSeq.increment) seqMetadata.increment else null,
+                                minValue = if (seqMetadata.minValue != oldSeq.minValue) seqMetadata.minValue else null,
+                                maxValue = if (seqMetadata.maxValue != oldSeq.maxValue) seqMetadata.maxValue else null,
+                                restart = null,
+                            )
+                            SchemaEditorViewModel.alterSequenceDDL(driver, currentDialogState.editingSequence!!, changes)
+                        }
+
+                        ddlResult.onSuccess { ddl ->
+                            updateDialogState {
+                                copy(
+                                    showSequenceEditor = false,
+                                    editingSequence = null,
+                                    showDDLPreview = true,
+                                    ddlSql = ddl,
+                                    isDestructive = false,
+                                    pendingExecution = if (isCreateMode) {
+                                        { SchemaEditorViewModel.executeSequenceCreate(driver, ddl) }
+                                    } else {
+                                        { SchemaEditorViewModel.executeSequenceAlter(driver, ddl) }
+                                    },
+                                )
+                            }
+                        }.onFailure { error ->
+                            updateDialogState {
+                                copy(
+                                    showError = true,
+                                    errorMessage = error.message ?: "Failed to generate DDL",
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        updateDialogState {
+                            copy(
+                                showError = true,
+                                errorMessage = e.message ?: "Unknown error",
+                            )
+                        }
+                    }
+                }
+            },
+        )
+    }
+
+    if (currentDialogState.showViewEditor && driver != null) {
+        val dialect = getDialectForDriver(driver)
+        ViewEditorDialog(
+            dialect = dialect,
+            onDismiss = {
+                updateDialogState { copy(showViewEditor = false) }
+            },
+            onSave = { ddl ->
+                updateDialogState {
+                    copy(
+                        showViewEditor = false,
+                        showDDLPreview = true,
+                        ddlSql = ddl,
+                        isDestructive = false,
+                        pendingExecution = { executeDDL(driver, ddl) },
+                    )
+                }
+            },
+        )
+    }
+
+    if (currentDialogState.showIndexEditor && driver != null) {
+        val dialect = getDialectForDriver(driver)
+        val allTables = schemaMetadata?.tables?.map { it.name } ?: emptyList()
+
+        IndexEditorDialog(
+            dialect = dialect,
+            tables = allTables,
+            getColumnsForTable = { tableName ->
+                withContext(Dispatchers.IO) {
+                    val queryExecutor = QueryExecutor(driver)
+                    queryExecutor.getColumns(tableName).map { it.name }
+                }
+            },
+            onDismiss = {
+                updateDialogState { copy(showIndexEditor = false) }
+            },
+            onPreview = { ddl ->
+                updateDialogState {
+                    copy(
+                        showDDLPreview = true,
+                        ddlSql = ddl,
+                        isDestructive = false,
+                        pendingExecution = { Result.success(Unit) },
+                    )
+                }
+            },
+            onCreate = { ddl ->
+                executeDDL(driver, ddl).also {
+                    if (it.isSuccess) {
+                        updateDialogState { copy(showIndexEditor = false) }
+                        onRefresh()
+                    }
+                }
+            },
+        )
+    }
+
+    if (currentDialogState.showDDLPreview) {
+        DDLPreviewDialog(
+            ddlSql = currentDialogState.ddlSql,
+            isDestructive = currentDialogState.isDestructive,
+            onDismiss = {
+                updateDialogState {
+                    copy(
+                        showDDLPreview = false,
+                        ddlSql = "",
+                        isDestructive = false,
+                        pendingExecution = null,
+                    )
+                }
+            },
+            onExecute = {
+                coroutineScope.launch {
+                    val execution = currentDialogState.pendingExecution
+                    if (execution != null) {
+                        onStatusTextChanged("Status: Executing DDL ($profileName)")
+                        try {
+                            val result = execution()
+                            result.onSuccess {
+                                onStatusTextChanged("Status: DDL executed successfully ($profileName)")
+                                updateDialogState {
+                                    copy(
+                                        showDDLPreview = false,
+                                        ddlSql = "",
+                                        isDestructive = false,
+                                        pendingExecution = null,
+                                    )
+                                }
+                                onRefresh()
+                            }.onFailure { error ->
+                                onStatusTextChanged("Status: DDL execution failed ($profileName)")
+                                updateDialogState {
+                                    copy(
+                                        showDDLPreview = false,
+                                        ddlSql = "",
+                                        isDestructive = false,
+                                        pendingExecution = null,
+                                        showError = true,
+                                        errorMessage = error.message ?: "Failed to execute DDL",
+                                    )
+                                }
+                            }
+                        } catch (e: Exception) {
+                            onStatusTextChanged("Status: DDL execution failed ($profileName)")
+                            updateDialogState {
+                                copy(
+                                    showDDLPreview = false,
+                                    ddlSql = "",
+                                    isDestructive = false,
+                                    pendingExecution = null,
+                                    showError = true,
+                                    errorMessage = e.message ?: "Failed to execute DDL",
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+        )
+    }
+
+    if (currentDialogState.showError) {
+        AlertDialog(
+            onDismissRequest = {
+                updateDialogState { copy(showError = false, errorMessage = "") }
+            },
+            title = { Text("DDL Error") },
+            text = { Text(currentDialogState.errorMessage) },
+            confirmButton = {
+                TextButton(onClick = {
+                    updateDialogState { copy(showError = false, errorMessage = "") }
+                }) {
+                    Text("OK")
+                }
+            },
+        )
     }
 }
