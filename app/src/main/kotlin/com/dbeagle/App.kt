@@ -1,5 +1,8 @@
 package com.dbeagle
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -11,9 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,6 +25,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -35,12 +39,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -48,9 +54,12 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.dbeagle.crash.CrashReporter
 import com.dbeagle.di.appModule
-import com.dbeagle.navigation.NavigationTab
+import com.dbeagle.navigation.TabItem
+import com.dbeagle.navigation.TabManager
+import com.dbeagle.navigation.TabType
 import com.dbeagle.pool.DatabaseConnectionPool
 import com.dbeagle.session.SessionViewModel
+import com.dbeagle.settings.AppPreferencesRepository
 import com.dbeagle.theme.ThemeManager
 import com.dbeagle.ui.AppBottomBar
 import com.dbeagle.ui.ConnectionDialog
@@ -59,20 +68,28 @@ import com.dbeagle.ui.FavoritesScreen
 import com.dbeagle.ui.HistoryScreen
 import com.dbeagle.ui.LogViewerScreen
 import com.dbeagle.ui.QueryEditorScreen
-import com.dbeagle.ui.SchemaBrowserScreen
+import com.dbeagle.ui.WelcomeScreen
 import com.dbeagle.ui.dialogs.MasterPasswordDialog
 import com.dbeagle.ui.dialogs.SettingsDialog
 import com.dbeagle.ui.readMemoryStats
 import com.dbeagle.ui.theme.DBEagleTheme
 import com.dbeagle.viewmodel.ConnectionListViewModel
+import compose.icons.FontAwesomeIcons
+import compose.icons.fontawesomeicons.Solid
+import compose.icons.fontawesomeicons.solid.Cog
+import compose.icons.fontawesomeicons.solid.History
+import compose.icons.fontawesomeicons.solid.ListAlt
+import compose.icons.fontawesomeicons.solid.Star
+import compose.icons.fontawesomeicons.solid.Terminal
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 import org.koin.core.parameter.parametersOf
 import org.slf4j.LoggerFactory
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 fun main() {
     CrashReporter.install()
     val logger = LoggerFactory.getLogger("com.dbeagle.App")
@@ -83,11 +100,11 @@ fun main() {
     }
     application {
         val windowState = rememberWindowState(size = DpSize(1200.dp, 800.dp))
-        var selectedTab by remember { mutableStateOf(NavigationTab.QueryEditor) }
         var statusText by remember { mutableStateOf("Status: Disconnected") }
 
         val sessionViewModel: SessionViewModel = GlobalContext.get().get()
         val themeManager: ThemeManager = GlobalContext.get().get()
+        val tabManager = remember { TabManager() }
         val sessionOrder by sessionViewModel.sessionOrder.collectAsState()
         val sessionStates by sessionViewModel.sessionStates.collectAsState()
         val activeProfileId by sessionViewModel.activeProfileId.collectAsState()
@@ -107,6 +124,28 @@ fun main() {
                 memoryStats = readMemoryStats()
                 delay(1_000)
             }
+        }
+
+        // Load persisted tabs on startup
+        LaunchedEffect(Unit) {
+            val preferencesRepository: AppPreferencesRepository = GlobalContext.get().get()
+            val savedTabs = preferencesRepository.openedTabsFlow.first()
+            val savedSelectedId = preferencesRepository.selectedTabIdFlow.first()
+
+            if (savedTabs.isNotEmpty()) {
+                savedTabs.forEach { tabManager.addTab(it) }
+                savedSelectedId?.let { tabManager.selectTab(it) }
+            } else {
+                // Create default QueryEditor tab
+                tabManager.addTab(TabItem(type = TabType.QueryEditor, title = "Query Editor"))
+            }
+        }
+
+        // Save tabs on change (debounced)
+        LaunchedEffect(tabManager.tabs.toList(), tabManager.selectedTabId) {
+            delay(300) // debounce
+            val preferencesRepository: AppPreferencesRepository = GlobalContext.get().get()
+            preferencesRepository.saveOpenedTabs(tabManager.tabs.toList(), tabManager.selectedTabId)
         }
 
         var scratchSql by remember { mutableStateOf(SessionViewModel.DEFAULT_SQL) }
@@ -159,11 +198,188 @@ fun main() {
                                 titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             ),
                             actions = {
-                                IconButton(onClick = { showSettingsDialog = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Settings,
-                                        contentDescription = "Settings",
-                                    )
+                                TooltipArea(
+                                    tooltip = {
+                                        Surface(
+                                            modifier = Modifier.shadow(4.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(4.dp),
+                                        ) {
+                                            Box(modifier = Modifier.padding(8.dp)) {
+                                                Text("New Query Editor")
+                                            }
+                                        }
+                                    },
+                                    delayMillis = 600,
+                                    tooltipPlacement = TooltipPlacement.CursorPoint(
+                                        alignment = Alignment.BottomCenter,
+                                        offset = DpOffset(0.dp, 8.dp),
+                                    ),
+                                ) {
+                                    IconButton(onClick = {
+                                        val existingTab = tabManager.tabs.find { it.type == TabType.QueryEditor }
+                                        if (existingTab != null) {
+                                            tabManager.selectTab(existingTab.id)
+                                        } else {
+                                            tabManager.addTab(
+                                                TabItem(
+                                                    type = TabType.QueryEditor,
+                                                    title = "Query Editor${activeProfileName?.let { " - $it" } ?: ""}",
+                                                    connectionId = activeProfileId,
+                                                ),
+                                            )
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector = FontAwesomeIcons.Solid.Terminal,
+                                            contentDescription = "New Query Editor",
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                }
+
+                                TooltipArea(
+                                    tooltip = {
+                                        Surface(
+                                            modifier = Modifier.shadow(4.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(4.dp),
+                                        ) {
+                                            Box(modifier = Modifier.padding(8.dp)) {
+                                                Text("Favorites")
+                                            }
+                                        }
+                                    },
+                                    delayMillis = 600,
+                                    tooltipPlacement = TooltipPlacement.CursorPoint(
+                                        alignment = Alignment.BottomCenter,
+                                        offset = DpOffset(0.dp, 8.dp),
+                                    ),
+                                ) {
+                                    IconButton(onClick = {
+                                        val existingTab = tabManager.tabs.find { it.type == TabType.Favorites }
+                                        if (existingTab != null) {
+                                            tabManager.selectTab(existingTab.id)
+                                        } else {
+                                            tabManager.addTab(
+                                                TabItem(
+                                                    type = TabType.Favorites,
+                                                    title = "Favorites",
+                                                ),
+                                            )
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector = FontAwesomeIcons.Solid.Star,
+                                            contentDescription = "Favorites",
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                }
+
+                                TooltipArea(
+                                    tooltip = {
+                                        Surface(
+                                            modifier = Modifier.shadow(4.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(4.dp),
+                                        ) {
+                                            Box(modifier = Modifier.padding(8.dp)) {
+                                                Text("History")
+                                            }
+                                        }
+                                    },
+                                    delayMillis = 600,
+                                    tooltipPlacement = TooltipPlacement.CursorPoint(
+                                        alignment = Alignment.BottomCenter,
+                                        offset = DpOffset(0.dp, 8.dp),
+                                    ),
+                                ) {
+                                    IconButton(onClick = {
+                                        val existingTab = tabManager.tabs.find { it.type == TabType.History }
+                                        if (existingTab != null) {
+                                            tabManager.selectTab(existingTab.id)
+                                        } else {
+                                            tabManager.addTab(
+                                                TabItem(
+                                                    type = TabType.History,
+                                                    title = "History",
+                                                ),
+                                            )
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector = FontAwesomeIcons.Solid.History,
+                                            contentDescription = "History",
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                }
+
+                                TooltipArea(
+                                    tooltip = {
+                                        Surface(
+                                            modifier = Modifier.shadow(4.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(4.dp),
+                                        ) {
+                                            Box(modifier = Modifier.padding(8.dp)) {
+                                                Text("Query Log")
+                                            }
+                                        }
+                                    },
+                                    delayMillis = 600,
+                                    tooltipPlacement = TooltipPlacement.CursorPoint(
+                                        alignment = Alignment.BottomCenter,
+                                        offset = DpOffset(0.dp, 8.dp),
+                                    ),
+                                ) {
+                                    IconButton(onClick = {
+                                        val existingTab = tabManager.tabs.find { it.type == TabType.QueryLog }
+                                        if (existingTab != null) {
+                                            tabManager.selectTab(existingTab.id)
+                                        } else {
+                                            tabManager.addTab(
+                                                TabItem(
+                                                    type = TabType.QueryLog,
+                                                    title = "Query Log",
+                                                ),
+                                            )
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector = FontAwesomeIcons.Solid.ListAlt,
+                                            contentDescription = "Query Log",
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                }
+
+                                TooltipArea(
+                                    tooltip = {
+                                        Surface(
+                                            modifier = Modifier.shadow(4.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(4.dp),
+                                        ) {
+                                            Box(modifier = Modifier.padding(8.dp)) {
+                                                Text("Settings")
+                                            }
+                                        }
+                                    },
+                                    delayMillis = 600,
+                                    tooltipPlacement = TooltipPlacement.CursorPoint(
+                                        alignment = Alignment.BottomCenter,
+                                        offset = DpOffset(0.dp, 8.dp),
+                                    ),
+                                ) {
+                                    IconButton(onClick = { showSettingsDialog = true }) {
+                                        Icon(
+                                            imageVector = FontAwesomeIcons.Solid.Cog,
+                                            contentDescription = "Settings",
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
                                 }
                             },
                         )
@@ -249,36 +465,36 @@ fun main() {
                                         Tab(
                                             selected = activeProfileId == profileId,
                                             onClick = { sessionViewModel.setActiveProfile(profileId) },
-                                            text = {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Text(label)
-                                                    Spacer(Modifier.width(8.dp))
-                                                    IconButton(
-                                                        onClick = {
-                                                            appCoroutineScope.launch {
-                                                                sessionViewModel.closeSession(profileId)
-                                                            }
-                                                        },
-                                                        modifier = Modifier.size(28.dp),
-                                                    ) {
-                                                        Icon(Icons.Default.Close, contentDescription = "Close connection")
-                                                    }
-                                                }
-                                            },
+                                            text = { Text(label) },
                                         )
                                     }
                                 }
                             }
 
+                            val selectedNavTabIndex = tabManager.selectedTabId?.let { id ->
+                                tabManager.tabs.indexOfFirst { it.id == id }
+                            }?.let { if (it >= 0) it else 0 } ?: 0
+
                             ScrollableTabRow(
-                                selectedTabIndex = selectedTab.ordinal,
+                                selectedTabIndex = selectedNavTabIndex,
                                 edgePadding = 8.dp,
                             ) {
-                                NavigationTab.entries.forEach { tab ->
+                                tabManager.tabs.forEach { tab ->
                                     Tab(
-                                        selected = selectedTab == tab,
-                                        onClick = { selectedTab = tab },
-                                        text = { Text(tab.title) },
+                                        selected = tabManager.selectedTabId == tab.id,
+                                        onClick = { tabManager.selectTab(tab.id) },
+                                        text = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(tab.title)
+                                                Spacer(Modifier.width(8.dp))
+                                                IconButton(
+                                                    onClick = { tabManager.closeTab(tab.id) },
+                                                    modifier = Modifier.size(28.dp),
+                                                ) {
+                                                    Icon(Icons.Default.Close, contentDescription = "Close tab")
+                                                }
+                                            }
+                                        },
                                     )
                                 }
                             }
@@ -287,8 +503,8 @@ fun main() {
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                when (selectedTab) {
-                                    NavigationTab.QueryEditor -> {
+                                when (tabManager.selectedTab?.type) {
+                                    TabType.QueryEditor -> {
                                         QueryEditorScreen(
                                             sessionViewModel = sessionViewModel,
                                             activeProfileId = activeProfileId,
@@ -302,39 +518,69 @@ fun main() {
                                             sessionStates = sessionStates,
                                         )
                                     }
-                                    NavigationTab.SchemaBrowser -> {
-                                        SchemaBrowserScreen(
-                                            sessionViewModel = sessionViewModel,
-                                            activeProfileId = activeProfileId,
-                                            sessionStates = sessionStates,
-                                            activeDriver = activeDriver,
-                                            activeProfileName = activeProfileName,
-                                            onStatusTextChanged = { statusText = it },
-                                            selectedTab = selectedTab,
-                                        )
-                                    }
-                                    NavigationTab.Favorites -> {
+                                    TabType.Favorites -> {
                                         FavoritesScreen(
                                             onLoadQuery = { query ->
                                                 val pid = activeProfileId
                                                 if (pid == null) scratchSql = query else sessionViewModel.updateQueryEditorSql(pid, query)
-                                                selectedTab = NavigationTab.QueryEditor
+                                                // Switch to QueryEditor tab
+                                                val queryEditorTab = tabManager.tabs.find { it.type == TabType.QueryEditor }
+                                                if (queryEditorTab != null) {
+                                                    tabManager.selectTab(queryEditorTab.id)
+                                                } else {
+                                                    tabManager.addTab(
+                                                        TabItem(
+                                                            type = TabType.QueryEditor,
+                                                            title = "Query Editor${activeProfileName?.let { " - $it" } ?: ""}",
+                                                            connectionId = activeProfileId,
+                                                        ),
+                                                    )
+                                                }
                                             },
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     }
-                                    NavigationTab.History -> {
+                                    TabType.History -> {
                                         HistoryScreen(
                                             onLoadQuery = { query ->
                                                 val pid = activeProfileId
                                                 if (pid == null) scratchSql = query else sessionViewModel.updateQueryEditorSql(pid, query)
-                                                selectedTab = NavigationTab.QueryEditor
+                                                // Switch to QueryEditor tab
+                                                val queryEditorTab = tabManager.tabs.find { it.type == TabType.QueryEditor }
+                                                if (queryEditorTab != null) {
+                                                    tabManager.selectTab(queryEditorTab.id)
+                                                } else {
+                                                    tabManager.addTab(
+                                                        TabItem(
+                                                            type = TabType.QueryEditor,
+                                                            title = "Query Editor${activeProfileName?.let { " - $it" } ?: ""}",
+                                                            connectionId = activeProfileId,
+                                                        ),
+                                                    )
+                                                }
                                             },
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     }
-                                    NavigationTab.QueryLog -> {
+                                    TabType.QueryLog -> {
                                         LogViewerScreen(modifier = Modifier.fillMaxSize())
+                                    }
+                                    TabType.TableEditor -> {
+                                        // Will be implemented in Task 9
+                                        Text("Table Editor - Coming Soon", style = MaterialTheme.typography.headlineMedium)
+                                    }
+                                    null -> {
+                                        WelcomeScreen(
+                                            onNewQueryEditor = {
+                                                tabManager.addTab(
+                                                    TabItem(
+                                                        type = TabType.QueryEditor,
+                                                        title = "Query Editor",
+                                                    ),
+                                                )
+                                            },
+                                            onOpenConnection = { triggerNewConnection = true },
+                                        )
                                     }
                                 }
                             }
