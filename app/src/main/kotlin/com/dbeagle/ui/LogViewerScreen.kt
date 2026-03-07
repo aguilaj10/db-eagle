@@ -1,5 +1,6 @@
 package com.dbeagle.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,12 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -24,12 +24,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.dbeagle.logging.QueryLogEntry
 import com.dbeagle.logging.QueryStatus
 import com.dbeagle.viewmodel.LogFilter
@@ -146,104 +150,79 @@ fun LogViewerScreen(modifier: Modifier = Modifier) {
                 )
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(8.dp),
+            val colorScheme = MaterialTheme.colorScheme
+            val logText = formatLogsAsText(filteredLogs, colorScheme)
+
+            SelectionContainer(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(colorScheme.surfaceContainer)
             ) {
-                items(filteredLogs) { entry ->
-                    LogEntryCard(entry = entry)
-                    Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = logText,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        ),
+                        color = colorScheme.onSurface
+                    )
                 }
             }
         }
     }
 }
 
-@Composable
-private fun LogEntryCard(entry: QueryLogEntry) {
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
-    val timestampText = dateFormat.format(Date(entry.timestamp))
+private fun formatLogsAsText(logs: List<QueryLogEntry>, colorScheme: androidx.compose.material3.ColorScheme): AnnotatedString {
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+    val separator = "-".repeat(80)
 
-    val statusColor = when (entry.status) {
-        QueryStatus.SUCCESS -> MaterialTheme.colorScheme.primary
-        QueryStatus.ERROR -> MaterialTheme.colorScheme.error
-    }
+    return buildAnnotatedString {
+        logs.forEachIndexed { index, entry ->
+            val timestampText = dateFormat.format(Date(entry.timestamp))
+            pushStyle(SpanStyle(color = colorScheme.onSurfaceVariant))
+            append("[$timestampText] ")
 
-    val statusText = when (entry.status) {
-        QueryStatus.SUCCESS -> "SUCCESS"
-        QueryStatus.ERROR -> "ERROR"
-    }
+            append("(${entry.durationMs}ms) ")
 
-    val truncatedSql = if (entry.sql.length > 100) {
-        entry.sql.take(100) + "..."
-    } else {
-        entry.sql
-    }
+            when (entry.status) {
+                QueryStatus.SUCCESS -> {
+                    pushStyle(SpanStyle(color = colorScheme.primary))
+                    append("[SUCCESS]")
+                    pop()
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = timestampText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "${entry.durationMs}ms",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = statusText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = statusColor,
-                    )
+                    if (entry.rowCount != null) {
+                        pushStyle(SpanStyle(color = colorScheme.secondary))
+                        append(" [${entry.rowCount} rows]")
+                        pop()
+                    }
+                }
+                QueryStatus.ERROR -> {
+                    pushStyle(SpanStyle(color = colorScheme.error))
+                    append("[ERROR]")
+                    pop()
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            appendLine()
 
-            Text(
-                text = truncatedSql,
-                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            appendLine(entry.sql)
 
             if (entry.status == QueryStatus.ERROR && entry.errorMessage != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Error: ${entry.errorMessage}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                pushStyle(SpanStyle(color = colorScheme.error))
+                appendLine("Error: ${entry.errorMessage}")
+                pop()
             }
 
-            if (entry.status == QueryStatus.SUCCESS && entry.rowCount != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${entry.rowCount} ${if (entry.rowCount == 1) "row" else "rows"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (index < logs.size - 1) {
+                appendLine(separator)
+                appendLine()
             }
         }
     }

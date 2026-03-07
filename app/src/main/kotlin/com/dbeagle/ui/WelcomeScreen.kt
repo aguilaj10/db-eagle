@@ -14,13 +14,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import db_eagle.app.generated.resources.Res
+import db_eagle.app.generated.resources.*
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.painterResource
 import compose.icons.FontAwesomeIcons
 import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.solid.Database
 import compose.icons.fontawesomeicons.solid.Terminal
 
+@OptIn(ExperimentalResourceApi::class)
 @Composable
 fun WelcomeScreen(
     onNewQueryEditor: () -> Unit,
@@ -36,7 +40,7 @@ fun WelcomeScreen(
             verticalArrangement = Arrangement.Center,
         ) {
             Image(
-                painter = painterResource("icons/icon_128x128.png"),
+                painter = painterResource(Res.drawable.icon_128x128),
                 contentDescription = "DB Eagle Logo",
                 modifier = Modifier.size(128.dp),
             )

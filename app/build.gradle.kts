@@ -5,6 +5,10 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+compose.resources {
+    publicResClass = true
+}
+
 dependencies {
     implementation(project(":core"))
     implementation(project(":data"))
@@ -14,6 +18,7 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.foundation)
     implementation(libs.compose.runtime)
+    implementation(libs.compose.resources)
     implementation(libs.compose.material.icons.extended)
     implementation(libs.composeIcons.fontAwesome)
     implementation(compose.desktop.currentOs)
