@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.PointerMatcher
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.TooltipPlacement
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.onClick
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -41,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 
@@ -169,6 +172,7 @@ private fun SchemaTreeNodeItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .onClick {
                     if (node is SchemaTreeNode.Table || node.children.isNotEmpty()) {
                         val willExpand = !isExpanded
@@ -221,6 +225,9 @@ private fun SchemaTreeNodeItem(
                 text = node.label,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
             )
 
             if (node is SchemaTreeNode.Column) {
@@ -229,6 +236,9 @@ private fun SchemaTreeNodeItem(
                     text = node.type,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
                 )
 
                 // Display FK indicator if this column is a foreign key
@@ -265,6 +275,9 @@ private fun SchemaTreeNodeItem(
                                 text = "→ $target",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.secondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                softWrap = false,
                             )
                         }
                     }
@@ -277,6 +290,9 @@ private fun SchemaTreeNodeItem(
                     text = "(increment: ${node.increment})",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
                 )
             }
         }
