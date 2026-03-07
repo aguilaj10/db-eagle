@@ -1,8 +1,6 @@
 package com.dbeagle.ui.dialogs
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,8 +9,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,6 +34,7 @@ import com.dbeagle.ddl.DDLValidator
 import com.dbeagle.ddl.IndexDDLBuilder
 import com.dbeagle.ddl.IndexDefinition
 import com.dbeagle.ddl.ValidationResult
+import com.dbeagle.ui.components.ReadonlyDropdownField
 import com.dbeagle.viewmodel.IndexEditorViewModel
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -44,6 +46,7 @@ enum class IndexType(val displayName: String) {
     FOREIGN_KEY("Foreign Key"),
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IndexEditorDialog(
     dialect: DDLDialect,
@@ -62,9 +65,7 @@ fun IndexEditorDialog(
     var indexType by remember { mutableStateOf(IndexType.REGULAR) }
     var unique by remember { mutableStateOf(false) }
     var showPreview by remember { mutableStateOf(false) }
-    var isTableDropdownExpanded by remember { mutableStateOf(false) }
     var isColumnsDropdownExpanded by remember { mutableStateOf(false) }
-    var isIndexTypeDropdownExpanded by remember { mutableStateOf(false) }
 
     // Sync indexType changes with unique flag for backward compatibility
     LaunchedEffect(indexType) {
@@ -132,71 +133,33 @@ fun IndexEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = indexType.displayName,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Index Type") },
-                        supportingText = {
-                            when (indexType) {
-                                IndexType.PRIMARY_KEY -> Text("Uniquely identifies each row. Typically one column.")
-                                IndexType.UNIQUE -> Text("Ensures column values are unique across rows.")
-                                IndexType.FOREIGN_KEY -> Text("References another table's primary key.")
-                                IndexType.REGULAR -> Text("Improves query performance for selected columns.")
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isIndexTypeDropdownExpanded = true },
-                        enabled = false,
-                    )
-                    DropdownMenu(
-                        expanded = isIndexTypeDropdownExpanded,
-                        onDismissRequest = { isIndexTypeDropdownExpanded = false },
-                    ) {
-                        IndexType.entries.forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type.displayName) },
-                                onClick = {
-                                    indexType = type
-                                    isIndexTypeDropdownExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
+                ReadonlyDropdownField(
+                    label = "Index Type",
+                    value = indexType,
+                    options = IndexType.entries,
+                    onSelect = { indexType = it },
+                    valueText = { it.displayName },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                // Table dropdown
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = selectedTable ?: "",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Table") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isTableDropdownExpanded = true },
-                        enabled = false,
-                    )
-                    DropdownMenu(
-                        expanded = isTableDropdownExpanded,
-                        onDismissRequest = { isTableDropdownExpanded = false },
-                    ) {
-                        tables.forEach { table ->
-                            DropdownMenuItem(
-                                text = { Text(table) },
-                                onClick = {
-                                    selectedTable = table
-                                    isTableDropdownExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
+                ReadonlyDropdownField(
+                    label = "Table",
+                    value = selectedTable ?: "",
+                    options = tables,
+                    onSelect = { selectedTable = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                // Columns multi-select dropdown
-                Box(modifier = Modifier.fillMaxWidth()) {
+                // Columns multi-select dropdown (custom due to multi-select + checkboxes)
+                ExposedDropdownMenuBox(
+                    expanded = isColumnsDropdownExpanded,
+                    onExpandedChange = { 
+                        if (selectedTable != null && !uiState.isLoadingColumns) {
+                            isColumnsDropdownExpanded = it
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     OutlinedTextField(
                         value = selectedColumns.joinToString(", "),
                         onValueChange = {},
@@ -215,22 +178,16 @@ fun IndexEditorDialog(
                                 CircularProgressIndicator(
                                     modifier = Modifier.padding(8.dp),
                                 )
+                            } else {
+                                ExposedDropdownMenuDefaults.TrailingIcon(isColumnsDropdownExpanded)
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                            .fillMaxWidth(),
                         enabled = selectedTable != null && !uiState.isLoadingColumns,
                     )
-                    // Transparent overlay to intercept clicks
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable(
-                                enabled = selectedTable != null && !uiState.isLoadingColumns
-                            ) {
-                                isColumnsDropdownExpanded = true
-                            }
-                    )
-                    DropdownMenu(
+                    ExposedDropdownMenu(
                         expanded = isColumnsDropdownExpanded,
                         onDismissRequest = { isColumnsDropdownExpanded = false },
                     ) {

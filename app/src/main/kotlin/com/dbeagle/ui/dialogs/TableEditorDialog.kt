@@ -17,11 +17,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +43,7 @@ import com.dbeagle.ddl.ColumnType
 import com.dbeagle.ddl.ForeignKeyDefinition
 import com.dbeagle.ddl.IndexDefinition
 import com.dbeagle.ddl.TableDefinition
+import com.dbeagle.ui.components.ReadonlyDropdownField
 import com.dbeagle.viewmodel.TableEditorViewModel
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
@@ -241,7 +238,6 @@ private fun ColumnRow(
     var nullable by remember { mutableStateOf(column.nullable) }
     var defaultValue by remember { mutableStateOf(column.defaultValue ?: "") }
     var autoIncrement by remember { mutableStateOf(column.autoIncrement) }
-    var typeExpanded by remember { mutableStateOf(false) }
 
     // Show autoIncrement only for integer types
     val showAutoIncrement = columnType in listOf(
@@ -278,35 +274,17 @@ private fun ColumnRow(
             modifier = Modifier.weight(2f).fillMaxWidth(),
         )
 
-        ExposedDropdownMenuBox(
-            expanded = typeExpanded,
-            onExpandedChange = { typeExpanded = it },
-            modifier = Modifier.weight(1.5f),
-        ) {
-            OutlinedTextField(
-                value = columnType.name,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Type") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded) },
-                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-            )
-            ExposedDropdownMenu(
-                expanded = typeExpanded,
-                onDismissRequest = { typeExpanded = false },
-            ) {
-                availableTypes.forEach { type ->
-                    DropdownMenuItem(
-                        text = { Text(type.name) },
-                        onClick = {
-                            columnType = type
-                            typeExpanded = false
-                            notifyUpdate()
-                        },
-                    )
-                }
-            }
-        }
+        ReadonlyDropdownField(
+            label = "Type",
+            value = columnType,
+            options = availableTypes,
+            onSelect = {
+                columnType = it
+                notifyUpdate()
+            },
+            valueText = { it.name },
+            modifier = Modifier.weight(1.5f)
+        )
 
         Row(
             modifier = Modifier.weight(1f),
@@ -507,10 +485,6 @@ private fun ForeignKeyRow(
     var onDeleteAction by remember { mutableStateOf(fk.onDelete ?: "") }
     var onUpdateAction by remember { mutableStateOf(fk.onUpdate ?: "") }
 
-    var refTableExpanded by remember { mutableStateOf(false) }
-    var onDeleteExpanded by remember { mutableStateOf(false) }
-    var onUpdateExpanded by remember { mutableStateOf(false) }
-
     val referentialActions = listOf("", "CASCADE", "SET NULL", "RESTRICT", "NO ACTION")
 
     fun notifyUpdate() {
@@ -555,35 +529,16 @@ private fun ForeignKeyRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ExposedDropdownMenuBox(
-                expanded = refTableExpanded,
-                onExpandedChange = { refTableExpanded = it },
-                modifier = Modifier.weight(1f),
-            ) {
-                OutlinedTextField(
-                    value = refTable,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Target Table") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(refTableExpanded) },
-                    modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                )
-                ExposedDropdownMenu(
-                    expanded = refTableExpanded,
-                    onDismissRequest = { refTableExpanded = false },
-                ) {
-                    allTables.forEach { table ->
-                        DropdownMenuItem(
-                            text = { Text(table) },
-                            onClick = {
-                                refTable = table
-                                refTableExpanded = false
-                                notifyUpdate()
-                            },
-                        )
-                    }
-                }
-            }
+            ReadonlyDropdownField(
+                label = "Target Table",
+                value = refTable,
+                options = allTables,
+                onSelect = {
+                    refTable = it
+                    notifyUpdate()
+                },
+                modifier = Modifier.weight(1f)
+            )
 
             OutlinedTextField(
                 value = refColumns,
@@ -635,65 +590,29 @@ private fun ForeignKeyRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ExposedDropdownMenuBox(
-                expanded = onDeleteExpanded,
-                onExpandedChange = { onDeleteExpanded = it },
-                modifier = Modifier.weight(1f),
-            ) {
-                OutlinedTextField(
-                    value = onDeleteAction.ifEmpty { "None" },
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("ON DELETE") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(onDeleteExpanded) },
-                    modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                )
-                ExposedDropdownMenu(
-                    expanded = onDeleteExpanded,
-                    onDismissRequest = { onDeleteExpanded = false },
-                ) {
-                    referentialActions.forEach { action ->
-                        DropdownMenuItem(
-                            text = { Text(action.ifEmpty { "None" }) },
-                            onClick = {
-                                onDeleteAction = action
-                                onDeleteExpanded = false
-                                notifyUpdate()
-                            },
-                        )
-                    }
-                }
-            }
+            ReadonlyDropdownField(
+                label = "ON DELETE",
+                value = onDeleteAction,
+                options = referentialActions,
+                onSelect = {
+                    onDeleteAction = it
+                    notifyUpdate()
+                },
+                valueText = { it.ifEmpty { "None" } },
+                modifier = Modifier.weight(1f)
+            )
 
-            ExposedDropdownMenuBox(
-                expanded = onUpdateExpanded,
-                onExpandedChange = { onUpdateExpanded = it },
-                modifier = Modifier.weight(1f),
-            ) {
-                OutlinedTextField(
-                    value = onUpdateAction.ifEmpty { "None" },
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("ON UPDATE") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(onUpdateExpanded) },
-                    modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                )
-                ExposedDropdownMenu(
-                    expanded = onUpdateExpanded,
-                    onDismissRequest = { onUpdateExpanded = false },
-                ) {
-                    referentialActions.forEach { action ->
-                        DropdownMenuItem(
-                            text = { Text(action.ifEmpty { "None" }) },
-                            onClick = {
-                                onUpdateAction = action
-                                onUpdateExpanded = false
-                                notifyUpdate()
-                            },
-                        )
-                    }
-                }
-            }
+            ReadonlyDropdownField(
+                label = "ON UPDATE",
+                value = onUpdateAction,
+                options = referentialActions,
+                onSelect = {
+                    onUpdateAction = it
+                    notifyUpdate()
+                },
+                valueText = { it.ifEmpty { "None" } },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }

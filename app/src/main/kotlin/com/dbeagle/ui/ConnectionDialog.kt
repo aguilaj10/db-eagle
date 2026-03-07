@@ -7,11 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,9 +20,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.dbeagle.model.ConnectionProfile
 import com.dbeagle.model.DatabaseType
+import com.dbeagle.ui.components.ReadonlyDropdownField
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectionDialog(
     initialProfile: ConnectionProfile?,
@@ -41,9 +36,9 @@ fun ConnectionDialog(
     var database by remember { mutableStateOf(initialProfile?.database ?: "") }
     var username by remember { mutableStateOf(initialProfile?.username ?: "") }
     var password by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
 
     val isPostgresSQL = type is DatabaseType.PostgreSQL
+    val databaseTypes = listOf(DatabaseType.PostgreSQL, DatabaseType.SQLite)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -61,36 +56,18 @@ fun ConnectionDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it },
-                ) {
-                    OutlinedTextField(
-                        value = if (isPostgresSQL) "PostgresSQL" else "SQLite",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Type") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("PostgresSQL") },
-                            onClick = {
-                                expanded = false
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("SQLite") },
-                            onClick = {
-                                expanded = false
-                            },
-                        )
-                    }
-                }
+                ReadonlyDropdownField(
+                    label = "Type",
+                    value = type,
+                    options = databaseTypes,
+                    onSelect = { type = it },
+                    valueText = { when(it) {
+                        is DatabaseType.PostgreSQL -> "PostgresSQL"
+                        is DatabaseType.SQLite -> "SQLite"
+                        is DatabaseType.Oracle -> "Oracle"
+                    }},
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 if (isPostgresSQL) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
