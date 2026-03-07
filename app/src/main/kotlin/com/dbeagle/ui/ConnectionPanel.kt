@@ -79,6 +79,27 @@ import kotlinx.coroutines.withContext
 import org.koin.core.context.GlobalContext
 import org.koin.core.parameter.parametersOf
 
+private fun inferColumnType(typeString: String): com.dbeagle.ddl.ColumnType {
+    val normalized = typeString.uppercase()
+    return when {
+        normalized.contains("INT") && normalized.contains("BIG") -> com.dbeagle.ddl.ColumnType.BIGINT
+        normalized.contains("SMALL") && normalized.contains("INT") -> com.dbeagle.ddl.ColumnType.SMALLINT
+        normalized.contains("INT") -> com.dbeagle.ddl.ColumnType.INTEGER
+        normalized.contains("DECIMAL") || normalized.contains("NUMERIC") -> com.dbeagle.ddl.ColumnType.DECIMAL
+        normalized.contains("REAL") -> com.dbeagle.ddl.ColumnType.REAL
+        normalized.contains("DOUBLE") -> com.dbeagle.ddl.ColumnType.DOUBLE_PRECISION
+        normalized.contains("BOOL") -> com.dbeagle.ddl.ColumnType.BOOLEAN
+        normalized.contains("UUID") -> com.dbeagle.ddl.ColumnType.UUID
+        normalized.contains("JSON") && normalized.contains("B") -> com.dbeagle.ddl.ColumnType.JSONB
+        normalized.contains("JSON") -> com.dbeagle.ddl.ColumnType.JSON
+        normalized.contains("DATE") && !normalized.contains("TIME") -> com.dbeagle.ddl.ColumnType.DATE
+        normalized.contains("TIMESTAMP") || normalized.contains("DATETIME") -> com.dbeagle.ddl.ColumnType.TIMESTAMP
+        normalized.contains("BLOB") || normalized.contains("BYTEA") || normalized.contains("BINARY") -> com.dbeagle.ddl.ColumnType.BLOB
+        normalized.contains("CHAR") || normalized.contains("TEXT") || normalized.contains("STRING") -> com.dbeagle.ddl.ColumnType.TEXT
+        else -> com.dbeagle.ddl.ColumnType.TEXT
+    }
+}
+
 // Dialog state management
 data class DialogState(
     val profileId: String,
@@ -566,6 +587,66 @@ private fun InlineSchemaSection(
                         SchemaTree(
                             nodes = nodes,
                             modifier = Modifier.fillMaxSize(),
+                            onNodeExpansionChanged = { node, isExpanding ->
+                                if (isExpanding && node is SchemaTreeNode.Table && node.children.isEmpty() && driver != null) {
+                                    coroutineScope.launch {
+                                        val queryExecutor = QueryExecutor(driver)
+                                        val columns = withContext(Dispatchers.IO) {
+                                            queryExecutor.getColumns(node.label)
+                                        }
+                                        
+                                        val columnNodes = columns.map { col ->
+                                            val fkTarget = schemaMetadata?.foreignKeys
+                                                ?.find { it.fromTable == node.label && it.fromColumn == col.name }
+                                                ?.let { "${it.toTable}.${it.toColumn}" }
+                                            
+                                            SchemaTreeNode.Column(
+                                                id = "column:${node.label}.${col.name}",
+                                                label = col.name,
+                                                type = col.type,
+                                                foreignKeyTarget = fkTarget,
+                                            )
+                                        }
+                                        
+                                        val tableKey = schemaMetadata?.tables
+                                            ?.find { it.name == node.label }
+                                            ?.let { "${it.schema}.${it.name}" }
+                                            ?: node.label
+                                        
+                                        sessionViewModel.updateSchemaState(profileId) { state ->
+                                            val updatedCache = state.columnsCache + (tableKey to SessionViewModel.ColumnCacheEntry(
+                                                loadedAtMs = System.currentTimeMillis(),
+                                                columns = columnNodes,
+                                            ))
+                                            
+                                            val updatedNodes = state.nodes.map { sectionNode ->
+                                                if (sectionNode is SchemaTreeNode.Section && sectionNode.id == "section:tables") {
+                                                    sectionNode.copy(
+                                                        children = sectionNode.children.map { tableNode ->
+                                                            if (tableNode.id == node.id) {
+                                                                SchemaTreeNode.Table(
+                                                                    id = tableNode.id,
+                                                                    label = tableNode.label,
+                                                                    children = columnNodes,
+                                                                )
+                                                            } else {
+                                                                tableNode
+                                                            }
+                                                        }
+                                                    )
+                                                } else {
+                                                    sectionNode
+                                                }
+                                            }
+                                            
+                                            state.copy(
+                                                nodes = updatedNodes,
+                                                columnsCache = updatedCache,
+                                            )
+                                        }
+                                    }
+                                }
+                            },
                             onViewData = { tableName ->
                                 onDoubleClickTable(tableName)
                             },
@@ -701,20 +782,13 @@ private fun InlineSchemaSection(
 
         val existingTableDef = currentDialogState.editingTable?.let { tableName ->
             schemaMetadata?.tables?.find { it.name == tableName }?.let { tableMetadata ->
-                val tableKey = "${tableMetadata.schema}.${tableMetadata.name}"
-                val cachedColumns = columnsCache[tableKey]?.columns ?: emptyList()
-
-                val columnDefs = cachedColumns.map { col ->
-                    val colType = try {
-                        com.dbeagle.ddl.ColumnType.valueOf(col.type.uppercase())
-                    } catch (_: IllegalArgumentException) {
-                        com.dbeagle.ddl.ColumnType.TEXT
-                    }
+                val columnDefs = tableMetadata.columns.map { col ->
+                    val colType = inferColumnType(col.type)
                     com.dbeagle.ddl.ColumnDefinition(
-                        name = col.label,
+                        name = col.name,
                         type = colType,
-                        nullable = true,
-                        defaultValue = null,
+                        nullable = col.nullable,
+                        defaultValue = col.defaultValue,
                     )
                 }
 

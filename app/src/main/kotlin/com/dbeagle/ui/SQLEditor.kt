@@ -54,12 +54,22 @@ fun SQLEditor(
         code = code,
     )
 
-    var textFieldValue by remember(sql) {
+    var textFieldValue by remember {
         mutableStateOf(
             TextFieldValue(
                 annotatedString = parseSQL(sql),
             ),
         )
+    }
+    
+    // Sync external changes without losing cursor position
+    var lastExternalSql by remember { mutableStateOf(sql) }
+    if (sql != lastExternalSql && sql != textFieldValue.text) {
+        textFieldValue = TextFieldValue(
+            annotatedString = parseSQL(sql),
+            selection = textFieldValue.selection,
+        )
+        lastExternalSql = sql
     }
 
     Column(

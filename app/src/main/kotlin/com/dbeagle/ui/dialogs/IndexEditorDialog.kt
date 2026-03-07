@@ -98,11 +98,21 @@ fun IndexEditorDialog(
     val isFormValid = isNameValid && selectedTable != null && selectedColumns.isNotEmpty()
 
     val generatedDdl = if (isFormValid) {
+        val (schema, table) = selectedTable!!.let {
+            if (it.contains(".")) {
+                val parts = it.split(".", limit = 2)
+                parts[0] to parts[1]
+            } else {
+                null to it
+            }
+        }
+        
         IndexDDLBuilder.buildCreateIndex(
             dialect = dialect,
             index = IndexDefinition(
                 name = indexName,
-                tableName = selectedTable!!,
+                tableName = table,
+                schema = schema,
                 columns = selectedColumns.toList(),
                 unique = unique,
             ),

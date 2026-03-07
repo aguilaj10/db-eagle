@@ -51,7 +51,11 @@ sealed class SchemaTreeNode(
 ) {
     open val children: List<SchemaTreeNode> = emptyList()
 
-    class Section(id: String, label: String, override val children: List<SchemaTreeNode>) : SchemaTreeNode(id, label, Icons.AutoMirrored.Filled.List)
+    class Section(id: String, label: String, override val children: List<SchemaTreeNode>) : SchemaTreeNode(id, label, Icons.AutoMirrored.Filled.List) {
+        fun copy(id: String = this.id, label: String = this.label, children: List<SchemaTreeNode> = this.children): Section {
+            return Section(id, label, children)
+        }
+    }
 
     class Table(id: String, label: String, override val children: List<SchemaTreeNode>) : SchemaTreeNode(id, label, Icons.Default.Menu)
 

@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 data class IndexDefinition(
     val name: String,
     val tableName: String,
+    val schema: String? = null,
     val columns: List<String>,
     val unique: Boolean = false,
 )
@@ -20,7 +21,14 @@ object IndexDDLBuilder {
         append("INDEX ")
         append(dialect.quoteIdentifier(index.name))
         append(" ON ")
-        append(dialect.quoteIdentifier(index.tableName))
+        
+        val qualifiedTableName = if (index.schema != null) {
+            "${dialect.quoteIdentifier(index.schema)}.${dialect.quoteIdentifier(index.tableName)}"
+        } else {
+            dialect.quoteIdentifier(index.tableName)
+        }
+        append(qualifiedTableName)
+        
         append(" (")
         append(index.columns.joinToString(", ") { dialect.quoteIdentifier(it) })
         append(")")

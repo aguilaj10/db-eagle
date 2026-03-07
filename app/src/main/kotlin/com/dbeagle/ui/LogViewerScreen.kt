@@ -24,6 +24,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,7 +47,7 @@ import java.util.Locale
 
 @Composable
 fun LogViewerScreen(modifier: Modifier = Modifier) {
-    val viewModel = GlobalContext.get().get<LogViewerViewModel>()
+    val viewModel = remember { GlobalContext.get().get<LogViewerViewModel>() }
     val uiState by viewModel.uiState.collectAsState()
     val filteredLogs = viewModel.filteredLogs
 
